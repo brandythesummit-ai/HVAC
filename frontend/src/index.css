@@ -1,112 +1,200 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --color-bg-primary: 255 255 255;
-    --color-bg-secondary: 249 250 251;
-    --color-bg-tertiary: 243 244 246;
-    --color-sidebar: 17 24 39;
-    --color-sidebar-hover: 31 41 55;
-    --color-text-primary: 17 24 39;
-    --color-text-secondary: 107 114 128;
-    --color-accent: 59 130 246;
-    --color-accent-hover: 37 99 235;
-    --color-success: 16 185 129;
-    --color-warning: 245 158 11;
-    --color-error: 239 68 68;
-  }
-
-  body {
-    margin: 0;
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    @apply text-gray-900 bg-gray-50;
-  }
-
-  code {
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
-  }
-
-  * {
-    @apply border-gray-200;
-  }
+:root {
+  --color-bg-primary: 255 255 255;
+  --color-bg-secondary: 249 250 251;
+  --color-bg-tertiary: 243 244 246;
+  --color-sidebar: 17 24 39;
+  --color-sidebar-hover: 31 41 55;
+  --color-text-primary: 17 24 39;
+  --color-text-secondary: 107 114 128;
+  --color-accent: 59 130 246;
+  --color-accent-hover: 37 99 235;
+  --color-success: 16 185 129;
+  --color-warning: 245 158 11;
+  --color-error: 239 68 68;
 }
 
-@layer components {
-  /* Scrollbar Styling */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
+body {
+  margin: 0;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: rgb(17 24 39);
+  background-color: rgb(249 250 251);
+}
 
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-gray-100;
-  }
+code {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
 
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full;
-  }
+* {
+  border-color: rgb(229 231 235);
+}
 
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400;
-  }
+/* Scrollbar Styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-  /* Button Styles */
-  .btn-primary {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150;
-  }
+.custom-scrollbar::-webkit-scrollbar-track {
+  background-color: rgb(243 244 246);
+}
 
-  .btn-secondary {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150;
-  }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(209 213 219);
+  border-radius: 9999px;
+}
 
-  .btn-ghost {
-    @apply inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-600 bg-transparent hover:bg-gray-100 rounded-lg transition-all duration-150;
-  }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(156 163 175);
+}
 
-  /* Input Styles */
-  .input-field {
-    @apply block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150;
-  }
+/* Button Styles */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: white;
+  background-color: rgb(37 99 235);
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: all 150ms;
+}
 
-  /* Card Styles */
-  .card {
-    @apply bg-white border border-gray-200 rounded-xl shadow-sm;
-  }
+.btn-primary:hover {
+  background-color: rgb(29 78 216);
+}
 
-  .card-header {
-    @apply px-6 py-4 border-b border-gray-200;
-  }
+.btn-primary:focus {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-color: rgb(59 130 246);
+}
 
-  .card-body {
-    @apply px-6 py-4;
-  }
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-  /* Badge Styles */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(55 65 81);
+  background-color: white;
+  border: 1px solid rgb(209 213 219);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: all 150ms;
+}
 
-  .badge-success {
-    @apply bg-green-100 text-green-800;
-  }
+.btn-secondary:hover {
+  background-color: rgb(249 250 251);
+}
 
-  .badge-warning {
-    @apply bg-yellow-100 text-yellow-800;
-  }
+.btn-secondary:focus {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-color: rgb(59 130 246);
+}
 
-  .badge-error {
-    @apply bg-red-100 text-red-800;
-  }
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(75 85 99);
+  background-color: transparent;
+  border-radius: 0.5rem;
+  transition: all 150ms;
+}
 
-  .badge-info {
-    @apply bg-blue-100 text-blue-800;
-  }
+.btn-ghost:hover {
+  background-color: rgb(243 244 246);
+}
+
+/* Input Styles */
+.input-field {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid rgb(209 213 219);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: all 150ms;
+}
+
+.input-field::placeholder {
+  color: rgb(156 163 175);
+}
+
+.input-field:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: rgb(59 130 246);
+  border-color: transparent;
+}
+
+/* Card Styles */
+.card {
+  background-color: white;
+  border: 1px solid rgb(229 231 235);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.card-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgb(229 231 235);
+}
+
+.card-body {
+  padding: 1rem 1.5rem;
+}
+
+/* Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background-color: rgb(220 252 231);
+  color: rgb(22 101 52);
+}
+
+.badge-warning {
+  background-color: rgb(254 249 195);
+  color: rgb(133 77 14);
+}
+
+.badge-error {
+  background-color: rgb(254 226 226);
+  color: rgb(153 27 27);
+}
+
+.badge-info {
+  background-color: rgb(219 234 254);
+  color: rgb(30 64 175);
 }
 
 @layer utilities {
