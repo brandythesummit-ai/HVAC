@@ -30,31 +30,19 @@ async def get_summit_config(db=Depends(get_db)):
                 masked_token = "••••" + access_token[-4:] if len(access_token) > 4 else "••••"
 
             return {
-                "success": True,
-                "data": {
-                    "access_token": masked_token,
-                    "location_id": agency.get("summit_location_id", ""),
-                    "configured": bool(access_token and agency.get("summit_location_id"))
-                },
-                "error": None
+                "access_token": masked_token,
+                "location_id": agency.get("summit_location_id", ""),
+                "configured": bool(access_token and agency.get("summit_location_id"))
             }
         else:
             return {
-                "success": True,
-                "data": {
-                    "access_token": "",
-                    "location_id": "",
-                    "configured": False
-                },
-                "error": None
+                "access_token": "",
+                "location_id": "",
+                "configured": False
             }
 
     except Exception as e:
-        return {
-            "success": False,
-            "data": None,
-            "error": str(e)
-        }
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/config", response_model=dict)
@@ -79,19 +67,11 @@ async def update_summit_config(config: SummitConfigRequest, db=Depends(get_db)):
             }).execute()
 
         return {
-            "success": True,
-            "data": {
-                "message": "Summit.AI Private Integration configuration saved successfully"
-            },
-            "error": None
+            "message": "Summit.AI Private Integration configuration saved successfully"
         }
 
     except Exception as e:
-        return {
-            "success": False,
-            "data": None,
-            "error": str(e)
-        }
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/test", response_model=dict)
@@ -114,20 +94,15 @@ async def test_summit_connection(db=Depends(get_db)):
 
         test_result = await client.test_connection()
 
-        return {
-            "success": test_result["success"],
-            "data": test_result,
-            "error": None if test_result["success"] else test_result.get("message")
-        }
+        if not test_result["success"]:
+            raise HTTPException(status_code=400, detail=test_result.get("message"))
+
+        return test_result
 
     except HTTPException:
         raise
     except Exception as e:
-        return {
-            "success": False,
-            "data": None,
-            "error": str(e)
-        }
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sync-status", response_model=dict)
@@ -140,18 +115,10 @@ async def get_sync_status(db=Depends(get_db)):
         failed = db.table("leads").select("id", count="exact").eq("summit_sync_status", "failed").execute()
 
         return {
-            "success": True,
-            "data": {
-                "pending": pending.count if hasattr(pending, 'count') else 0,
-                "synced": synced.count if hasattr(synced, 'count') else 0,
-                "failed": failed.count if hasattr(failed, 'count') else 0
-            },
-            "error": None
+            "pending": pending.count if hasattr(pending, 'count') else 0,
+            "synced": synced.count if hasattr(synced, 'count') else 0,
+            "failed": failed.count if hasattr(failed, 'count') else 0
         }
 
     except Exception as e:
-        return {
-            "success": False,
-            "data": None,
-            "error": str(e)
-        }
+        raise HTTPException(status_code=500, detail=str(e))
