@@ -3,13 +3,13 @@ import SyncStatusBadge from './SyncStatusBadge';
 
 const LeadRow = ({ lead, isSelected, onToggle }) => {
   return (
-    <tr className="hover:bg-gray-50">
+    <tr className="hover:bg-gray-50 transition-colors duration-150">
       <td className="px-6 py-4 whitespace-nowrap">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={onToggle}
-          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
         />
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
@@ -29,7 +29,7 @@ const LeadRow = ({ lead, isSelected, onToggle }) => {
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         {lead.square_footage ? `${lead.square_footage.toLocaleString()} sqft` : '-'}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
         {formatCurrency(lead.job_value)}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
