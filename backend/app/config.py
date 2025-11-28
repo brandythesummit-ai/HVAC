@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
 
-    # Summit.AI
-    summit_api_key: str = ""
+    # Summit.AI (Private Integration - Static Token)
+    summit_access_token: str = ""
     summit_location_id: str = ""
 
     # Encryption

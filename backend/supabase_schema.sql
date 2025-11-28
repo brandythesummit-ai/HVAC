@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS agencies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
-    summit_api_key TEXT,
+    summit_access_token TEXT,  -- GHL Private Integration static access token
     summit_location_id TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );

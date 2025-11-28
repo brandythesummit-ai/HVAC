@@ -1,34 +1,53 @@
-"""Summit.AI configuration and testing endpoints."""
+"""Summit.AI configuration and testing endpoints with Private Integration static token."""
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
 
 from app.database import get_db
 from app.services.summit_client import SummitClient
-from app.config import settings
 
 router = APIRouter(prefix="/api/summit", tags=["summit"])
 
 
 class SummitConfigRequest(BaseModel):
-    """Model for Summit.AI configuration."""
-    api_key: str
+    """Model for Summit.AI Private Integration configuration."""
+    access_token: str
     location_id: str
 
 
 @router.get("/config", response_model=dict)
-async def get_summit_config():
-    """Get current Summit.AI configuration (masked)."""
+async def get_summit_config(db=Depends(get_db)):
+    """Get current Summit.AI Private Integration configuration (masked)."""
     try:
-        return {
-            "success": True,
-            "data": {
-                "api_key": "••••••••" if settings.summit_api_key else "",
-                "location_id": settings.summit_location_id,
-                "configured": bool(settings.summit_api_key and settings.summit_location_id)
-            },
-            "error": None
-        }
+        # Get from database
+        agency_result = db.table("agencies").select("*").limit(1).execute()
+
+        if agency_result.data:
+            agency = agency_result.data[0]
+            access_token = agency.get("summit_access_token", "")
+            # Mask token (show only last 4 characters)
+            masked_token = ""
+            if access_token:
+                masked_token = "••••" + access_token[-4:] if len(access_token) > 4 else "••••"
+
+            return {
+                "success": True,
+                "data": {
+                    "access_token": masked_token,
+                    "location_id": agency.get("summit_location_id", ""),
+                    "configured": bool(access_token and agency.get("summit_location_id"))
+                },
+                "error": None
+            }
+        else:
+            return {
+                "success": True,
+                "data": {
+                    "access_token": "",
+                    "location_id": "",
+                    "configured": False
+                },
+                "error": None
+            }
 
     except Exception as e:
         return {
@@ -40,44 +59,33 @@ async def get_summit_config():
 
 @router.put("/config", response_model=dict)
 async def update_summit_config(config: SummitConfigRequest, db=Depends(get_db)):
-    """Update Summit.AI configuration."""
+    """Update Summit.AI Private Integration configuration."""
     try:
-        # In a real app, you'd store this in the database or update environment
-        # For now, we'll just validate the config by testing the connection
-
-        client = SummitClient(api_key=config.api_key, location_id=config.location_id)
-        test_result = await client.test_connection()
-
-        if not test_result.get("success"):
-            raise HTTPException(status_code=400, detail=test_result.get("message"))
-
         # Store in agency record (assuming single agency for now)
         agency_result = db.table("agencies").select("*").limit(1).execute()
 
         if agency_result.data:
             # Update existing
             db.table("agencies").update({
-                "summit_api_key": config.api_key,
+                "summit_access_token": config.access_token,
                 "summit_location_id": config.location_id
             }).eq("id", agency_result.data[0]["id"]).execute()
         else:
             # Create new agency
             db.table("agencies").insert({
                 "name": "Default Agency",
-                "summit_api_key": config.api_key,
+                "summit_access_token": config.access_token,
                 "summit_location_id": config.location_id
             }).execute()
 
         return {
             "success": True,
             "data": {
-                "message": "Summit.AI configuration updated successfully"
+                "message": "Summit.AI Private Integration configuration saved successfully"
             },
             "error": None
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
         return {
             "success": False,
@@ -87,13 +95,22 @@ async def update_summit_config(config: SummitConfigRequest, db=Depends(get_db)):
 
 
 @router.post("/test", response_model=dict)
-async def test_summit_connection(config: Optional[SummitConfigRequest] = None):
-    """Test Summit.AI connection."""
+async def test_summit_connection(db=Depends(get_db)):
+    """Test Summit.AI connection with Private Integration token."""
     try:
-        if config:
-            client = SummitClient(api_key=config.api_key, location_id=config.location_id)
-        else:
-            client = SummitClient()
+        # Get credentials from database
+        agency_result = db.table("agencies").select("*").limit(1).execute()
+
+        if not agency_result.data:
+            raise HTTPException(status_code=400, detail="No agency configured")
+
+        agency = agency_result.data[0]
+
+        # Create client with stored token
+        client = SummitClient(
+            access_token=agency.get("summit_access_token"),
+            location_id=agency.get("summit_location_id")
+        )
 
         test_result = await client.test_connection()
 
@@ -103,6 +120,8 @@ async def test_summit_connection(config: Optional[SummitConfigRequest] = None):
             "error": None if test_result["success"] else test_result.get("message")
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         return {
             "success": False,

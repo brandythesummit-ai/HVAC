@@ -1,29 +1,37 @@
-"""Summit.AI (HighLevel) CRM API client."""
+"""Summit.AI (HighLevel) CRM API client with Private Integration static token."""
 import httpx
 from typing import Dict, List, Optional, Any
 from app.config import settings
 
 
 class SummitClient:
-    """Client for The Summit.AI (HighLevel) CRM API."""
+    """Client for The Summit.AI (HighLevel) CRM API with Private Integration static token."""
 
-    def __init__(self, api_key: Optional[str] = None, location_id: Optional[str] = None):
+    def __init__(
+        self,
+        access_token: Optional[str] = None,
+        location_id: Optional[str] = None,
+    ):
         """
-        Initialize Summit.AI client.
+        Initialize Summit.AI client with Private Integration static token.
 
         Args:
-            api_key: Summit.AI API key (defaults to settings)
-            location_id: Summit.AI location ID (defaults to settings)
+            access_token: GHL Private Integration static access token (pit-****)
+            location_id: Summit.AI location ID
         """
-        self.api_key = api_key or settings.summit_api_key
+        self.access_token = access_token or settings.summit_access_token
         self.location_id = location_id or settings.summit_location_id
-        self.base_url = "https://rest.gohighlevel.com/v1"
+        self.base_url = "https://services.leadconnectorhq.com"
 
     def _get_headers(self) -> Dict[str, str]:
-        """Get authentication headers."""
+        """Get authentication headers with static access token."""
+        if not self.access_token:
+            raise ValueError("No access token configured. Please add your Private Integration token in Settings.")
+
         return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+            "Version": "2021-07-28"
         }
 
     async def search_contact(
@@ -136,7 +144,7 @@ class SummitClient:
             return response.json()
 
     async def test_connection(self) -> Dict[str, Any]:
-        """Test Summit.AI connection."""
+        """Test Summit.AI connection with Private Integration token."""
         try:
             url = f"{self.base_url}/locations/{self.location_id}"
             async with httpx.AsyncClient() as client:

@@ -7,10 +7,10 @@ import { maskApiKey } from '../../utils/formatters';
 const SummitSettings = () => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
-    api_key: '',
+    access_token: '',
     location_id: '',
   });
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [showAccessToken, setShowAccessToken] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
   const { data: config, isLoading } = useQuery({
@@ -34,7 +34,7 @@ const SummitSettings = () => {
   useEffect(() => {
     if (config) {
       setFormData({
-        api_key: config.api_key || '',
+        access_token: config.access_token || '',
         location_id: config.location_id || '',
       });
     }
@@ -84,7 +84,7 @@ const SummitSettings = () => {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">The Summit.AI Configuration</h3>
             <p className="text-sm text-gray-600">
-              Configure your Summit.AI (HighLevel) CRM integration settings
+              Configure your GHL Private Integration static access token
             </p>
           </div>
         </div>
@@ -93,27 +93,27 @@ const SummitSettings = () => {
       {/* Card Body */}
       <div className="card-body">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* API Key Field */}
+          {/* Access Token Field */}
           <div>
-            <label htmlFor="api_key" className="block text-sm font-medium text-gray-700 mb-1.5">
-              API Key
+            <label htmlFor="access_token" className="block text-sm font-medium text-gray-700 mb-1.5">
+              Access Token
             </label>
             <div className="flex rounded-lg shadow-sm">
               <input
-                type={showApiKey ? 'text' : 'password'}
-                name="api_key"
-                id="api_key"
-                value={formData.api_key}
+                type={showAccessToken ? 'text' : 'password'}
+                name="access_token"
+                id="access_token"
+                value={formData.access_token}
                 onChange={handleChange}
-                placeholder="Enter your Summit.AI API key"
+                placeholder="pit-****-****-****-****"
                 className="input-field rounded-r-none flex-1"
               />
               <button
                 type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
+                onClick={() => setShowAccessToken(!showAccessToken)}
                 className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-700 rounded-r-lg hover:bg-gray-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {showApiKey ? (
+                {showAccessToken ? (
                   <>
                     <EyeOff className="h-4 w-4 mr-1.5" />
                     <span className="text-sm font-medium">Hide</span>
@@ -126,9 +126,12 @@ const SummitSettings = () => {
                 )}
               </button>
             </div>
-            {formData.api_key && !showApiKey && (
-              <p className="mt-1.5 text-sm text-gray-500">{maskApiKey(formData.api_key)}</p>
+            {formData.access_token && !showAccessToken && (
+              <p className="mt-1.5 text-sm text-gray-500">{maskApiKey(formData.access_token)}</p>
             )}
+            <p className="mt-1.5 text-xs text-gray-500">
+              Create a Private Integration in your GHL Agency Settings to get your access token
+            </p>
           </div>
 
           {/* Location ID Field */}
@@ -142,7 +145,7 @@ const SummitSettings = () => {
               id="location_id"
               value={formData.location_id}
               onChange={handleChange}
-              placeholder="Enter your Summit.AI Location ID"
+              placeholder="Enter your GHL Location ID"
               className="input-field"
             />
           </div>
@@ -176,25 +179,6 @@ const SummitSettings = () => {
           {/* Action Buttons */}
           <div className="flex items-center gap-3 pt-2">
             <button
-              type="button"
-              onClick={handleTestConnection}
-              disabled={testConnection.isPending || !formData.api_key}
-              className="btn-secondary"
-            >
-              {testConnection.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Cloud className="h-4 w-4 mr-2" />
-                  Test Connection
-                </>
-              )}
-            </button>
-
-            <button
               type="submit"
               disabled={updateConfig.isPending}
               className="btn-primary"
@@ -208,6 +192,25 @@ const SummitSettings = () => {
                 <>
                   <Save className="h-4 w-4 mr-2" />
                   Save Settings
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={testConnection.isPending || !formData.access_token}
+              className="btn-secondary"
+            >
+              {testConnection.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Cloud className="h-4 w-4 mr-2" />
+                  Test Connection
                 </>
               )}
             </button>
