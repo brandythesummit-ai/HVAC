@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_url: str = "http://localhost:8000"  # Base URL for API (used for OAuth callbacks)
     # CORS origins - supports both localhost and Vercel deployment
     # Set CORS_ORIGINS in Vercel to include your frontend URL
     cors_origins: str = "http://localhost:3000,http://localhost:5173,https://*.vercel.app"

@@ -2,39 +2,27 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from datetime import datetime
+import secrets
+import urllib.parse
 
 from app.database import get_db
-from app.models.county import CountyCreate, CountyUpdate, CountyResponse, CountyTestRequest
+from app.models.county import CountyCreate, CountyUpdate, CountyResponse
 from app.services.accela_client import AccelaClient
 from app.services.encryption import encryption_service
+from app.config import settings
 
 router = APIRouter(prefix="/api/counties", tags=["counties"])
 
 
 @router.post("", response_model=dict)
 async def create_county(county: CountyCreate, db=Depends(get_db)):
-    """Create a new county with Accela credentials and test connection."""
+    """Create a new county. OAuth authorization must be completed separately."""
     try:
-        # Test connection first
-        client = AccelaClient(
-            environment=county.accela_environment,
-            app_id=county.accela_app_id,
-            app_secret=encryption_service.encrypt(county.accela_app_secret)
-        )
-
-        test_result = await client.test_connection()
-        if not test_result.get("success"):
-            raise HTTPException(status_code=400, detail=test_result.get("message"))
-
-        # Create county record
+        # Create county record (without OAuth authorization yet)
         county_data = {
             "name": county.name,
-            "accela_environment": county.accela_environment,
-            "accela_app_id": county.accela_app_id,
-            "accela_app_secret": encryption_service.encrypt(county.accela_app_secret),
-            "accela_access_token": client._access_token,
-            "token_expires_at": client._token_expires_at,
-            "status": "connected",
+            "county_code": county.county_code,
+            "status": "pending_authorization",  # Will change to "connected" after OAuth
             "is_active": True,
             "created_at": datetime.utcnow().isoformat()
         }
@@ -47,6 +35,7 @@ async def create_county(county: CountyCreate, db=Depends(get_db)):
         return {
             "success": True,
             "data": result.data[0] if result.data else None,
+            "message": "County created. Please complete OAuth authorization.",
             "error": None
         }
 
@@ -66,12 +55,15 @@ async def list_counties(db=Depends(get_db)):
     try:
         result = db.table("counties").select("*").order("created_at", desc=True).execute()
 
-        # Mask secrets in response
+        # Mask secrets and add oauth_authorized flag
         counties = []
         for county in result.data:
             county_copy = county.copy()
-            county_copy["accela_app_secret"] = "••••••••" if county.get("accela_app_secret") else None
-            county_copy["accela_access_token"] = "••••••••" if county.get("accela_access_token") else None
+            # Remove sensitive fields from response
+            county_copy.pop("refresh_token", None)
+            county_copy.pop("oauth_state", None)
+            # Add oauth_authorized flag
+            county_copy["oauth_authorized"] = bool(county.get("refresh_token"))
             counties.append(county_copy)
 
         return {
@@ -97,10 +89,12 @@ async def get_county(county_id: str, db=Depends(get_db)):
         if not result.data:
             raise HTTPException(status_code=404, detail="County not found")
 
-        county = result.data[0]
-        # Mask secrets
-        county["accela_app_secret"] = "••••••••" if county.get("accela_app_secret") else None
-        county["accela_access_token"] = "••••••••" if county.get("accela_access_token") else None
+        county = result.data[0].copy()
+        # Remove sensitive fields
+        county.pop("refresh_token", None)
+        county.pop("oauth_state", None)
+        # Add oauth_authorized flag
+        county["oauth_authorized"] = bool(result.data[0].get("refresh_token"))
 
         return {
             "success": True,
@@ -126,12 +120,12 @@ async def update_county(county_id: str, county: CountyUpdate, db=Depends(get_db)
         update_data = {}
         if county.name is not None:
             update_data["name"] = county.name
-        if county.accela_environment is not None:
-            update_data["accela_environment"] = county.accela_environment
-        if county.accela_app_id is not None:
-            update_data["accela_app_id"] = county.accela_app_id
-        if county.accela_app_secret is not None:
-            update_data["accela_app_secret"] = encryption_service.encrypt(county.accela_app_secret)
+        if county.county_code is not None:
+            update_data["county_code"] = county.county_code
+        if county.refresh_token is not None:
+            update_data["refresh_token"] = encryption_service.encrypt(county.refresh_token)
+        if county.token_expires_at is not None:
+            update_data["token_expires_at"] = county.token_expires_at.isoformat()
         if county.is_active is not None:
             update_data["is_active"] = county.is_active
 
@@ -184,40 +178,58 @@ async def delete_county(county_id: str, db=Depends(get_db)):
         }
 
 
-@router.post("/{county_id}/test", response_model=dict)
-async def test_county_connection(county_id: str, db=Depends(get_db)):
-    """Test Accela connection for a county."""
+# OAuth endpoints
+
+@router.post("/{county_id}/oauth/authorize", response_model=dict)
+async def get_oauth_authorization_url(county_id: str, db=Depends(get_db)):
+    """Generate OAuth authorization URL for a county."""
     try:
         # Get county
         result = db.table("counties").select("*").eq("id", county_id).execute()
-
         if not result.data:
             raise HTTPException(status_code=404, detail="County not found")
 
         county = result.data[0]
 
-        # Create client and test
-        client = AccelaClient(
-            environment=county["accela_environment"],
-            app_id=county["accela_app_id"],
-            app_secret=county["accela_app_secret"],
-            access_token=county.get("accela_access_token", ""),
-            token_expires_at=county.get("token_expires_at", "")
-        )
+        # Get global Accela app credentials
+        app_settings = db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_settings.data or not app_settings.data[0].get("app_id"):
+            raise HTTPException(
+                status_code=400,
+                detail="Accela app credentials not configured. Please configure in Settings."
+            )
 
-        test_result = await client.test_connection()
+        app_id = app_settings.data[0]["app_id"]
 
-        # Update status
-        new_status = "connected" if test_result["success"] else "error"
-        db.table("counties").update({
-            "status": new_status,
-            "token_expires_at": test_result.get("token_expires_at")
-        }).eq("id", county_id).execute()
+        # Generate CSRF state token
+        state = secrets.token_urlsafe(32)
+
+        # Store state in county record
+        db.table("counties").update({"oauth_state": state}).eq("id", county_id).execute()
+
+        # Build authorization URL
+        # Format: https://{agency}.accela.com/oauth2/authorize?client_id={app_id}&response_type=code&redirect_uri={callback_url}&state={state}&agency_name={county_code}
+        callback_url = f"{settings.api_url}/api/counties/oauth/callback"
+
+        params = {
+            "client_id": app_id,
+            "response_type": "code",
+            "redirect_uri": callback_url,
+            "state": state,
+            "agency_name": county["county_code"]
+        }
+
+        # Note: The base URL depends on the agency, typically https://apis.accela.com
+        base_url = "https://apis.accela.com/oauth2/authorize"
+        auth_url = f"{base_url}?{urllib.parse.urlencode(params)}"
 
         return {
-            "success": test_result["success"],
-            "data": test_result,
-            "error": None if test_result["success"] else test_result.get("message")
+            "success": True,
+            "data": {
+                "authorization_url": auth_url,
+                "state": state
+            },
+            "error": None
         }
 
     except HTTPException:
@@ -230,24 +242,66 @@ async def test_county_connection(county_id: str, db=Depends(get_db)):
         }
 
 
-@router.post("/test-credentials", response_model=dict)
-async def test_credentials(request: CountyTestRequest):
-    """Test Accela credentials without saving."""
+@router.get("/oauth/callback", response_model=dict)
+async def oauth_callback(code: str, state: str, db=Depends(get_db)):
+    """Handle OAuth callback from Accela."""
     try:
+        # Find county by state token
+        result = db.table("counties").select("*").eq("oauth_state", state).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Invalid state token or authorization expired")
+
+        county = result.data[0]
+
+        # Get global Accela app credentials
+        app_settings = db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_settings.data:
+            raise HTTPException(status_code=500, detail="Accela app credentials not found")
+
+        app_id = app_settings.data[0]["app_id"]
+        app_secret_encrypted = app_settings.data[0]["app_secret"]
+        app_secret = encryption_service.decrypt(app_secret_encrypted)
+
+        # Exchange authorization code for refresh token
         client = AccelaClient(
-            environment=request.accela_environment,
-            app_id=request.accela_app_id,
-            app_secret=encryption_service.encrypt(request.accela_app_secret)
+            app_id=app_id,
+            app_secret=app_secret,
+            county_code=county["county_code"]
         )
 
-        test_result = await client.test_connection()
+        token_response = await client.exchange_code_for_token(
+            code=code,
+            redirect_uri=f"{settings.api_url}/api/counties/oauth/callback"
+        )
 
-        return {
-            "success": test_result["success"],
-            "data": test_result,
-            "error": None if test_result["success"] else test_result.get("message")
+        if not token_response.get("success"):
+            raise HTTPException(status_code=400, detail=token_response.get("error", "Token exchange failed"))
+
+        # Store encrypted refresh token
+        refresh_token_encrypted = encryption_service.encrypt(token_response["refresh_token"])
+
+        update_data = {
+            "refresh_token": refresh_token_encrypted,
+            "token_expires_at": token_response.get("expires_at"),
+            "status": "connected",
+            "oauth_state": None  # Clear state token
         }
 
+        db.table("counties").update(update_data).eq("id", county["id"]).execute()
+
+        return {
+            "success": True,
+            "data": {
+                "message": "OAuth authorization successful",
+                "county_id": county["id"],
+                "county_name": county["name"]
+            },
+            "error": None
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         return {
             "success": False,

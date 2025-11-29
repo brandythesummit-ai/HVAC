@@ -1,4 +1,4 @@
-"""Accela Civic Platform API client with token refresh."""
+"""Accela Civic Platform API client with OAuth refresh_token flow."""
 import httpx
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
@@ -6,30 +6,38 @@ from app.services.encryption import encryption_service
 
 
 class AccelaClient:
-    """Client for Accela Civic Platform V4 API."""
+    """Client for Accela Civic Platform V4 API using OAuth refresh_token flow."""
 
-    def __init__(self, environment: str, app_id: str, app_secret: str, access_token: str = "", token_expires_at: str = ""):
+    def __init__(
+        self,
+        app_id: str,
+        app_secret: str,
+        county_code: str,
+        refresh_token: str = "",
+        access_token: str = "",
+        token_expires_at: str = ""
+    ):
         """
-        Initialize Accela client.
+        Initialize Accela client with OAuth refresh_token flow.
 
         Args:
-            environment: Accela environment (e.g., 'PROD', 'TEST')
-            app_id: Accela application ID
-            app_secret: Accela application secret (will be decrypted if encrypted)
-            access_token: Current access token (will be decrypted if encrypted)
+            app_id: Accela application ID (global, from settings)
+            app_secret: Accela application secret (decrypted)
+            county_code: County/agency code (e.g., 'ISLANDERNC' for Nassau County)
+            refresh_token: OAuth refresh token (encrypted, from database)
+            access_token: Current access token (encrypted, from cache)
             token_expires_at: Token expiration timestamp (ISO format)
         """
-        self.environment = environment
         self.app_id = app_id
-        self.app_secret = app_secret  # Store encrypted
+        self.app_secret = app_secret  # Store decrypted (received from config)
+        self.county_code = county_code
+        self._refresh_token = refresh_token  # Store encrypted
         self._access_token = access_token  # Store encrypted
         self._token_expires_at = token_expires_at
 
-        # Determine base URL from environment
-        if environment.upper() == "PROD":
-            self.base_url = "https://apis.accela.com"
-        else:
-            self.base_url = f"https://{environment.lower()}.apis.accela.com"
+        # Use production Accela API
+        self.base_url = "https://apis.accela.com"
+        self.auth_url = "https://auth.accela.com"
 
     @property
     def access_token(self) -> str:
@@ -39,11 +47,11 @@ class AccelaClient:
         return encryption_service.decrypt(self._access_token)
 
     @property
-    def decrypted_app_secret(self) -> str:
-        """Get decrypted app secret."""
-        if not self.app_secret:
+    def refresh_token_decrypted(self) -> str:
+        """Get decrypted refresh token."""
+        if not self._refresh_token:
             return ""
-        return encryption_service.decrypt(self.app_secret)
+        return encryption_service.decrypt(self._refresh_token)
 
     def _is_token_expired(self) -> bool:
         """Check if current token is expired or will expire soon."""
@@ -57,20 +65,72 @@ class AccelaClient:
         except (ValueError, AttributeError):
             return True
 
-    async def refresh_token(self) -> Dict[str, Any]:
+    async def exchange_code_for_token(self, code: str, redirect_uri: str) -> Dict[str, Any]:
         """
-        Refresh OAuth token.
+        Exchange authorization code for refresh token.
+
+        Args:
+            code: Authorization code from OAuth callback
+            redirect_uri: Must match the redirect_uri used in authorization request
+
+        Returns:
+            Dict with 'success', 'refresh_token', 'access_token', 'expires_at'
+        """
+        url = f"{self.auth_url}/oauth2/token"
+
+        data = {
+            "client_id": self.app_id,
+            "client_secret": self.app_secret,
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    data=data,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"}
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            # Calculate expiration
+            expires_in = result.get("expires_in", 3600)  # Default 1 hour
+            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+            return {
+                "success": True,
+                "refresh_token": result["refresh_token"],
+                "access_token": result["access_token"],
+                "expires_at": expires_at.isoformat() + 'Z',
+                "error": None
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def refresh_access_token(self) -> Dict[str, Any]:
+        """
+        Use refresh token to get new access token.
 
         Returns:
             Dict with 'access_token' and 'expires_at' (encrypted)
         """
-        url = f"{self.base_url}/oauth2/token"
+        if not self._refresh_token:
+            raise ValueError("No refresh token available")
+
+        url = f"{self.auth_url}/oauth2/token"
 
         data = {
             "client_id": self.app_id,
-            "client_secret": self.decrypted_app_secret,
-            "grant_type": "client_credentials",
-            "scope": "records addresses owners parcels"
+            "client_secret": self.app_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token_decrypted
         }
 
         async with httpx.AsyncClient() as client:
@@ -82,8 +142,8 @@ class AccelaClient:
             response.raise_for_status()
             result = response.json()
 
-        # Calculate expiration (tokens typically last 15 minutes)
-        expires_in = result.get("expires_in", 900)  # Default 15 minutes
+        # Calculate expiration
+        expires_in = result.get("expires_in", 3600)  # Default 1 hour
         expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
         # Encrypt and store
@@ -99,7 +159,7 @@ class AccelaClient:
     async def _ensure_valid_token(self):
         """Ensure we have a valid token, refresh if needed."""
         if self._is_token_expired():
-            await self.refresh_token()
+            await self.refresh_access_token()
 
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """
@@ -113,6 +173,7 @@ class AccelaClient:
         headers = {
             "Authorization": self.access_token,  # NO "Bearer " prefix!
             "Content-Type": "application/json",
+            "x-accela-agency": self.county_code,  # Agency context header
             **kwargs.pop("headers", {})
         }
 
