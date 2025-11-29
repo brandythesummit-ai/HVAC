@@ -4,7 +4,9 @@ export const leadsApi = {
   // Get all leads with filters
   getAll: async (params = {}) => {
     const response = await apiClient.get('/api/leads', { params });
-    return response.data;
+    // Backend returns {success, data: {leads, count}, error}
+    // Extract just the leads array
+    return response.data?.data?.leads || [];
   },
 
   // Create leads from permits
