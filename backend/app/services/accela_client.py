@@ -325,7 +325,8 @@ class AccelaClient:
         date_from: str,
         date_to: str,
         limit: int = 100,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        permit_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Get permits from Accela.
@@ -335,6 +336,7 @@ class AccelaClient:
             date_to: End date (YYYY-MM-DD)
             limit: Max results (default 100)
             status: Optional status filter (e.g., 'Finaled')
+            permit_type: Optional type filter (e.g., 'Mechanical') - filters at API level
 
         Returns:
             List of permit records
@@ -348,6 +350,9 @@ class AccelaClient:
 
         if status:
             params["status"] = status
+
+        if permit_type:
+            params["type"] = permit_type
 
         result = await self._make_request("GET", "/v4/records", params=params)
         return result.get("result", [])

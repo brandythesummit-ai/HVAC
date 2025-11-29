@@ -2,6 +2,9 @@ import { formatDate, formatCurrency } from '../../utils/formatters';
 import SyncStatusBadge from './SyncStatusBadge';
 
 const LeadRow = ({ lead, isSelected, onToggle }) => {
+  // Extract permit data from nested structure
+  const permit = lead.permits || {};
+
   return (
     <tr className="hover:bg-gray-50 transition-colors duration-150">
       <td className="px-6 py-4 whitespace-nowrap">
@@ -13,24 +16,24 @@ const LeadRow = ({ lead, isSelected, onToggle }) => {
         />
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-medium text-gray-900">{lead.owner_name || '-'}</div>
-        <div className="text-sm text-gray-500">{lead.owner_phone || '-'}</div>
+        <div className="text-sm font-medium text-gray-900">{permit.owner_name || '-'}</div>
+        <div className="text-sm text-gray-500">{permit.owner_phone || '-'}</div>
       </td>
       <td className="px-6 py-4">
-        <div className="text-sm text-gray-900">{lead.property_address || '-'}</div>
-        <div className="text-sm text-gray-500">{lead.county_name}</div>
+        <div className="text-sm text-gray-900">{permit.property_address || '-'}</div>
+        <div className="text-sm text-gray-500">{permit.county_name || '-'}</div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {formatDate(lead.permit_opened_date)}
+        {formatDate(permit.opened_date)}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {lead.year_built || '-'}
+        {permit.year_built || '-'}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {lead.square_footage ? `${lead.square_footage.toLocaleString()} sqft` : '-'}
+        {permit.square_footage ? `${permit.square_footage.toLocaleString()} sqft` : '-'}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-        {formatCurrency(lead.job_value)}
+        {formatCurrency(permit.job_value)}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <SyncStatusBadge status={lead.summit_sync_status} />

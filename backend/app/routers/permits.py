@@ -38,11 +38,11 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
     if addresses:
         addr = addresses[0]
         parts = [
-            addr.get("streetStart", ""),
-            addr.get("streetName", ""),
-            addr.get("city", ""),
-            addr.get("state", ""),
-            addr.get("zip", "")
+            str(addr.get("streetStart", "")),
+            str(addr.get("streetName", "")),
+            str(addr.get("city", "")),
+            str(addr.get("state", "")),
+            str(addr.get("zip", ""))
         ]
         extracted["property_address"] = " ".join(filter(None, parts))
 
@@ -122,24 +122,24 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             token_expires_at=county.get("token_expires_at", "")
         )
 
-        print(f"🔍 [PULL PERMITS] Created Accela client, pulling permits...")
+        print(f"🔍 [PULL PERMITS] Created Accela client, pulling Mechanical permits...")
 
-        # Pull permits
-        permits = await client.get_permits(
+        # Pull ONLY Mechanical permits (filtered at API level for efficiency)
+        hvac_permits = await client.get_permits(
             date_from=request.date_from,
             date_to=request.date_to,
             limit=request.limit,
-            status=request.status
+            status=request.status,
+            permit_type="Mechanical"
         )
 
-        print(f"✅ [PULL PERMITS] Retrieved {len(permits)} permits from Accela")
-
-        # Filter for Mechanical permits
-        hvac_permits = [p for p in permits if "Mechanical" in p.get("type", {}).get("value", "")]
-        print(f"🔍 [PULL PERMITS] Filtered to {len(hvac_permits)} HVAC permits")
+        print(f"✅ [PULL PERMITS] Retrieved {len(hvac_permits)} Mechanical permits from Accela")
 
         # Enrich each permit
         saved_permits = []
+        failed_saves = []
+        saved_count = 0
+
         for permit in hvac_permits:
             record_id = permit.get("id")
             if not record_id:
@@ -167,20 +167,48 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 **extracted
             }
 
-            # Check if permit already exists
-            existing = db.table("permits").select("id").eq("accela_record_id", record_id).execute()
+            # Try to save permit (insert or update if exists)
+            try:
+                # Check if permit already exists
+                existing = db.table("permits").select("id").eq("county_id", county_id).eq("accela_record_id", record_id).execute()
 
-            if existing.data:
-                # Update existing
-                update_result = db.table("permits").update(permit_data).eq("accela_record_id", record_id).execute()
-                saved_permits.append(update_result.data[0] if update_result.data else None)
-            else:
-                # Insert new
-                insert_result = db.table("permits").insert(permit_data).execute()
-                saved_permits.append(insert_result.data[0] if insert_result.data else None)
+                if existing.data:
+                    # Update existing
+                    update_result = db.table("permits").update(permit_data).eq("accela_record_id", record_id).execute()
+                    if update_result.data:
+                        saved_permits.append(update_result.data[0])
+                        saved_count += 1
+                    else:
+                        saved_permits.append(None)
+                        failed_saves.append({
+                            "record_id": record_id,
+                            "error": "Update returned no data"
+                        })
+                else:
+                    # Insert new
+                    insert_result = db.table("permits").insert(permit_data).execute()
+                    if insert_result.data:
+                        saved_permits.append(insert_result.data[0])
+                        saved_count += 1
+                    else:
+                        saved_permits.append(None)
+                        failed_saves.append({
+                            "record_id": record_id,
+                            "error": "Insert returned no data"
+                        })
+            except Exception as save_error:
+                # Record failure
+                saved_permits.append(None)
+                failed_saves.append({
+                    "record_id": record_id,
+                    "error": str(save_error)
+                })
+                print(f"⚠️  [PULL PERMITS] Failed to save permit {record_id}: {str(save_error)}")
 
         # Auto-create leads for each saved permit
         created_leads = []
+        failed_leads = []
+
         for permit in saved_permits:
             if not permit:
                 continue
@@ -201,36 +229,45 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                     lead_result = db.table("leads").insert(lead_data).execute()
                     if lead_result.data:
                         created_leads.append(lead_result.data[0])
+                    else:
+                        failed_leads.append({
+                            "permit_id": permit["id"],
+                            "error": "Insert returned no data"
+                        })
                 except Exception as lead_error:
+                    failed_leads.append({
+                        "permit_id": permit["id"],
+                        "error": str(lead_error)
+                    })
                     print(f"⚠️  [PULL PERMITS] Failed to create lead for permit {permit['id']}: {str(lead_error)}")
 
         print(f"✅ [PULL PERMITS] Created {len(created_leads)} new leads")
 
         # Update county last_pull_at and store updated tokens
+        # Update last pull timestamp
         update_data = {
             "last_pull_at": datetime.utcnow().isoformat()
         }
-
-        # Update access token if it was refreshed
-        if client._access_token:
-            update_data["access_token"] = client._access_token
-        if client._token_expires_at:
-            update_data["token_expires_at"] = client._token_expires_at
-
         db.table("counties").update(update_data).eq("id", county_id).execute()
 
         saved_count = len([p for p in saved_permits if p])
-        print(f"✅ [PULL PERMITS] Complete! Total: {len(permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Leads: {len(created_leads)}")
+        print(f"✅ [PULL PERMITS] Complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Leads: {len(created_leads)}")
 
         return {
             "success": True,
             "data": {
-                "total_pulled": len(permits),
+                "total_pulled": len(hvac_permits),
                 "hvac_permits": len(hvac_permits),
                 "saved": saved_count,
                 "leads_created": len(created_leads),
+                "failed_saves": len(failed_saves),
+                "failed_leads": len(failed_leads),
                 "permits": saved_permits,
-                "leads": created_leads
+                "leads": created_leads,
+                "errors": {
+                    "save_failures": failed_saves,
+                    "lead_failures": failed_leads
+                } if (failed_saves or failed_leads) else None
             },
             "error": None
         }

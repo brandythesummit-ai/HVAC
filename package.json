@@ -1,0 +1,38 @@
+{
+  "name": "hvac",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:pull-permits": "playwright test tests/e2e/01-pull-permits.spec.js",
+    "test:leads-validation": "playwright test tests/e2e/02-leads-data-validation.spec.js",
+    "test:filtering": "playwright test tests/e2e/03-leads-filtering.spec.js",
+    "test:errors": "playwright test tests/e2e/04-error-scenarios.spec.js",
+    "test:journey": "playwright test tests/e2e/05-complete-user-journey.spec.js",
+    "test:report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brandythesummit-ai/HVAC.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/brandythesummit-ai/HVAC/issues"
+  },
+  "homepage": "https://github.com/brandythesummit-ai/HVAC#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^24.10.1"
+  }
+}
