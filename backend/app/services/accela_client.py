@@ -61,7 +61,8 @@ class AccelaClient:
         try:
             expires_at = datetime.fromisoformat(self._token_expires_at.replace('Z', '+00:00'))
             # Refresh if token expires within 1 minute
-            return datetime.utcnow() >= expires_at - timedelta(minutes=1)
+            from datetime import timezone
+            return datetime.now(timezone.utc) >= expires_at - timedelta(minutes=1)
         except (ValueError, AttributeError):
             return True
 
