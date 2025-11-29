@@ -285,7 +285,13 @@ async def get_oauth_authorization_url(county_id: str, db=Depends(get_db)):
 
 
 @router.get("/oauth/callback", response_model=dict)
-async def oauth_callback(code: str, state: str, db=Depends(get_db)):
+async def oauth_callback(
+    code: str,
+    state: str,
+    agency_name: str = None,
+    environment: str = None,
+    db=Depends(get_db)
+):
     """Handle OAuth callback from Accela."""
     try:
         # Find county by state token
