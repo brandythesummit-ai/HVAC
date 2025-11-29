@@ -111,7 +111,24 @@ class AccelaClient:
                 "error": None
             }
 
+        except httpx.HTTPStatusError as e:
+            # Log the full error response for debugging
+            error_body = e.response.text
+            error_status = e.response.status_code
+
+            print(f"❌ Accela token exchange failed:")
+            print(f"   Status: {error_status}")
+            print(f"   URL: {url}")
+            print(f"   Request headers: {dict(e.response.request.headers)}")
+            print(f"   Request body: {e.response.request.content.decode()}")
+            print(f"   Response body: {error_body}")
+
+            return {
+                "success": False,
+                "error": f"Accela API error ({error_status}): {error_body}"
+            }
         except Exception as e:
+            print(f"❌ Unexpected error during token exchange: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
