@@ -31,7 +31,8 @@ const AddCountyModal = ({ onClose }) => {
     e.preventDefault();
     try {
       const result = await createCounty.mutateAsync(formData);
-      setCreatedCounty(result);
+      // Extract county from {success: true, data: {...}} response
+      setCreatedCounty(result.data || result);
       setStep(2);
     } catch (error) {
       console.error('Failed to create county:', error);
