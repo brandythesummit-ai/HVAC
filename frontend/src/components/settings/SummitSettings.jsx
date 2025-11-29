@@ -84,7 +84,7 @@ const SummitSettings = () => {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">The Summit.AI Configuration</h3>
             <p className="text-sm text-gray-600">
-              Configure your GHL Private Integration static access token
+              Configure your The Summit.AI Private Integration static access token
             </p>
           </div>
         </div>
@@ -130,7 +130,7 @@ const SummitSettings = () => {
               <p className="mt-1.5 text-sm text-gray-500">{maskApiKey(formData.access_token)}</p>
             )}
             <p className="mt-1.5 text-xs text-gray-500">
-              Create a Private Integration in your GHL Agency Settings to get your access token
+              Create a Private Integration in your The Summit.AI Agency Settings to get your access token
             </p>
           </div>
 
@@ -145,7 +145,7 @@ const SummitSettings = () => {
               id="location_id"
               value={formData.location_id}
               onChange={handleChange}
-              placeholder="Enter your GHL Location ID"
+              placeholder="Enter your The Summit.AI Location ID"
               className="input-field"
             />
           </div>

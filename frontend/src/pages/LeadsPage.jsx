@@ -1,13 +1,17 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Filter, AlertCircle } from 'lucide-react';
 import { useLeads } from '../hooks/useLeads';
 import { useCounties } from '../hooks/useCounties';
 import LeadsTable from '../components/leads/LeadsTable';
 
 const LeadsPage = () => {
+  const location = useLocation();
+
+  // Initialize filters from navigation state if provided (from Pull Permits modal)
   const [filters, setFilters] = useState({
-    county_id: '',
-    sync_status: '',
+    county_id: location.state?.filterByCounty || '',
+    sync_status: location.state?.filterBySyncStatus || '',
   });
 
   const { data: leads, isLoading, error } = useLeads(filters);

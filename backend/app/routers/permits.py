@@ -179,6 +179,33 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 insert_result = db.table("permits").insert(permit_data).execute()
                 saved_permits.append(insert_result.data[0] if insert_result.data else None)
 
+        # Auto-create leads for each saved permit
+        created_leads = []
+        for permit in saved_permits:
+            if not permit:
+                continue
+
+            # Check if lead already exists for this permit
+            existing_lead = db.table("leads").select("id").eq("permit_id", permit["id"]).execute()
+
+            if not existing_lead.data:
+                # Create new lead with pending status
+                lead_data = {
+                    "permit_id": permit["id"],
+                    "county_id": county_id,
+                    "summit_sync_status": "pending",
+                    "created_at": datetime.utcnow().isoformat()
+                }
+
+                try:
+                    lead_result = db.table("leads").insert(lead_data).execute()
+                    if lead_result.data:
+                        created_leads.append(lead_result.data[0])
+                except Exception as lead_error:
+                    print(f"⚠️  [PULL PERMITS] Failed to create lead for permit {permit['id']}: {str(lead_error)}")
+
+        print(f"✅ [PULL PERMITS] Created {len(created_leads)} new leads")
+
         # Update county last_pull_at and store updated tokens
         update_data = {
             "last_pull_at": datetime.utcnow().isoformat()
@@ -193,7 +220,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         db.table("counties").update(update_data).eq("id", county_id).execute()
 
         saved_count = len([p for p in saved_permits if p])
-        print(f"✅ [PULL PERMITS] Complete! Total: {len(permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}")
+        print(f"✅ [PULL PERMITS] Complete! Total: {len(permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Leads: {len(created_leads)}")
 
         return {
             "success": True,
@@ -201,7 +228,9 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 "total_pulled": len(permits),
                 "hvac_permits": len(hvac_permits),
                 "saved": saved_count,
-                "permits": saved_permits
+                "leads_created": len(created_leads),
+                "permits": saved_permits,
+                "leads": created_leads
             },
             "error": None
         }

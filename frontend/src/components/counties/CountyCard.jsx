@@ -100,9 +100,9 @@ const CountyCard = ({ county }) => {
                   <Send className="h-4 w-4 text-green-600" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900">
-                  {metricsLoading ? '-' : metrics.sent_to_ghl || 0}
+                  {metricsLoading ? '-' : metrics.sent_to_summit || 0}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">Sent to GHL</p>
+                <p className="text-xs text-gray-500 mt-0.5">Sent to Summit.AI</p>
               </div>
             </div>
           )}

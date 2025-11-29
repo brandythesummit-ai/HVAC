@@ -138,7 +138,8 @@ async def get_county_metrics(county_id: str, db=Depends(get_db)):
             "data": {
                 "total_permits": total_permits,
                 "new_leads": pending_leads,
-                "sent_to_ghl": synced_to_summit
+                "sent_to_summit": synced_to_summit,
+                "sent_to_ghl": synced_to_summit  # DEPRECATED: Remove after frontend updated
             },
             "error": None
         }
