@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Filter, Users, Eye } from 'lucide-react';
+import { Download, Filter, Users, Eye, Info, AlertTriangle, Calendar, Filter as FilterIcon, Building } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 
 const StatCard = ({ label, value, icon }) => (
@@ -16,8 +16,83 @@ const StatCard = ({ label, value, icon }) => (
   </div>
 );
 
+const QueryInfoCard = ({ queryInfo }) => {
+  const dateRangeText = queryInfo.date_range_days
+    ? `${queryInfo.date_range_days} days`
+    : 'Unknown';
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <div className="flex items-start">
+        <Info className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+        <div className="flex-1">
+          <h4 className="text-sm font-semibold text-blue-900 mb-2">
+            Search Criteria
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-blue-800">
+            <div className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              <span>
+                <strong>Date Range:</strong> {queryInfo.date_from} to {queryInfo.date_to}
+                <span className="text-blue-600 ml-1">({dateRangeText})</span>
+              </span>
+            </div>
+            <div className="flex items-center">
+              <FilterIcon className="w-4 h-4 mr-2" />
+              <span>
+                <strong>Status:</strong> {queryInfo.status_filter || 'All Statuses'}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <Building className="w-4 h-4 mr-2" />
+              <span>
+                <strong>Permit Type:</strong> {queryInfo.permit_type_filter}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <FilterIcon className="w-4 h-4 mr-2" />
+              <span>
+                <strong>Max Results:</strong> {queryInfo.limit}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-blue-700">
+            County: {queryInfo.county_name} ({queryInfo.county_code})
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SuggestionsCard = ({ suggestions }) => {
+  if (!suggestions || suggestions.length === 0) return null;
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      <div className="flex items-start">
+        <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 mr-3 flex-shrink-0" />
+        <div className="flex-1">
+          <h4 className="text-sm font-semibold text-amber-900 mb-2">
+            Why did I get 0 results?
+          </h4>
+          <ul className="space-y-1.5 text-sm text-amber-800">
+            {suggestions.map((suggestion, idx) => (
+              <li key={idx} className="flex items-start">
+                <span className="mr-2">•</span>
+                <span>{suggestion}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PullResultsView = ({ results, county, onClose, onGoToLeads, onViewDetail }) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   const pageSize = 20;
 
   const totalPages = Math.ceil((results.permits?.length || 0) / pageSize);
@@ -25,8 +100,18 @@ const PullResultsView = ({ results, county, onClose, onGoToLeads, onViewDetail }
   const endIndex = startIndex + pageSize;
   const currentPermits = results.permits?.slice(startIndex, endIndex) || [];
 
+  const hasResults = results.total_pulled > 0;
+  const queryInfo = results.query_info || {};
+  const suggestions = results.suggestions || [];
+
   return (
     <div className="space-y-6">
+      {/* NEW: Always show what was searched */}
+      {queryInfo && <QueryInfoCard queryInfo={queryInfo} />}
+
+      {/* NEW: Show suggestions only if 0 results */}
+      {!hasResults && <SuggestionsCard suggestions={suggestions} />}
+
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
@@ -128,8 +213,31 @@ const PullResultsView = ({ results, county, onClose, onGoToLeads, onViewDetail }
       ) : (
         <div className="card">
           <div className="card-body text-center py-12">
-            <p className="text-gray-500">No HVAC permits found. Try adjusting your filters.</p>
+            <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 font-medium">No Permits Found</p>
+            <p className="text-sm text-gray-500 mt-1">
+              See suggestions above for troubleshooting tips
+            </p>
           </div>
+        </div>
+      )}
+
+      {/* NEW: Optional debug info */}
+      {results.debug_info && (
+        <div className="text-right">
+          <button
+            onClick={() => setShowDebugInfo(!showDebugInfo)}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            {showDebugInfo ? 'Hide' : 'Show'} Debug Info
+          </button>
+          {showDebugInfo && (
+            <div className="mt-2 text-left bg-gray-50 border border-gray-200 rounded p-3">
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap">
+                {JSON.stringify(results.debug_info, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
 

@@ -243,10 +243,21 @@ const PullPermitsModal = ({ county, onClose }) => {
                 className="btn-primary"
               >
                 {pullPermits.isPending ? (
-                  <>
+                  <div className="flex items-center">
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Pulling...
-                  </>
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Pulling Permits...</span>
+                      <span className="text-xs font-normal text-blue-100 mt-0.5">
+                        {useYearsFilter && formData.older_than_years
+                          ? `Last ${formData.older_than_years} years`
+                          : formData.date_from && formData.date_to
+                          ? `${formData.date_from} to ${formData.date_to}`
+                          : 'All dates'}
+                        {formData.finaled_only ? ' • Finaled only' : ''}
+                        {' • Max: ' + formData.limit}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     <Download className="h-4 w-4 mr-2" />

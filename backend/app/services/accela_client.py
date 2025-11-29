@@ -327,9 +327,9 @@ class AccelaClient:
         limit: int = 100,
         status: Optional[str] = None,
         permit_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        Get permits from Accela.
+        Get permits from Accela with diagnostic information.
 
         Args:
             date_from: Start date (YYYY-MM-DD)
@@ -339,7 +339,7 @@ class AccelaClient:
             permit_type: Optional type filter (e.g., 'Mechanical') - filters at API level
 
         Returns:
-            List of permit records
+            Dict containing permits, query_info, and debug_info
         """
         params = {
             "module": "Building",
@@ -354,8 +354,30 @@ class AccelaClient:
         if permit_type:
             params["type"] = permit_type
 
+        # Enhanced logging
+        print(f"🔍 [ACCELA API] GET /v4/records")
+        print(f"   Params: {params}")
+
         result = await self._make_request("GET", "/v4/records", params=params)
-        return result.get("result", [])
+        permits = result.get("result", [])
+
+        # Return permits with diagnostics
+        return {
+            "permits": permits,
+            "query_info": {
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": limit,
+                "status": status,
+                "permit_type": permit_type,
+                "module": "Building"
+            },
+            "debug_info": {
+                "total_returned": len(permits),
+                "api_params": params,
+                "api_endpoint": "/v4/records"
+            }
+        }
 
     async def get_addresses(self, record_id: str) -> List[Dict[str, Any]]:
         """Get addresses for a record."""

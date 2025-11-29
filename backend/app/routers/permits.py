@@ -176,13 +176,17 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         print(f"🔍 [PULL PERMITS] Created Accela client, pulling Mechanical permits...")
 
         # Pull ONLY Mechanical permits (filtered at API level for efficiency)
-        hvac_permits = await client.get_permits(
+        accela_response = await client.get_permits(
             date_from=request.date_from,
             date_to=request.date_to,
             limit=request.limit,
             status=request.status,
             permit_type="Mechanical"
         )
+
+        hvac_permits = accela_response["permits"]
+        query_info = accela_response["query_info"]
+        debug_info = accela_response["debug_info"]
 
         print(f"✅ [PULL PERMITS] Retrieved {len(hvac_permits)} Mechanical permits from Accela")
 
@@ -304,9 +308,27 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         saved_count = len([p for p in saved_permits if p])
         print(f"✅ [PULL PERMITS] Complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Leads: {len(created_leads)}")
 
+        # Calculate helpful metrics
+        from datetime import datetime as dt
+        date_from_obj = dt.fromisoformat(request.date_from)
+        date_to_obj = dt.fromisoformat(request.date_to)
+        date_range_days = (date_to_obj - date_from_obj).days
+
+        # Generate suggestions if 0 results
+        suggestions = []
+        if len(hvac_permits) == 0:
+            suggestions.append("No Mechanical permits found in this date range")
+            suggestions.append("Try widening your date range")
+            if request.status:
+                suggestions.append(f"Try removing the '{request.status}' status filter")
+            suggestions.append("Verify Mechanical permits exist in Accela for this period")
+            if date_range_days < 30:
+                suggestions.append("Date range is narrow (< 30 days) - try a longer period")
+
         return {
             "success": True,
             "data": {
+                # Existing fields
                 "total_pulled": len(hvac_permits),
                 "hvac_permits": len(hvac_permits),
                 "saved": saved_count,
@@ -318,7 +340,21 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 "errors": {
                     "save_failures": failed_saves,
                     "lead_failures": failed_leads
-                } if (failed_saves or failed_leads) else None
+                } if (failed_saves or failed_leads) else None,
+
+                # NEW: Diagnostic fields
+                "query_info": {
+                    "date_from": request.date_from,
+                    "date_to": request.date_to,
+                    "date_range_days": date_range_days,
+                    "limit": request.limit,
+                    "status_filter": request.status,
+                    "permit_type_filter": "Mechanical",
+                    "county_name": county.get("name"),
+                    "county_code": county.get("county_code")
+                },
+                "suggestions": suggestions if suggestions else None,
+                "debug_info": debug_info
             },
             "error": None
         }
