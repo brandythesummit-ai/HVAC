@@ -1,6 +1,6 @@
 """Accela Civic Platform API client with OAuth refresh_token flow."""
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from app.services.encryption import encryption_service
 
@@ -61,7 +61,6 @@ class AccelaClient:
         try:
             expires_at = datetime.fromisoformat(self._token_expires_at.replace('Z', '+00:00'))
             # Refresh if token expires within 1 minute
-            from datetime import timezone
             return datetime.now(timezone.utc) >= expires_at - timedelta(minutes=1)
         except (ValueError, AttributeError):
             return True
