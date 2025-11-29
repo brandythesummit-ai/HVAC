@@ -260,8 +260,8 @@ async def get_oauth_authorization_url(county_id: str, db=Depends(get_db)):
             "agency_name": county["county_code"]
         }
 
-        # Note: The base URL depends on the agency, typically https://apis.accela.com
-        base_url = "https://apis.accela.com/oauth2/authorize"
+        # Accela OAuth authorization endpoint
+        base_url = "https://auth.accela.com/oauth2/authorize"
         auth_url = f"{base_url}?{urllib.parse.urlencode(params)}"
 
         return {
