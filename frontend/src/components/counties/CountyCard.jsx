@@ -176,8 +176,8 @@ const CountyCard = ({ county }) => {
                     Delete {county.name}?
                   </h3>
                   <p className="text-sm text-gray-600">
-                    This will permanently delete this county and all associated permits.
-                    Leads will be preserved and remain in the system.
+                    This will permanently delete this county connection.
+                    All permits and leads will be preserved in the system.
                   </p>
                 </div>
               </div>

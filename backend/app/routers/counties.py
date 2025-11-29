@@ -197,8 +197,8 @@ async def update_county(county_id: str, county: CountyUpdate, db=Depends(get_db)
 @router.delete("/{county_id}", response_model=dict)
 async def delete_county(county_id: str, db=Depends(get_db)):
     """
-    Delete a county and all associated permits.
-    Leads are preserved (county_id set to null) so they remain in the system.
+    Delete a county record only.
+    Permits and leads are preserved (county_id set to null) so they remain in the system.
     """
     try:
         # Verify county exists
@@ -206,8 +206,8 @@ async def delete_county(county_id: str, db=Depends(get_db)):
         if not county_result.data:
             raise HTTPException(status_code=404, detail="County not found")
 
-        # Step 1: Delete all permits associated with this county
-        db.table("permits").delete().eq("county_id", county_id).execute()
+        # Step 1: Preserve permits by setting their county_id to null
+        db.table("permits").update({"county_id": None}).eq("county_id", county_id).execute()
 
         # Step 2: Preserve leads by setting their county_id to null
         db.table("leads").update({"county_id": None}).eq("county_id", county_id).execute()
@@ -217,7 +217,7 @@ async def delete_county(county_id: str, db=Depends(get_db)):
 
         return {
             "success": True,
-            "data": {"message": "County deleted successfully. Permits removed, leads preserved."},
+            "data": {"message": "County deleted successfully. Permits and leads preserved."},
             "error": None
         }
 
