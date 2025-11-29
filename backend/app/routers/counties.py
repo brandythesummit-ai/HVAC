@@ -257,7 +257,8 @@ async def get_oauth_authorization_url(county_id: str, db=Depends(get_db)):
             "response_type": "code",
             "redirect_uri": callback_url,
             "state": state,
-            "agency_name": county["county_code"]
+            "agency_name": county["county_code"],
+            "environment": "PROD"
         }
 
         # Accela OAuth authorization endpoint
