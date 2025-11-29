@@ -38,4 +38,16 @@ export const countiesApi = {
     const response = await apiClient.post(`/api/counties/${id}/test`);
     return response.data;
   },
+
+  // Get OAuth authorization URL
+  getOAuthUrl: async (id) => {
+    const response = await apiClient.post(`/api/counties/${id}/oauth/authorize`);
+    return response.data?.data || response.data;
+  },
+
+  // Get county metrics
+  getMetrics: async (id) => {
+    const response = await apiClient.get(`/api/counties/${id}/metrics`);
+    return response.data?.data || {};
+  },
 };

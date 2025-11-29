@@ -112,6 +112,47 @@ async def get_county(county_id: str, db=Depends(get_db)):
         }
 
 
+@router.get("/{county_id}/metrics", response_model=dict)
+async def get_county_metrics(county_id: str, db=Depends(get_db)):
+    """Get metrics for a county (total permits, new leads, etc.)."""
+    try:
+        # Get county to verify it exists
+        county_result = db.table("counties").select("*").eq("id", county_id).execute()
+        if not county_result.data:
+            raise HTTPException(status_code=404, detail="County not found")
+
+        # Get total permits count
+        permits_result = db.table("permits").select("id", count="exact").eq("county_id", county_id).execute()
+        total_permits = permits_result.count or 0
+
+        # Get new leads (permits not yet sent to GHL)
+        new_leads_result = db.table("permits").select("id", count="exact").eq("county_id", county_id).eq("ghl_sent", False).execute()
+        new_leads = new_leads_result.count or 0
+
+        # Get sent to GHL count
+        sent_result = db.table("permits").select("id", count="exact").eq("county_id", county_id).eq("ghl_sent", True).execute()
+        sent_to_ghl = sent_result.count or 0
+
+        return {
+            "success": True,
+            "data": {
+                "total_permits": total_permits,
+                "new_leads": new_leads,
+                "sent_to_ghl": sent_to_ghl
+            },
+            "error": None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }
+
+
 @router.put("/{county_id}", response_model=dict)
 async def update_county(county_id: str, county: CountyUpdate, db=Depends(get_db)):
     """Update county information."""

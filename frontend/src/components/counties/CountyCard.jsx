@@ -1,42 +1,42 @@
 import { useState } from 'react';
-import { MapPin, Download, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/formatters';
+import { useCountyMetrics, useGetOAuthUrl } from '../../hooks/useCounties';
 import PullPermitsModal from './PullPermitsModal';
 
 const CountyCard = ({ county }) => {
   const [showPullModal, setShowPullModal] = useState(false);
+  const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
+  const getOAuthUrl = useGetOAuthUrl();
+
+  const handleAuthorize = async () => {
+    try {
+      const { authorization_url } = await getOAuthUrl.mutateAsync(county.id);
+      window.open(authorization_url, '_blank', 'width=600,height=700');
+    } catch (error) {
+      console.error('Failed to get OAuth URL:', error);
+    }
+  };
 
   const getStatusBadgeClass = () => {
-    switch (county.status) {
-      case 'connected':
-        return 'badge badge-success';
-      case 'token_expired':
-        return 'badge badge-warning';
-      default:
-        return 'badge badge-error';
+    if (county.oauth_authorized) {
+      return 'badge badge-success';
     }
+    return 'badge badge-warning';
   };
 
   const getStatusText = () => {
-    switch (county.status) {
-      case 'connected':
-        return 'Connected';
-      case 'token_expired':
-        return 'Token Expired';
-      default:
-        return 'Error';
+    if (county.oauth_authorized) {
+      return 'Authorized';
     }
+    return 'Not Authorized';
   };
 
   const getStatusIcon = () => {
-    switch (county.status) {
-      case 'connected':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'token_expired':
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <AlertCircle className="h-4 w-4" />;
+    if (county.oauth_authorized) {
+      return <CheckCircle className="h-4 w-4" />;
     }
+    return <AlertCircle className="h-4 w-4" />;
   };
 
   return (
@@ -50,8 +50,8 @@ const CountyCard = ({ county }) => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">{county.name}</h3>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {county.accela_environment || 'Production'}
+                <p className="text-sm text-gray-500 mt-0.5 font-mono">
+                  {county.county_code}
                 </p>
               </div>
             </div>
@@ -63,6 +63,40 @@ const CountyCard = ({ county }) => {
         </div>
 
         <div className="card-body">
+          {/* Metrics Section */}
+          {county.oauth_authorized && metrics && (
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <div className="flex items-center justify-center mb-1">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metricsLoading ? '-' : metrics.total_permits || 0}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">Total Permits</p>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center mb-1">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metricsLoading ? '-' : metrics.new_leads || 0}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">New Leads</p>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center mb-1">
+                  <Send className="h-4 w-4 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metricsLoading ? '-' : metrics.sent_to_ghl || 0}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">Sent to GHL</p>
+              </div>
+            </div>
+          )}
+
+          {/* Last Pull Time */}
           {county.last_pull_at && (
             <div className="flex items-center text-sm text-gray-500 mb-4">
               <Clock className="h-4 w-4 mr-1.5" />
@@ -70,14 +104,34 @@ const CountyCard = ({ county }) => {
             </div>
           )}
 
-          <button
-            onClick={() => setShowPullModal(true)}
-            disabled={!county.is_active}
-            className="btn-primary w-full"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Pull Permits
-          </button>
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {county.oauth_authorized ? (
+              <button
+                onClick={() => setShowPullModal(true)}
+                disabled={!county.is_active}
+                className="btn-primary w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Pull Permits
+              </button>
+            ) : (
+              <button
+                onClick={handleAuthorize}
+                disabled={getOAuthUrl.isPending}
+                className="btn-primary w-full"
+              >
+                {getOAuthUrl.isPending ? (
+                  <>Loading...</>
+                ) : (
+                  <>
+                    Authorize with Accela
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

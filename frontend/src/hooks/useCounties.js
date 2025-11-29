@@ -54,3 +54,17 @@ export const useTestCountyConnection = () => {
     mutationFn: countiesApi.testConnection,
   });
 };
+
+export const useGetOAuthUrl = () => {
+  return useMutation({
+    mutationFn: countiesApi.getOAuthUrl,
+  });
+};
+
+export const useCountyMetrics = (id) => {
+  return useQuery({
+    queryKey: ['counties', id, 'metrics'],
+    queryFn: () => countiesApi.getMetrics(id),
+    enabled: !!id,
+  });
+};
