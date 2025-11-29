@@ -1,6 +1,5 @@
 """Accela Civic Platform API client with OAuth refresh_token flow."""
 import httpx
-import base64
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from app.services.encryption import encryption_service
@@ -79,15 +78,12 @@ class AccelaClient:
         """
         url = f"{self.auth_url}/oauth2/token"
 
-        # Prepare Basic Auth header
-        credentials = f"{self.app_id}:{self.app_secret}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
-
         data = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
-            "environment": "PROD"
+            "client_id": self.app_id,
+            "client_secret": self.app_secret
         }
 
         try:
@@ -97,7 +93,7 @@ class AccelaClient:
                     data=data,
                     headers={
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "Authorization": f"Basic {encoded_credentials}"
+                        "x-accela-appid": self.app_id
                     }
                 )
                 response.raise_for_status()
@@ -133,14 +129,11 @@ class AccelaClient:
 
         url = f"{self.auth_url}/oauth2/token"
 
-        # Prepare Basic Auth header
-        credentials = f"{self.app_id}:{self.app_secret}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
-
         data = {
             "grant_type": "refresh_token",
             "refresh_token": self.refresh_token_decrypted,
-            "environment": "PROD"
+            "client_id": self.app_id,
+            "client_secret": self.app_secret
         }
 
         async with httpx.AsyncClient() as client:
@@ -149,7 +142,7 @@ class AccelaClient:
                 data=data,
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": f"Basic {encoded_credentials}"
+                    "x-accela-appid": self.app_id
                 }
             )
             response.raise_for_status()
