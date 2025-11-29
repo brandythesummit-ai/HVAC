@@ -125,20 +125,20 @@ async def get_county_metrics(county_id: str, db=Depends(get_db)):
         permits_result = db.table("permits").select("id", count="exact").eq("county_id", county_id).execute()
         total_permits = permits_result.count or 0
 
-        # Get new leads (permits not yet sent to GHL)
-        new_leads_result = db.table("permits").select("id", count="exact").eq("county_id", county_id).eq("ghl_sent", False).execute()
-        new_leads = new_leads_result.count or 0
+        # Get pending leads (not yet synced to Summit)
+        pending_leads_result = db.table("leads").select("id", count="exact").eq("county_id", county_id).eq("summit_sync_status", "pending").execute()
+        pending_leads = pending_leads_result.count or 0
 
-        # Get sent to GHL count
-        sent_result = db.table("permits").select("id", count="exact").eq("county_id", county_id).eq("ghl_sent", True).execute()
-        sent_to_ghl = sent_result.count or 0
+        # Get synced to Summit count
+        synced_result = db.table("leads").select("id", count="exact").eq("county_id", county_id).eq("summit_sync_status", "synced").execute()
+        synced_to_summit = synced_result.count or 0
 
         return {
             "success": True,
             "data": {
                 "total_permits": total_permits,
-                "new_leads": new_leads,
-                "sent_to_ghl": sent_to_ghl
+                "new_leads": pending_leads,
+                "sent_to_ghl": synced_to_summit
             },
             "error": None
         }
