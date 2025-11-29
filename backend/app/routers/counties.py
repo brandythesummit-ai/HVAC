@@ -221,6 +221,106 @@ async def delete_county(county_id: str, db=Depends(get_db)):
 
 # OAuth endpoints
 
+@router.post("/{county_id}/oauth/password-setup", response_model=dict)
+async def setup_county_with_password(
+    county_id: str,
+    credentials: dict,
+    db=Depends(get_db)
+):
+    """
+    Setup county OAuth using password grant flow (simpler than authorization code).
+
+    User enters their Accela credentials once, backend exchanges for tokens.
+    Refresh tokens are used for ongoing access - user never needs to enter password again.
+
+    Request body:
+    {
+        "username": "user@example.com",
+        "password": "userpassword",
+        "scope": "records"  // optional, defaults to "records"
+    }
+    """
+    try:
+        # Get county
+        result = db.table("counties").select("*").eq("id", county_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="County not found")
+
+        county = result.data[0]
+
+        # Get global Accela app credentials
+        app_settings = db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_settings.data or not app_settings.data[0].get("app_id"):
+            raise HTTPException(
+                status_code=400,
+                detail="Accela app credentials not configured. Please configure in Settings."
+            )
+
+        app_id = app_settings.data[0]["app_id"]
+        app_secret_encrypted = app_settings.data[0]["app_secret"]
+        app_secret = encryption_service.decrypt(app_secret_encrypted)
+
+        # Extract credentials
+        username = credentials.get("username")
+        password = credentials.get("password")
+        scope = credentials.get("scope", "records")
+
+        if not username or not password:
+            raise HTTPException(
+                status_code=400,
+                detail="username and password are required"
+            )
+
+        # Exchange credentials for tokens using password grant
+        client = AccelaClient(
+            app_id=app_id,
+            app_secret=app_secret,
+            county_code=county["county_code"]
+        )
+
+        token_response = await client.exchange_password_for_token(
+            username=username,
+            password=password,
+            scope=scope
+        )
+
+        if not token_response.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=token_response.get("error", "Token exchange failed")
+            )
+
+        # Store encrypted refresh token
+        refresh_token_encrypted = encryption_service.encrypt(token_response["refresh_token"])
+
+        update_data = {
+            "refresh_token": refresh_token_encrypted,
+            "token_expires_at": token_response.get("expires_at"),
+            "status": "connected"
+        }
+
+        db.table("counties").update(update_data).eq("id", county_id).execute()
+
+        return {
+            "success": True,
+            "data": {
+                "message": "County connected successfully using password grant",
+                "county_id": county_id,
+                "county_name": county["name"]
+            },
+            "error": None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }
+
+
 @router.post("/{county_id}/oauth/authorize", response_model=dict)
 async def get_oauth_authorization_url(county_id: str, db=Depends(get_db)):
     """Generate OAuth authorization URL for a county."""

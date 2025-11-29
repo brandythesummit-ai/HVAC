@@ -86,6 +86,13 @@ class AccelaClient:
             "client_secret": self.app_secret
         }
 
+        # DETAILED LOGGING - Before request
+        print(f"🔍 [AUTH CODE EXCHANGE] Starting token exchange")
+        print(f"   URL: {url}")
+        print(f"   Redirect URI: {redirect_uri}")
+        print(f"   Code (first 20 chars): {code[:20]}...")
+        print(f"   Client ID: {self.app_id}")
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -96,8 +103,16 @@ class AccelaClient:
                         "x-accela-appid": self.app_id
                     }
                 )
+
+                # DETAILED LOGGING - After request
+                print(f"✅ [AUTH CODE EXCHANGE] Response received")
+                print(f"   Status: {response.status_code}")
+                print(f"   Headers: {dict(response.headers)}")
+
                 response.raise_for_status()
                 result = response.json()
+
+                print(f"✅ [AUTH CODE EXCHANGE] Token exchange successful")
 
             # Calculate expiration
             expires_in = result.get("expires_in", 3600)  # Default 1 hour
@@ -112,23 +127,123 @@ class AccelaClient:
             }
 
         except httpx.HTTPStatusError as e:
-            # Log the full error response for debugging
+            # DETAILED LOGGING - Error case
             error_body = e.response.text
             error_status = e.response.status_code
+            trace_id = e.response.headers.get('x-accela-traceid') or e.response.headers.get('x-accela-trace-id')
 
-            print(f"❌ Accela token exchange failed:")
+            print(f"❌ [AUTH CODE EXCHANGE] Failed:")
             print(f"   Status: {error_status}")
             print(f"   URL: {url}")
+            print(f"   Redirect URI sent: {redirect_uri}")
             print(f"   Request headers: {dict(e.response.request.headers)}")
             print(f"   Request body: {e.response.request.content.decode()}")
+            print(f"   Response headers: {dict(e.response.headers)}")
             print(f"   Response body: {error_body}")
+            if trace_id:
+                print(f"   Trace ID: {trace_id}")
 
             return {
                 "success": False,
-                "error": f"Accela API error ({error_status}): {error_body}"
+                "error": f"Accela API error ({error_status}): {error_body}",
+                "trace_id": trace_id
             }
         except Exception as e:
-            print(f"❌ Unexpected error during token exchange: {str(e)}")
+            print(f"❌ [AUTH CODE EXCHANGE] Unexpected error: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def exchange_password_for_token(
+        self,
+        username: str,
+        password: str,
+        scope: str = "records"
+    ) -> Dict[str, Any]:
+        """
+        Exchange user credentials for tokens using password grant flow.
+
+        This is simpler than authorization code flow and works well for
+        backend integrations. User enters password once, then we use
+        refresh tokens for ongoing access.
+
+        Args:
+            username: User's email/username
+            password: User's password
+            scope: OAuth scope (default: 'records')
+
+        Returns:
+            Dict with 'success', 'refresh_token', 'access_token', 'expires_at'
+        """
+        url = f"{self.auth_url}/oauth2/token"
+
+        data = {
+            "grant_type": "password",
+            "client_id": self.app_id,
+            "client_secret": self.app_secret,
+            "username": username,
+            "password": password,
+            "scope": scope,
+            "agency_name": self.county_code,
+            "environment": "PROD"
+        }
+
+        print(f"🔍 [PASSWORD GRANT] Starting token exchange")
+        print(f"   URL: {url}")
+        print(f"   Username: {username}")
+        print(f"   Agency: {self.county_code}")
+        print(f"   Scope: {scope}")
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    data=data,
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "x-accela-appid": self.app_id
+                    }
+                )
+
+                print(f"✅ [PASSWORD GRANT] Response received")
+                print(f"   Status: {response.status_code}")
+
+                response.raise_for_status()
+                result = response.json()
+
+                print(f"✅ [PASSWORD GRANT] Token exchange successful")
+
+            # Calculate expiration
+            expires_in = result.get("expires_in", 3600)  # Default 1 hour
+            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+            return {
+                "success": True,
+                "refresh_token": result["refresh_token"],
+                "access_token": result["access_token"],
+                "expires_at": expires_at.isoformat() + 'Z',
+                "error": None
+            }
+
+        except httpx.HTTPStatusError as e:
+            error_body = e.response.text
+            error_status = e.response.status_code
+            trace_id = e.response.headers.get('x-accela-traceid') or e.response.headers.get('x-accela-trace-id')
+
+            print(f"❌ [PASSWORD GRANT] Failed:")
+            print(f"   Status: {error_status}")
+            print(f"   Response body: {error_body}")
+            if trace_id:
+                print(f"   Trace ID: {trace_id}")
+
+            return {
+                "success": False,
+                "error": f"Accela API error ({error_status}): {error_body}",
+                "trace_id": trace_id
+            }
+        except Exception as e:
+            print(f"❌ [PASSWORD GRANT] Unexpected error: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
