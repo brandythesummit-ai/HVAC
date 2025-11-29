@@ -37,11 +37,16 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
     # Extract address
     if addresses:
         addr = addresses[0]
+        state = addr.get("state", "")
+        # Handle state as dict with 'value' or 'text' keys, or as string
+        if isinstance(state, dict):
+            state = state.get("value") or state.get("text", "")
+
         parts = [
             str(addr.get("streetStart", "")),
             str(addr.get("streetName", "")),
             str(addr.get("city", "")),
-            str(addr.get("state", "")),
+            str(state) if state else "",
             str(addr.get("zip", ""))
         ]
         extracted["property_address"] = " ".join(filter(None, parts))

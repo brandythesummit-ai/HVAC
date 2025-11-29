@@ -5,6 +5,13 @@ const LeadRow = ({ lead, isSelected, onToggle }) => {
   // Extract permit data from nested structure
   const permit = lead.permits || {};
 
+  // Clean up address - remove dict string representation from state
+  const cleanAddress = (address) => {
+    if (!address) return '-';
+    // Remove patterns like "{'value': 'FL', 'text': 'FL'}" and replace with just the value
+    return address.replace(/\s*\{'value':\s*'([^']+)',\s*'text':\s*'[^']+'\}/g, ' $1').trim();
+  };
+
   return (
     <tr className="hover:bg-gray-50 transition-colors duration-150">
       <td className="px-6 py-4 whitespace-nowrap">
@@ -20,7 +27,7 @@ const LeadRow = ({ lead, isSelected, onToggle }) => {
         <div className="text-sm text-gray-500">{permit.owner_phone || '-'}</div>
       </td>
       <td className="px-6 py-4">
-        <div className="text-sm text-gray-900">{permit.property_address || '-'}</div>
+        <div className="text-sm text-gray-900">{cleanAddress(permit.property_address)}</div>
         <div className="text-sm text-gray-500">{permit.county_name || '-'}</div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
