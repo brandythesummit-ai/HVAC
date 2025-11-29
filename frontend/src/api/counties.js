@@ -4,7 +4,9 @@ export const countiesApi = {
   // Get all counties
   getAll: async () => {
     const response = await apiClient.get('/api/counties');
-    return response.data;
+    // Backend returns {success, data: [...], error}
+    // Extract just the data array
+    return response.data?.data || [];
   },
 
   // Get single county
