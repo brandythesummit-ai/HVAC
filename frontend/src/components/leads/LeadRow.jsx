@@ -28,16 +28,16 @@ const LeadRow = ({ lead, isSelected, onToggle }) => {
       </td>
       <td className="px-6 py-4">
         <div className="text-sm text-gray-900">{cleanAddress(permit.property_address)}</div>
-        <div className="text-sm text-gray-500">{permit.county_name || '-'}</div>
+        <div className="text-sm text-gray-500">{permit.neighborhood || permit.county_name || '-'}</div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         {formatDate(permit.opened_date)}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {permit.year_built || '-'}
+        {permit.lot_size_sqft ? `${permit.lot_size_sqft.toLocaleString()} sqft` : '-'}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {permit.square_footage ? `${permit.square_footage.toLocaleString()} sqft` : '-'}
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+        {formatCurrency(permit.total_property_value)}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
         {formatCurrency(permit.job_value)}

@@ -106,10 +106,10 @@ const LeadsTable = ({ leads, isLoading }) => {
                   Permit Date
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Year Built
+                  Lot Size
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Sq Ft
+                  Property Value
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Job Value

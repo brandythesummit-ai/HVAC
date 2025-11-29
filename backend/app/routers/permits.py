@@ -19,6 +19,11 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
         "status": permit.get("status", {}).get("value", ""),
     }
 
+    # Extract permit custom ID (e.g., HC-BTR-25-0300825)
+    custom_id = permit.get("customId", "")
+    if custom_id:
+        extracted["custom_id"] = custom_id
+
     # Extract dates
     opened_date = permit.get("openedDate")
     if opened_date:
@@ -28,9 +33,10 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
             extracted["opened_date"] = None
 
     # Extract job value
-    if "value" in permit:
+    job_value = permit.get("jobValue")
+    if job_value:
         try:
-            extracted["job_value"] = float(permit["value"])
+            extracted["job_value"] = float(job_value) if float(job_value) > 0 else None
         except (ValueError, TypeError):
             extracted["job_value"] = None
 
@@ -51,6 +57,11 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
         ]
         extracted["property_address"] = " ".join(filter(None, parts))
 
+        # Extract neighborhood
+        neighborhood = addr.get("neighborhood", "")
+        if neighborhood:
+            extracted["neighborhood"] = neighborhood
+
     # Extract owner info
     if owners:
         owner = owners[0]
@@ -61,25 +72,60 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
     # Extract parcel data (property info)
     if parcels:
         parcel = parcels[0]
-        try:
-            extracted["year_built"] = int(parcel.get("yearBuilt", 0)) or None
-        except (ValueError, TypeError):
-            extracted["year_built"] = None
 
-        try:
-            extracted["square_footage"] = int(parcel.get("landArea", 0)) or None
-        except (ValueError, TypeError):
-            extracted["square_footage"] = None
+        # Note: yearBuilt doesn't exist in Accela parcel response
+        # Leaving as None for now
+        extracted["year_built"] = None
 
+        # Use parcelArea (in acres) - convert to square feet
         try:
-            extracted["property_value"] = float(parcel.get("landValue", 0)) or None
+            parcel_area_acres = float(parcel.get("parcelArea", 0))
+            if parcel_area_acres > 0:
+                # Convert acres to square feet (1 acre = 43,560 sq ft)
+                extracted["lot_size_sqft"] = int(parcel_area_acres * 43560)
+            else:
+                extracted["lot_size_sqft"] = None
         except (ValueError, TypeError):
-            extracted["property_value"] = None
+            extracted["lot_size_sqft"] = None
 
+        # Land value (lot value)
         try:
-            extracted["lot_size"] = float(parcel.get("lotSize", 0)) or None
+            extracted["land_value"] = float(parcel.get("landValue", 0)) or None
         except (ValueError, TypeError):
-            extracted["lot_size"] = None
+            extracted["land_value"] = None
+
+        # Improved value (building value)
+        try:
+            extracted["improved_value"] = float(parcel.get("improvedValue", 0)) or None
+        except (ValueError, TypeError):
+            extracted["improved_value"] = None
+
+        # Total property value (land + improvements)
+        if extracted.get("land_value") and extracted.get("improved_value"):
+            extracted["total_property_value"] = extracted["land_value"] + extracted["improved_value"]
+        elif extracted.get("land_value"):
+            extracted["total_property_value"] = extracted["land_value"]
+        elif extracted.get("improved_value"):
+            extracted["total_property_value"] = extracted["improved_value"]
+        else:
+            extracted["total_property_value"] = None
+
+        # Parcel number
+        parcel_number = parcel.get("parcelNumber", "")
+        if parcel_number:
+            extracted["parcel_number"] = parcel_number
+
+        # Subdivision
+        subdivision = parcel.get("subdivision", {})
+        if isinstance(subdivision, dict):
+            subdivision = subdivision.get("text") or subdivision.get("value", "")
+        if subdivision:
+            extracted["subdivision"] = subdivision
+
+        # Legal description
+        legal_desc = parcel.get("legalDescription", "")
+        if legal_desc:
+            extracted["legal_description"] = legal_desc
 
     return extracted
 
