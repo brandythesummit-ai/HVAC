@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send } from 'lucide-react';
+import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2 } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/formatters';
-import { useCountyMetrics, useGetOAuthUrl } from '../../hooks/useCounties';
+import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty } from '../../hooks/useCounties';
 import PullPermitsModal from './PullPermitsModal';
 
 const CountyCard = ({ county }) => {
   const [showPullModal, setShowPullModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
   const getOAuthUrl = useGetOAuthUrl();
+  const deleteCounty = useDeleteCounty();
 
   const handleAuthorize = async () => {
     try {
@@ -15,6 +17,15 @@ const CountyCard = ({ county }) => {
       window.open(authorization_url, '_blank', 'width=600,height=700');
     } catch (error) {
       console.error('Failed to get OAuth URL:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteCounty.mutateAsync(county.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Failed to delete county:', error);
     }
   };
 
@@ -131,6 +142,15 @@ const CountyCard = ({ county }) => {
                 )}
               </button>
             )}
+
+            {/* Delete Button */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="btn-secondary w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete County
+            </button>
           </div>
         </div>
       </div>
@@ -140,6 +160,53 @@ const CountyCard = ({ county }) => {
           county={county}
           onClose={() => setShowPullModal(false)}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-50">
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl animate-slide-in">
+            <div className="px-6 py-6">
+              <div className="flex items-start mb-4">
+                <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mr-4">
+                  <Trash2 className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    Delete {county.name}?
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    This will permanently delete this county and all associated permits.
+                    Leads will be preserved and remain in the system.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="btn-secondary"
+                  disabled={deleteCounty.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleteCounty.isPending}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                >
+                  {deleteCounty.isPending ? 'Deleting...' : 'Delete County'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
