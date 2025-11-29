@@ -83,7 +83,9 @@ class AccelaClient:
             "code": code,
             "redirect_uri": redirect_uri,
             "client_id": self.app_id,
-            "client_secret": self.app_secret
+            "client_secret": self.app_secret,
+            "agency_name": self.county_code,
+            "environment": "PROD"
         }
 
         try:
