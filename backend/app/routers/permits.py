@@ -6,6 +6,7 @@ from datetime import datetime
 from app.database import get_db
 from app.models.permit import PullPermitsRequest, PermitResponse, PermitListRequest
 from app.services.accela_client import AccelaClient
+from app.services.encryption import encryption_service
 
 router = APIRouter(prefix="/api", tags=["permits"])
 
@@ -82,6 +83,8 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
 async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(get_db)):
     """Pull permits from Accela and enrich with property data."""
     try:
+        print(f"🔍 [PULL PERMITS] Starting permit pull for county {county_id}")
+
         # Get county
         result = db.table("counties").select("*").eq("id", county_id).execute()
 
@@ -89,15 +92,37 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             raise HTTPException(status_code=404, detail="County not found")
 
         county = result.data[0]
+        print(f"✅ [PULL PERMITS] Found county: {county.get('name')} ({county.get('county_code')})")
+
+        # Verify county has refresh token
+        if not county.get("refresh_token"):
+            raise HTTPException(status_code=400, detail="County not authorized. Please authorize with Accela first.")
+
+        # Get global Accela app credentials
+        app_settings = db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_settings.data or not app_settings.data[0].get("app_id"):
+            raise HTTPException(
+                status_code=400,
+                detail="Accela app credentials not configured. Please configure in Settings."
+            )
+
+        app_id = app_settings.data[0]["app_id"]
+        app_secret_encrypted = app_settings.data[0]["app_secret"]
+        app_secret = encryption_service.decrypt(app_secret_encrypted)
+
+        print(f"✅ [PULL PERMITS] Retrieved app credentials")
 
         # Create Accela client
         client = AccelaClient(
-            environment=county["accela_environment"],
-            app_id=county["accela_app_id"],
-            app_secret=county["accela_app_secret"],
-            access_token=county.get("accela_access_token", ""),
+            app_id=app_id,
+            app_secret=app_secret,
+            county_code=county["county_code"],
+            refresh_token=county.get("refresh_token", ""),
+            access_token=county.get("access_token", ""),
             token_expires_at=county.get("token_expires_at", "")
         )
+
+        print(f"🔍 [PULL PERMITS] Created Accela client, pulling permits...")
 
         # Pull permits
         permits = await client.get_permits(
@@ -107,8 +132,11 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             status=request.status
         )
 
+        print(f"✅ [PULL PERMITS] Retrieved {len(permits)} permits from Accela")
+
         # Filter for Mechanical permits
         hvac_permits = [p for p in permits if "Mechanical" in p.get("type", {}).get("value", "")]
+        print(f"🔍 [PULL PERMITS] Filtered to {len(hvac_permits)} HVAC permits")
 
         # Enrich each permit
         saved_permits = []
@@ -151,19 +179,28 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 insert_result = db.table("permits").insert(permit_data).execute()
                 saved_permits.append(insert_result.data[0] if insert_result.data else None)
 
-        # Update county last_pull_at
-        db.table("counties").update({
-            "last_pull_at": datetime.utcnow().isoformat(),
-            "accela_access_token": client._access_token,
-            "token_expires_at": client._token_expires_at
-        }).eq("id", county_id).execute()
+        # Update county last_pull_at and store updated tokens
+        update_data = {
+            "last_pull_at": datetime.utcnow().isoformat()
+        }
+
+        # Update access token if it was refreshed
+        if client._access_token:
+            update_data["access_token"] = client._access_token
+        if client._token_expires_at:
+            update_data["token_expires_at"] = client._token_expires_at
+
+        db.table("counties").update(update_data).eq("id", county_id).execute()
+
+        saved_count = len([p for p in saved_permits if p])
+        print(f"✅ [PULL PERMITS] Complete! Total: {len(permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}")
 
         return {
             "success": True,
             "data": {
                 "total_pulled": len(permits),
                 "hvac_permits": len(hvac_permits),
-                "saved": len([p for p in saved_permits if p]),
+                "saved": saved_count,
                 "permits": saved_permits
             },
             "error": None
@@ -172,6 +209,9 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ [PULL PERMITS] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "data": None,
