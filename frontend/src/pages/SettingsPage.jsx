@@ -1,4 +1,5 @@
 import SummitSettings from '../components/settings/SummitSettings';
+import AccelaSettings from '../components/settings/AccelaSettings';
 import { Settings as SettingsIcon } from 'lucide-react';
 
 const SettingsPage = () => {
@@ -19,6 +20,7 @@ const SettingsPage = () => {
 
       {/* Settings Content */}
       <div className="space-y-6">
+        <AccelaSettings />
         <SummitSettings />
       </div>
     </div>
