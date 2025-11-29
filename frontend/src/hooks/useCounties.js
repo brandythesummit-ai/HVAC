@@ -61,6 +61,17 @@ export const useGetOAuthUrl = () => {
   });
 };
 
+export const useSetupCountyWithPassword = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, credentials }) => countiesApi.setupWithPassword(id, credentials),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['counties'] });
+    },
+  });
+};
+
 export const useCountyMetrics = (id) => {
   return useQuery({
     queryKey: ['counties', id, 'metrics'],

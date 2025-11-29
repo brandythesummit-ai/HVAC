@@ -45,6 +45,12 @@ export const countiesApi = {
     return response.data?.data || response.data;
   },
 
+  // Setup county with password grant (simpler alternative to OAuth popup)
+  setupWithPassword: async (id, credentials) => {
+    const response = await apiClient.post(`/api/counties/${id}/oauth/password-setup`, credentials);
+    return response.data;
+  },
+
   // Get county metrics
   getMetrics: async (id) => {
     const response = await apiClient.get(`/api/counties/${id}/metrics`);

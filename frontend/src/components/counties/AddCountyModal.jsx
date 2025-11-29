@@ -1,20 +1,30 @@
 import { useState } from 'react';
-import { X, CheckCircle, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
-import { useCreateCounty, useGetOAuthUrl } from '../../hooks/useCounties';
+import { X, CheckCircle, Loader2, ExternalLink, AlertCircle, Key } from 'lucide-react';
+import { useCreateCounty, useGetOAuthUrl, useSetupCountyWithPassword } from '../../hooks/useCounties';
 
 const AddCountyModal = ({ onClose }) => {
   const [step, setStep] = useState(1); // 1: Form, 2: Success/Authorize
+  const [authMethod, setAuthMethod] = useState('password'); // 'password' or 'oauth'
   const [formData, setFormData] = useState({
     name: '',
     county_code: '',
   });
   const [createdCounty, setCreatedCounty] = useState(null);
+  const [credentials, setCredentials] = useState({
+    username: '',
+    password: '',
+  });
 
   const createCounty = useCreateCounty();
   const getOAuthUrl = useGetOAuthUrl();
+  const setupWithPassword = useSetupCountyWithPassword();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleCredentialChange = (e) => {
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
@@ -39,6 +49,24 @@ const AddCountyModal = ({ onClose }) => {
       }, 1000);
     } catch (error) {
       console.error('Failed to get OAuth URL:', error);
+    }
+  };
+
+  const handlePasswordSetup = async (e) => {
+    e.preventDefault();
+    try {
+      await setupWithPassword.mutateAsync({
+        id: createdCounty.id,
+        credentials: {
+          username: credentials.username,
+          password: credentials.password,
+          scope: 'records',
+        },
+      });
+      // Success! Close modal
+      onClose();
+    } catch (error) {
+      console.error('Failed to setup with password:', error);
     }
   };
 
@@ -162,86 +190,191 @@ const AddCountyModal = ({ onClose }) => {
                       County Created Successfully!
                     </h4>
                     <p className="text-sm text-green-800">
-                      {createdCounty.name} has been created. Now authorize it with your Accela account to start pulling permit data.
+                      {createdCounty.name} has been created. Choose how you'd like to authorize it below.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* County Details */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-3">County Details</h4>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Name:</dt>
-                    <dd className="text-gray-900 font-medium">{createdCounty.name}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">County Code:</dt>
-                    <dd className="text-gray-900 font-medium font-mono">{createdCounty.county_code}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Status:</dt>
-                    <dd className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      Pending Authorization
-                    </dd>
-                  </div>
-                </dl>
+              {/* Auth Method Toggle */}
+              <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod('password')}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    authMethod === 'password'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Key className="h-4 w-4 inline mr-2" />
+                  Password (Recommended)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod('oauth')}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    authMethod === 'oauth'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <ExternalLink className="h-4 w-4 inline mr-2" />
+                  OAuth Popup
+                </button>
               </div>
 
-              {/* Authorization Instructions */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start">
-                  <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
-                  <div className="flex-1 text-sm text-blue-800">
-                    <p className="font-medium mb-1">Next Step: Authorize with Accela</p>
-                    <p>
-                      Click "Authorize with Accela" below. You'll be taken to Accela's login page where you can log in with your county-specific Accela account.
-                    </p>
+              {/* Password Method */}
+              {authMethod === 'password' && (
+                <div className="space-y-4">
+                  {/* Info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
+                      <div className="flex-1 text-sm text-blue-800">
+                        <p className="font-medium mb-1">Simpler & More Reliable</p>
+                        <p>
+                          Enter your Accela credentials once. We'll securely exchange them for access tokens.
+                          You'll never need to enter your password again - refresh tokens handle ongoing access.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Error Message */}
-              {getOAuthUrl.error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <X className="h-5 w-5 text-red-600 mt-0.5 mr-3" />
-                    <p className="text-sm text-red-800">
-                      {getOAuthUrl.error.message || 'Failed to get authorization URL'}
-                    </p>
-                  </div>
+                  {/* Credentials Form */}
+                  <form onSubmit={handlePasswordSetup} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Accela Username/Email
+                      </label>
+                      <input
+                        type="email"
+                        name="username"
+                        value={credentials.username}
+                        onChange={handleCredentialChange}
+                        placeholder="user@example.com"
+                        className="input-field"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Accela Password
+                      </label>
+                      <input
+                        type="password"
+                        name="password"
+                        value={credentials.password}
+                        onChange={handleCredentialChange}
+                        placeholder="••••••••"
+                        className="input-field"
+                        required
+                      />
+                      <p className="mt-1.5 text-xs text-gray-500">
+                        Your password is sent directly to Accela and never stored
+                      </p>
+                    </div>
+
+                    {/* Error Message */}
+                    {setupWithPassword.error && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <X className="h-5 w-5 text-red-600 mt-0.5 mr-3" />
+                          <p className="text-sm text-red-800">
+                            {setupWithPassword.error.response?.data?.error || 'Failed to setup county'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={setupWithPassword.isPending}
+                        className="btn-primary"
+                      >
+                        {setupWithPassword.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : (
+                          'Connect County'
+                        )}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn-secondary"
-                >
-                  Do This Later
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAuthorize}
-                  disabled={getOAuthUrl.isPending}
-                  className="btn-primary"
-                >
-                  {getOAuthUrl.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      Authorize with Accela
-                      <ExternalLink className="h-4 w-4 ml-2" />
-                    </>
+              {/* OAuth Method */}
+              {authMethod === 'oauth' && (
+                <div className="space-y-4">
+                  {/* Info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
+                      <div className="flex-1 text-sm text-blue-800">
+                        <p className="font-medium mb-1">OAuth Popup Flow</p>
+                        <p>
+                          You'll be taken to Accela's login page in a new window where you can log in
+                          with your county-specific Accela account.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Error Message */}
+                  {getOAuthUrl.error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start">
+                        <X className="h-5 w-5 text-red-600 mt-0.5 mr-3" />
+                        <p className="text-sm text-red-800">
+                          {getOAuthUrl.error.message || 'Failed to get authorization URL'}
+                        </p>
+                      </div>
+                    </div>
                   )}
-                </button>
-              </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAuthorize}
+                      disabled={getOAuthUrl.isPending}
+                      className="btn-primary"
+                    >
+                      {getOAuthUrl.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          Authorize with Accela
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
