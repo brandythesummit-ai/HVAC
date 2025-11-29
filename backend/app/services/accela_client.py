@@ -83,7 +83,8 @@ class AccelaClient:
             "client_secret": self.app_secret,
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": redirect_uri
+            "redirect_uri": redirect_uri,
+            "environment": "PROD"
         }
 
         try:
@@ -130,7 +131,8 @@ class AccelaClient:
             "client_id": self.app_id,
             "client_secret": self.app_secret,
             "grant_type": "refresh_token",
-            "refresh_token": self.refresh_token_decrypted
+            "refresh_token": self.refresh_token_decrypted,
+            "environment": "PROD"
         }
 
         async with httpx.AsyncClient() as client:
