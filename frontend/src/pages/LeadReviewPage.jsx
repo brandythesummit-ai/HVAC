@@ -5,6 +5,7 @@ import { useLeads } from '../hooks/useLeads';
 import { useCounties } from '../hooks/useCounties';
 import LeadsTable from '../components/leads/LeadsTable';
 import FilterPanel from '../components/leads/FilterPanel';
+import PaginationControls from '../components/leads/PaginationControls';
 
 const LeadReviewPage = () => {
   const location = useLocation();
@@ -42,6 +43,10 @@ const LeadReviewPage = () => {
     // Advanced
     city: '',
     state: '',
+
+    // Pagination
+    limit: 50,
+    offset: 0,
   });
 
   const { data: leadsData, isLoading, error } = useLeads(filters);
@@ -51,7 +56,15 @@ const LeadReviewPage = () => {
   const total = leadsData?.total || 0;
 
   const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+    setFilters({ ...filters, [e.target.name]: e.target.value, offset: 0 });
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setFilters({ ...filters, limit: newLimit, offset: 0 });
+  };
+
+  const handlePageChange = (newOffset) => {
+    setFilters({ ...filters, offset: newOffset });
   };
 
   if (error) {
@@ -103,6 +116,15 @@ const LeadReviewPage = () => {
 
       {/* Leads Table */}
       <LeadsTable leads={leads} isLoading={isLoading} />
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        total={total}
+        limit={filters.limit}
+        offset={filters.offset}
+        onLimitChange={handleLimitChange}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 };
