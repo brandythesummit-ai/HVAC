@@ -173,36 +173,60 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             token_expires_at=county.get("token_expires_at", "")
         )
 
-        # Use EXACT permit type from HCFL Accela portal
-        # From portal screenshots: "Residential Mechanical Trade Permit"
+        # Try API-level filtering first, fall back to client-side if needed
         hvac_type = "Residential Mechanical Trade Permit"
 
-        print(f"🔍 [PULL PERMITS] Using API-level type filter: {hvac_type}")
+        print(f"🔍 [PULL PERMITS] Trying API-level type filter: {hvac_type}")
 
-        # Pull permits with API-level type filtering
+        # First attempt: API-level filtering
         accela_response = await client.get_permits(
             date_from=request.date_from,
             date_to=request.date_to,
             limit=request.limit,
             status=request.status,
-            permit_type=hvac_type  # ← USE EXACT API TYPE
+            permit_type=hvac_type
         )
 
         all_permits = accela_response["permits"]
+
+        print(f"✅ [PULL PERMITS] API filter returned {len(all_permits)} permits")
+
+        # If API filtering returned 0, fall back to client-side filtering
+        if len(all_permits) == 0:
+            print(f"⚠️  [PULL PERMITS] API filter returned 0 - falling back to client-side filtering")
+
+            # Pull ALL Building permits (no type filter)
+            accela_response = await client.get_permits(
+                date_from=request.date_from,
+                date_to=request.date_to,
+                limit=request.limit,
+                status=request.status,
+                permit_type=None  # No API filter
+            )
+
+            all_permits = accela_response["permits"]
+            print(f"✅ [PULL PERMITS] Retrieved {len(all_permits)} total Building permits")
+
+            # Client-side filter for HVAC/Mechanical
+            hvac_permits = []
+            for permit in all_permits:
+                permit_type = permit.get("type", {})
+                type_value = permit_type.get("value", "") if isinstance(permit_type, dict) else str(permit_type)
+
+                # Match: Mechanical, HVAC, Mech (case-insensitive)
+                if any(keyword.lower() in type_value.lower() for keyword in ["mechanical", "hvac", "mech"]):
+                    hvac_permits.append(permit)
+
+            print(f"✅ [PULL PERMITS] Client-side filter: {len(all_permits)} total → {len(hvac_permits)} HVAC/Mechanical")
+            filtering_method = "client-side fallback"
+        else:
+            # API filtering worked
+            hvac_permits = all_permits
+            filtering_method = "API"
+            print(f"✅ [PULL PERMITS] API filtering successful: {len(hvac_permits)} HVAC permits")
+
         query_info = accela_response["query_info"]
         debug_info = accela_response["debug_info"]
-
-        print(f"✅ [PULL PERMITS] Retrieved {len(all_permits)} permits from Accela (API-filtered for HVAC)")
-
-        # API already filtered for exact type - all_permits ARE hvac_permits
-        hvac_permits = all_permits
-
-        print(f"✅ [PULL PERMITS] API-level filtering returned {len(hvac_permits)} HVAC permits")
-
-        if len(hvac_permits) == 0:
-            print(f"⚠️  [PULL PERMITS] Got 0 HVAC permits from API")
-            print(f"   API type filter used: {hvac_type}")
-            print(f"   This may mean no permits of this exact type exist in the date range")
 
         # Enrich each permit
         saved_permits = []
@@ -363,8 +387,8 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                     "date_range_days": date_range_days,
                     "limit": request.limit,
                     "status_filter": request.status,
-                    "permit_type_filter": hvac_type + " (API-level filtered)",
-                    "filtering_method": "API",
+                    "permit_type_filter": hvac_type if filtering_method == "API" else "Mechanical/HVAC/Mech",
+                    "filtering_method": filtering_method,
                     "county_name": county.get("name"),
                     "county_code": county.get("county_code")
                 },
