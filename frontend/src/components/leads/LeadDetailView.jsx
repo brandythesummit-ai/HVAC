@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, MapPin, User, Home } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, MapPin, User, Home, Target, TrendingUp } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 
 /**
@@ -8,14 +8,50 @@ import { formatDate, formatCurrency } from '../../utils/formatters';
  */
 const LeadDetailView = ({ lead }) => {
   const [expandedSections, setExpandedSections] = useState({
-    permit: true,
+    pipeline: true,
+    property: false,
+    permit: false,
     addresses: false,
     owners: false,
     parcels: false,
   });
 
   const permit = lead.permits || {};
+  const property = lead.properties || {};
   const rawData = permit.raw_data || {};
+
+  // Helper to get pipeline name display
+  const getPipelineName = (pipeline) => {
+    const names = {
+      'hot_call': 'Hot Call Campaign',
+      'premium_mailer': 'Premium Mailer',
+      'nurture_drip': 'Nurture Drip Campaign',
+      'retargeting_ads': 'Retargeting Ads',
+      'cold_storage': 'Cold Storage'
+    };
+    return names[pipeline] || pipeline;
+  };
+
+  // Helper to get contact completeness display
+  const getContactCompletenessDisplay = (completeness) => {
+    const displays = {
+      'complete': '✅ Complete (Phone + Email)',
+      'partial': '⚠️ Partial (Phone OR Email)',
+      'minimal': '❌ Minimal (No Contact Info)'
+    };
+    return displays[completeness] || completeness;
+  };
+
+  // Helper to get affluence tier display
+  const getAffluenceTierDisplay = (tier) => {
+    const displays = {
+      'ultra_high': '💎 Ultra High ($500K+)',
+      'high': '🏆 High ($350K+)',
+      'medium': '⭐ Medium ($200K+)',
+      'standard': '📊 Standard'
+    };
+    return displays[tier] || tier;
+  };
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -137,6 +173,130 @@ const LeadDetailView = ({ lead }) => {
         </div>
 
         <div className="space-y-3">
+          {/* Pipeline Intelligence Section */}
+          <div className="border border-blue-200 rounded-lg overflow-hidden bg-blue-50">
+            <button
+              onClick={() => toggleSection('pipeline')}
+              className="w-full flex items-center justify-between px-4 py-3 bg-blue-100 hover:bg-blue-200 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-blue-700" />
+                <span className="font-semibold text-blue-900">Summit.ai Pipeline Intelligence</span>
+              </div>
+              {expandedSections.pipeline ? (
+                <ChevronDown className="h-4 w-4 text-blue-700" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-blue-700" />
+              )}
+            </button>
+
+            {expandedSections.pipeline && (
+              <div className="px-4 py-3 bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Recommended Pipeline */}
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                    <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Recommended Pipeline</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      {property.recommended_pipeline ? getPipelineName(property.recommended_pipeline) : 'Not calculated'}
+                    </p>
+                    {property.pipeline_confidence && (
+                      <div className="mt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-blue-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all"
+                              style={{width: `${property.pipeline_confidence}%`}}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-blue-700">{property.pipeline_confidence}%</span>
+                        </div>
+                        <p className="text-xs text-blue-600 mt-1">Confidence Score</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contact Completeness */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Contact Information</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {property.contact_completeness ? getContactCompletenessDisplay(property.contact_completeness) : 'Unknown'}
+                    </p>
+                  </div>
+
+                  {/* Affluence Tier */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Property Value Tier</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {property.affluence_tier ? getAffluenceTierDisplay(property.affluence_tier) : 'Unknown'}
+                    </p>
+                  </div>
+
+                  {/* Lead Score & Tier */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Lead Score & Tier</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      Score: {lead.lead_score || 0}/100 • Tier: {lead.lead_tier || 'COLD'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Property Summary Section */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleSection('property')}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-gray-600" />
+                <span className="font-semibold text-gray-900">Aggregated Property Data</span>
+              </div>
+              {expandedSections.property ? (
+                <ChevronDown className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-gray-600" />
+              )}
+            </button>
+
+            {expandedSections.property && (
+              <div className="px-4 py-3 bg-white">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="font-medium text-gray-600">Owner Name:</div>
+                  <div className="text-gray-900">{property.owner_name || '-'}</div>
+
+                  <div className="font-medium text-gray-600">Owner Phone:</div>
+                  <div className="text-gray-900">{property.owner_phone || '-'}</div>
+
+                  <div className="font-medium text-gray-600">Owner Email:</div>
+                  <div className="text-gray-900">{property.owner_email || '-'}</div>
+
+                  <div className="font-medium text-gray-600">Address:</div>
+                  <div className="text-gray-900">{property.normalized_address || '-'}</div>
+
+                  <div className="font-medium text-gray-600">HVAC Age:</div>
+                  <div className="text-gray-900">{property.hvac_age_years ? `${property.hvac_age_years} years` : '-'}</div>
+
+                  <div className="font-medium text-gray-600">Most Recent HVAC:</div>
+                  <div className="text-gray-900">{formatDate(property.most_recent_hvac_date)}</div>
+
+                  <div className="font-medium text-gray-600">Property Value:</div>
+                  <div className="text-gray-900">{formatCurrency(property.total_property_value)}</div>
+
+                  <div className="font-medium text-gray-600">Lot Size:</div>
+                  <div className="text-gray-900">{property.lot_size_sqft ? `${property.lot_size_sqft.toLocaleString()} sqft` : '-'}</div>
+
+                  <div className="font-medium text-gray-600">Year Built:</div>
+                  <div className="text-gray-900">{property.year_built || '-'}</div>
+
+                  <div className="font-medium text-gray-600">Parcel Number:</div>
+                  <div className="text-gray-900">{property.parcel_number || '-'}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Permit Data Section */}
           <Section
             title="Permit Information"
