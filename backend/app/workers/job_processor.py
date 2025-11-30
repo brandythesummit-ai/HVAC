@@ -20,6 +20,7 @@ from supabase import Client
 from app.database import get_db
 from app.services.accela_client import AccelaClient
 from app.services.property_aggregator import PropertyAggregator
+from app.services.encryption import encryption_service
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -181,10 +182,19 @@ class JobProcessor:
 
         county = county_result.data[0]
 
+        # Get Accela app credentials from database
+        app_settings = self.db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_settings.data or not app_settings.data[0].get("app_id"):
+            raise ValueError("Accela app credentials not configured. Please configure in Settings.")
+
+        app_id = app_settings.data[0]["app_id"]
+        app_secret_encrypted = app_settings.data[0]["app_secret"]
+        app_secret = encryption_service.decrypt(app_secret_encrypted)
+
         # Initialize Accela client
         accela_client = AccelaClient(
-            app_id=settings.accela_app_id,
-            app_secret=settings.accela_app_secret,
+            app_id=app_id,
+            app_secret=app_secret,
             county_code=county['county_code'],
             refresh_token=county['refresh_token'],
             access_token=county.get('access_token', ''),
@@ -367,10 +377,19 @@ class JobProcessor:
 
         county = county_result.data[0]
 
+        # Get Accela app credentials from database
+        app_settings = self.db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_settings.data or not app_settings.data[0].get("app_id"):
+            raise ValueError("Accela app credentials not configured. Please configure in Settings.")
+
+        app_id = app_settings.data[0]["app_id"]
+        app_secret_encrypted = app_settings.data[0]["app_secret"]
+        app_secret = encryption_service.decrypt(app_secret_encrypted)
+
         # Initialize clients
         accela_client = AccelaClient(
-            app_id=settings.accela_app_id,
-            app_secret=settings.accela_app_secret,
+            app_id=app_id,
+            app_secret=app_secret,
             county_code=county['county_code'],
             refresh_token=county['refresh_token'],
             access_token=county.get('access_token', ''),
