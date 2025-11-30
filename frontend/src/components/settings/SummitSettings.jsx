@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, CheckCircle, AlertCircle, Loader2, Eye, EyeOff, Cloud } from 'lucide-react';
+import { Save, CheckCircle, AlertCircle, Loader2, Cloud } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { summitApi } from '../../api/summit';
 
@@ -9,7 +9,6 @@ const SummitSettings = () => {
     access_token: '',
     location_id: '',
   });
-  const [showAccessToken, setShowAccessToken] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
   const { data: config, isLoading } = useQuery({
@@ -97,37 +96,15 @@ const SummitSettings = () => {
             <label htmlFor="access_token" className="block text-sm font-medium text-gray-700 mb-1.5">
               Access Token
             </label>
-            <div className="flex rounded-lg shadow-sm">
-              <input
-                type={showAccessToken ? 'text' : 'password'}
-                name="access_token"
-                id="access_token"
-                value={formData.access_token}
-                onChange={handleChange}
-                placeholder="pit-****-****-****-****"
-                className="input-field rounded-r-none flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => setShowAccessToken(!showAccessToken)}
-                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-700 rounded-r-lg hover:bg-gray-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {showAccessToken ? (
-                  <>
-                    <EyeOff className="h-4 w-4 mr-1.5" />
-                    <span className="text-sm font-medium">Hide</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4 mr-1.5" />
-                    <span className="text-sm font-medium">Show</span>
-                  </>
-                )}
-              </button>
-            </div>
-            {formData.access_token && !showAccessToken && (
-              <p className="mt-1.5 text-sm text-gray-500">{formData.access_token}</p>
-            )}
+            <input
+              type="text"
+              name="access_token"
+              id="access_token"
+              value={formData.access_token}
+              onChange={handleChange}
+              placeholder="pit-****-****-****-****"
+              className="input-field"
+            />
             <p className="mt-1.5 text-xs text-gray-500">
               Create a Private Integration in your The Summit.AI Agency Settings to get your access token
             </p>
@@ -147,9 +124,6 @@ const SummitSettings = () => {
               placeholder="Enter your The Summit.AI Location ID"
               className="input-field"
             />
-            {formData.location_id && (
-              <p className="mt-1.5 text-sm text-gray-500">{formData.location_id}</p>
-            )}
           </div>
 
           {/* Test Result Alert */}

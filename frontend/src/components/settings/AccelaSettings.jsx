@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, CheckCircle, AlertCircle, Loader2, Eye, EyeOff, Key } from 'lucide-react';
+import { Save, CheckCircle, AlertCircle, Loader2, Key } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../api/settings';
 
@@ -9,7 +9,6 @@ const AccelaSettings = () => {
     app_id: '',
     app_secret: '',
   });
-  const [showAppSecret, setShowAppSecret] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
 
   const { data: config, isLoading } = useQuery({
@@ -96,9 +95,6 @@ const AccelaSettings = () => {
               placeholder="Enter Accela Application ID"
               className="input-field"
             />
-            {formData.app_id && (
-              <p className="mt-1.5 text-sm text-gray-500">{formData.app_id}</p>
-            )}
             <p className="mt-1.5 text-xs text-gray-500">
               Get your App ID from the Accela Developer Portal
             </p>
@@ -109,37 +105,15 @@ const AccelaSettings = () => {
             <label htmlFor="app_secret" className="block text-sm font-medium text-gray-700 mb-1.5">
               Application Secret
             </label>
-            <div className="flex rounded-lg shadow-sm">
-              <input
-                type={showAppSecret ? 'text' : 'password'}
-                name="app_secret"
-                id="app_secret"
-                value={formData.app_secret}
-                onChange={handleChange}
-                placeholder="Enter Accela Application Secret"
-                className="input-field rounded-r-none flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => setShowAppSecret(!showAppSecret)}
-                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-700 rounded-r-lg hover:bg-gray-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                {showAppSecret ? (
-                  <>
-                    <EyeOff className="h-4 w-4 mr-1.5" />
-                    <span className="text-sm font-medium">Hide</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4 mr-1.5" />
-                    <span className="text-sm font-medium">Show</span>
-                  </>
-                )}
-              </button>
-            </div>
-            {formData.app_secret && !showAppSecret && (
-              <p className="mt-1.5 text-sm text-gray-500">{formData.app_secret}</p>
-            )}
+            <input
+              type="text"
+              name="app_secret"
+              id="app_secret"
+              value={formData.app_secret}
+              onChange={handleChange}
+              placeholder="Enter Accela Application Secret"
+              className="input-field"
+            />
             <p className="mt-1.5 text-xs text-gray-500">
               These credentials will be used for all counties via OAuth refresh tokens
             </p>
