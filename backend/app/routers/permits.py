@@ -448,3 +448,32 @@ async def get_permit(permit_id: str, db=Depends(get_db)):
             "data": None,
             "error": str(e)
         }
+
+
+@router.delete("/permits/{permit_id}", response_model=dict)
+async def delete_permit(permit_id: str, db=Depends(get_db)):
+    """Delete a permit/lead by ID."""
+    try:
+        # Check if permit exists first
+        check_result = db.table("permits").select("id").eq("id", permit_id).execute()
+
+        if not check_result.data:
+            raise HTTPException(status_code=404, detail="Permit not found")
+
+        # Delete the permit
+        db.table("permits").delete().eq("id", permit_id).execute()
+
+        return {
+            "success": True,
+            "data": {"message": "Permit deleted successfully", "id": permit_id},
+            "error": None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }

@@ -85,7 +85,7 @@ const ColumnCustomizer = ({ isOpen, onClose, columns, visibleColumns, onSaveColu
                   >
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => !isRequired && toggleColumn(column.id)}
+                        onClick={() => toggleColumn(column.id)}
                         disabled={isRequired}
                         className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
                           isRequired

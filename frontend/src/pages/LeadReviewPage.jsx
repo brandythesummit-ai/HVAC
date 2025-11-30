@@ -56,7 +56,11 @@ const LeadReviewPage = () => {
   const total = leadsData?.total || 0;
 
   const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value, offset: 0 });
+    if (e.type === 'reset') {
+      setFilters(e.resetFilters);
+    } else {
+      setFilters({ ...filters, [e.target.name]: e.target.value, offset: 0 });
+    }
   };
 
   const handleLimitChange = (newLimit) => {

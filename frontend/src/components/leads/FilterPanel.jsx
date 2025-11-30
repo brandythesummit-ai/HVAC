@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { Filter, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { Filter, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
 
 /**
  * Comprehensive FilterPanel for leads
  * Supports all 20+ filter parameters from the backend API
  */
 const FilterPanel = ({ filters, onFilterChange, counties, fixedFilters = [] }) => {
+  // Panel-level collapse state (persisted in localStorage)
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(() =>
+    localStorage.getItem('filterPanelCollapsed') === 'true'
+  );
+
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
     pipeline: false,
@@ -21,6 +26,12 @@ const FilterPanel = ({ filters, onFilterChange, counties, fixedFilters = [] }) =
     }));
   };
 
+  const togglePanelCollapse = () => {
+    const newState = !isPanelCollapsed;
+    setIsPanelCollapsed(newState);
+    localStorage.setItem('filterPanelCollapsed', newState.toString());
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -31,19 +42,42 @@ const FilterPanel = ({ filters, onFilterChange, counties, fixedFilters = [] }) =
   };
 
   const handleReset = () => {
-    const resetFilters = {};
-    Object.keys(filters).forEach(key => {
-      // Don't reset fixed filters
-      if (!fixedFilters.includes(key)) {
-        resetFilters[key] = '';
-      } else {
+    // Define proper default values
+    const resetFilters = {
+      limit: 50,
+      offset: 0,
+      county_id: '',
+      lead_tier: '',
+      min_score: '',
+      max_score: '',
+      is_qualified: '',
+      recommended_pipeline: '',
+      min_pipeline_confidence: '',
+      contact_completeness: '',
+      affluence_tier: '',
+      min_hvac_age: '',
+      max_hvac_age: '',
+      min_property_value: '',
+      max_property_value: '',
+      year_built_min: '',
+      year_built_max: '',
+      has_phone: '',
+      has_email: '',
+      city: '',
+      state: '',
+    };
+
+    // Preserve fixed filters (like sync_status)
+    fixedFilters.forEach(key => {
+      if (filters[key] !== undefined) {
         resetFilters[key] = filters[key];
       }
     });
 
-    // Trigger reset by calling onChange for each filter
-    Object.keys(resetFilters).forEach(key => {
-      onFilterChange({ target: { name: key, value: resetFilters[key] } });
+    // Fire single event with reset type
+    onFilterChange({
+      type: 'reset',
+      resetFilters
     });
   };
 
@@ -79,21 +113,31 @@ const FilterPanel = ({ filters, onFilterChange, counties, fixedFilters = [] }) =
     <div className="card animate-fade-in">
       {/* Header */}
       <div className="card-header flex items-center justify-between">
-        <div className="flex items-center">
-          <Filter className="h-5 w-5 text-gray-400 mr-2" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={togglePanelCollapse}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title={isPanelCollapsed ? "Expand filters" : "Collapse filters"}
+          >
+            {isPanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+          <Filter className="h-5 w-5 text-gray-400" />
           <h2 className="text-sm font-semibold text-gray-900">Advanced Filters</h2>
         </div>
-        <button
-          onClick={handleReset}
-          className="btn-secondary text-xs flex items-center gap-1"
-        >
-          <RotateCcw className="h-3 w-3" />
-          Reset All
-        </button>
+        {!isPanelCollapsed && (
+          <button
+            onClick={handleReset}
+            className="btn-secondary text-xs flex items-center gap-1"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset All
+          </button>
+        )}
       </div>
 
       {/* Filter Sections */}
-      <div className="card-body space-y-3">
+      {!isPanelCollapsed && (
+        <div className="card-body space-y-3">
         {/* Basic Filters */}
         <Section title="Basic Filters" sectionKey="basic">
           {/* County */}
@@ -452,7 +496,8 @@ const FilterPanel = ({ filters, onFilterChange, counties, fixedFilters = [] }) =
             />
           </div>
         </Section>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
