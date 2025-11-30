@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.permit import PullPermitsRequest, PermitResponse, PermitListRequest
 from app.services.accela_client import AccelaClient
 from app.services.encryption import encryption_service
+from app.services.property_aggregator import PropertyAggregator
 
 router = APIRouter(prefix="/api", tags=["permits"])
 
@@ -266,43 +267,46 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 })
                 print(f"⚠️  [PULL PERMITS] Failed to save permit {record_id}: {str(save_error)}")
 
-        # Auto-create leads for each saved permit
-        created_leads = []
-        failed_leads = []
+        # Process permits through PropertyAggregator for property-based lead generation
+        aggregator = PropertyAggregator(db)
+        properties_created = 0
+        properties_updated = 0
+        leads_created = 0
+        failed_aggregations = []
+
+        print(f"🏠 [PROPERTY AGGREGATOR] Processing {len([p for p in saved_permits if p])} permits...")
 
         for permit in saved_permits:
             if not permit:
                 continue
 
-            # Check if lead already exists for this permit
-            existing_lead = db.table("leads").select("id").eq("permit_id", permit["id"]).execute()
+            try:
+                # Process permit through property aggregator
+                property_id, lead_id, was_created = await aggregator.process_permit(
+                    permit,
+                    county_id
+                )
 
-            if not existing_lead.data:
-                # Create new lead with pending status
-                lead_data = {
-                    "permit_id": permit["id"],
-                    "county_id": county_id,
-                    "summit_sync_status": "pending",
-                    "created_at": datetime.utcnow().isoformat()
-                }
-
-                try:
-                    lead_result = db.table("leads").insert(lead_data).execute()
-                    if lead_result.data:
-                        created_leads.append(lead_result.data[0])
+                if property_id:
+                    if was_created:
+                        properties_created += 1
+                        if lead_id:
+                            leads_created += 1
+                            print(f"  ✅ Created property {property_id} and lead {lead_id}")
+                        else:
+                            print(f"  ✅ Created property {property_id} (not qualified)")
                     else:
-                        failed_leads.append({
-                            "permit_id": permit["id"],
-                            "error": "Insert returned no data"
-                        })
-                except Exception as lead_error:
-                    failed_leads.append({
-                        "permit_id": permit["id"],
-                        "error": str(lead_error)
-                    })
-                    print(f"⚠️  [PULL PERMITS] Failed to create lead for permit {permit['id']}: {str(lead_error)}")
+                        properties_updated += 1
+                        print(f"  ♻️  Updated property {property_id}")
 
-        print(f"✅ [PULL PERMITS] Created {len(created_leads)} new leads")
+            except Exception as agg_error:
+                failed_aggregations.append({
+                    "permit_id": permit["id"],
+                    "error": str(agg_error)
+                })
+                print(f"⚠️  [PROPERTY AGGREGATOR] Failed to process permit {permit['id']}: {str(agg_error)}")
+
+        print(f"✅ [PROPERTY AGGREGATOR] Complete! Properties: {properties_created} created, {properties_updated} updated. Leads: {leads_created} created")
 
         # Update county last_pull_at and store updated tokens
         # Update last pull timestamp
@@ -312,7 +316,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         db.table("counties").update(update_data).eq("id", county_id).execute()
 
         saved_count = len([p for p in saved_permits if p])
-        print(f"✅ [PULL PERMITS] Complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Leads: {len(created_leads)}")
+        print(f"✅ [PULL PERMITS] Complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Properties: {properties_created}/{properties_updated}, Leads: {leads_created}")
 
         # Calculate helpful metrics
         from datetime import datetime as dt
@@ -338,15 +342,16 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                 "total_pulled": len(hvac_permits),
                 "hvac_permits": len(hvac_permits),
                 "saved": saved_count,
-                "leads_created": len(created_leads),
+                "leads_created": leads_created,  # NEW: Property-based leads
+                "properties_created": properties_created,  # NEW
+                "properties_updated": properties_updated,  # NEW
                 "failed_saves": len(failed_saves),
-                "failed_leads": len(failed_leads),
+                "failed_aggregations": len(failed_aggregations),  # NEW
                 "permits": saved_permits,
-                "leads": created_leads,
                 "errors": {
                     "save_failures": failed_saves,
-                    "lead_failures": failed_leads
-                } if (failed_saves or failed_leads) else None,
+                    "aggregation_failures": failed_aggregations  # NEW
+                } if (failed_saves or failed_aggregations) else None,
 
                 # NEW: Diagnostic fields
                 "query_info": {

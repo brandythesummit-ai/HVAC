@@ -14,13 +14,26 @@ router = APIRouter(prefix="/api/leads", tags=["leads"])
 async def list_leads(
     county_id: str = None,
     sync_status: str = None,
+    lead_tier: str = None,  # NEW: Filter by HOT, WARM, COOL, COLD
+    min_score: int = None,  # NEW: Minimum lead score (0-100)
+    is_qualified: bool = None,  # NEW: Filter by qualification status
     limit: int = 50,
     offset: int = 0,
     db=Depends(get_db)
 ):
-    """List leads with filters."""
+    """
+    List leads with filters.
+
+    New property-based filters:
+    - lead_tier: HOT (15+ years), WARM (10-15 years), COOL (5-10 years), COLD (<5 years)
+    - min_score: Minimum lead score (0-100)
+    - is_qualified: Only leads with HVAC 5+ years old
+
+    Returns leads with property and permit data joined.
+    """
     try:
-        query = db.table("leads").select("*, permits(*)")
+        # Join with properties and permits
+        query = db.table("leads").select("*, properties(*), permits(*)")
 
         if county_id:
             query = query.eq("county_id", county_id)
@@ -28,7 +41,20 @@ async def list_leads(
         if sync_status:
             query = query.eq("summit_sync_status", sync_status)
 
-        result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+        # NEW: Property-based filters
+        if lead_tier:
+            query = query.eq("lead_tier", lead_tier.upper())
+
+        if min_score is not None:
+            query = query.gte("lead_score", min_score)
+
+        if is_qualified is not None:
+            # Filter through properties table
+            # Note: This requires property_id to be populated
+            query = query.not_.is_("property_id", "null")
+
+        # Order by lead score (highest first)
+        result = query.order("lead_score", desc=True).range(offset, offset + limit - 1).execute()
 
         return {
             "success": True,
@@ -49,7 +75,13 @@ async def list_leads(
 
 @router.post("/create-from-permits", response_model=dict)
 async def create_leads_from_permits(request: CreateLeadsRequest, db=Depends(get_db)):
-    """Convert permits to leads."""
+    """
+    Convert permits to leads.
+
+    DEPRECATED: Leads are now created automatically by the PropertyAggregator
+    when permits are processed. This endpoint is kept for backward compatibility
+    but will be removed in a future version.
+    """
     try:
         created_leads = []
 
@@ -128,16 +160,20 @@ async def update_lead_notes(lead_id: str, request: UpdateLeadNotesRequest, db=De
 
 @router.post("/sync-to-summit", response_model=dict)
 async def sync_leads_to_summit(request: SyncLeadsRequest, db=Depends(get_db)):
-    """Sync leads to Summit.AI CRM."""
+    """
+    Sync leads to Summit.AI CRM.
+
+    Now uses property-based data with lead scoring information.
+    """
     try:
-        # Get leads to sync
-        query = db.table("leads").select("*, permits(*)")
+        # Get leads to sync with properties and permits
+        query = db.table("leads").select("*, properties(*), permits(*)")
 
         if request.lead_ids:
             query = query.in_("id", request.lead_ids)
         else:
-            # Sync all pending
-            query = query.eq("summit_sync_status", "pending")
+            # Sync all pending HOT and WARM leads
+            query = query.eq("summit_sync_status", "pending").in_("lead_tier", ["HOT", "WARM"])
 
         leads_result = query.execute()
 
@@ -160,29 +196,37 @@ async def sync_leads_to_summit(request: SyncLeadsRequest, db=Depends(get_db)):
         sync_results = []
 
         for lead in leads_result.data:
-            permit = lead.get("permits")
-            if not permit:
-                continue
+            # Use property data (denormalized from most recent permit)
+            property_data = lead.get("properties")
+            if not property_data:
+                # Fallback to permit data if no property
+                property_data = lead.get("permits", {})
 
             try:
-                # Prepare contact data
-                owner_name = permit.get("owner_name", "")
+                # Prepare contact data with lead scoring info
+                owner_name = property_data.get("owner_name", "")
                 name_parts = owner_name.split() if owner_name else ["", ""]
+
+                # Build tags based on lead tier
+                tags = ["hvac-lead", f"tier-{lead.get('lead_tier', 'UNKNOWN').lower()}"]
 
                 contact_data = {
                     "firstName": name_parts[0] if len(name_parts) > 0 else "",
                     "lastName": name_parts[-1] if len(name_parts) > 1 else "",
-                    "email": permit.get("owner_email", ""),
-                    "phone": permit.get("owner_phone", ""),
-                    "address1": permit.get("property_address", ""),
+                    "email": property_data.get("owner_email", ""),
+                    "phone": property_data.get("owner_phone", ""),
+                    "address1": property_data.get("normalized_address", ""),
                     "customField": {
-                        "permit_id": permit.get("accela_record_id", ""),
-                        "permit_date": permit.get("opened_date", ""),
-                        "year_built": permit.get("year_built"),
-                        "square_footage": permit.get("square_footage"),
-                        "property_value": permit.get("property_value"),
+                        "lead_score": lead.get("lead_score"),
+                        "lead_tier": lead.get("lead_tier"),
+                        "hvac_age_years": property_data.get("hvac_age_years"),
+                        "most_recent_hvac_date": property_data.get("most_recent_hvac_date"),
+                        "qualification_reason": lead.get("qualification_reason"),
+                        "year_built": property_data.get("year_built"),
+                        "property_value": property_data.get("total_property_value"),
+                        "total_hvac_permits": property_data.get("total_hvac_permits"),
                     },
-                    "tags": ["hvac-lead"]
+                    "tags": tags
                 }
 
                 # Search for existing contact

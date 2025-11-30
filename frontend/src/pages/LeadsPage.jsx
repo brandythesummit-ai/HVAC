@@ -12,6 +12,9 @@ const LeadsPage = () => {
   const [filters, setFilters] = useState({
     county_id: location.state?.filterByCounty || '',
     sync_status: location.state?.filterBySyncStatus || '',
+    lead_tier: '',
+    min_score: '',
+    is_qualified: '',
   });
 
   const { data: leads, isLoading, error } = useLeads(filters);
@@ -48,7 +51,7 @@ const LeadsPage = () => {
           </div>
         </div>
         <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label htmlFor="county_id" className="block text-sm font-medium text-gray-700 mb-1">
                 County
@@ -66,6 +69,59 @@ const LeadsPage = () => {
                     {county.name}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="lead_tier" className="block text-sm font-medium text-gray-700 mb-1">
+                Lead Tier
+              </label>
+              <select
+                id="lead_tier"
+                name="lead_tier"
+                value={filters.lead_tier}
+                onChange={handleFilterChange}
+                className="input-field"
+              >
+                <option value="">All Tiers</option>
+                <option value="HOT">🔥 HOT (15+ years)</option>
+                <option value="WARM">🌡️ WARM (10-15 years)</option>
+                <option value="COOL">❄️ COOL (5-10 years)</option>
+                <option value="COLD">🧊 COLD (&lt;5 years)</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="min_score" className="block text-sm font-medium text-gray-700 mb-1">
+                Min Score
+              </label>
+              <input
+                type="number"
+                id="min_score"
+                name="min_score"
+                value={filters.min_score}
+                onChange={handleFilterChange}
+                min="0"
+                max="100"
+                placeholder="0-100"
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="is_qualified" className="block text-sm font-medium text-gray-700 mb-1">
+                Qualified Status
+              </label>
+              <select
+                id="is_qualified"
+                name="is_qualified"
+                value={filters.is_qualified}
+                onChange={handleFilterChange}
+                className="input-field"
+              >
+                <option value="">All Leads</option>
+                <option value="true">Qualified Only (5+ yrs)</option>
+                <option value="false">Not Qualified</option>
               </select>
             </div>
 

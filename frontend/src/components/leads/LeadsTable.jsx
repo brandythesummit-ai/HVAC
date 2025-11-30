@@ -103,16 +103,16 @@ const LeadsTable = ({ leads, isLoading }) => {
                   Address
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Permit Date
+                  HVAC Age
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Score / Tier
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Lot Size
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Property Value
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Job Value
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status

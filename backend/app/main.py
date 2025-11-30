@@ -2,8 +2,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import counties, permits, leads, summit
+from app.routers import counties, permits, leads, summit, background_jobs, properties
 from app.routers import settings as settings_router
+from app.workers.job_processor import start_job_processor, stop_job_processor
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,6 +28,21 @@ app.include_router(permits.router)
 app.include_router(leads.router)
 app.include_router(summit.router)
 app.include_router(settings_router.router)
+app.include_router(background_jobs.router)
+app.include_router(properties.router)
+
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Start background job processor on application startup."""
+    await start_job_processor()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop background job processor on application shutdown."""
+    await stop_job_processor()
 
 
 @app.get("/")

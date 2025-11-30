@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2 } from 'lucide-react';
+import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2, Database } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty } from '../../hooks/useCounties';
 import PullPermitsModal from './PullPermitsModal';
+import StartHistoricalPullModal from './StartHistoricalPullModal';
 
 const CountyCard = ({ county }) => {
   const [showPullModal, setShowPullModal] = useState(false);
+  const [showHistoricalPullModal, setShowHistoricalPullModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
   const getOAuthUrl = useGetOAuthUrl();
@@ -118,14 +120,25 @@ const CountyCard = ({ county }) => {
           {/* Action Buttons */}
           <div className="space-y-2">
             {county.oauth_authorized ? (
-              <button
-                onClick={() => setShowPullModal(true)}
-                disabled={!county.is_active}
-                className="btn-primary w-full"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Pull Permits
-              </button>
+              <>
+                <button
+                  onClick={() => setShowPullModal(true)}
+                  disabled={!county.is_active}
+                  className="btn-primary w-full"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Pull Permits
+                </button>
+
+                <button
+                  onClick={() => setShowHistoricalPullModal(true)}
+                  disabled={!county.is_active}
+                  className="btn-secondary w-full"
+                >
+                  <Database className="h-4 w-4 mr-2" />
+                  Start 30-Year Pull
+                </button>
+              </>
             ) : (
               <button
                 onClick={handleAuthorize}
@@ -159,6 +172,13 @@ const CountyCard = ({ county }) => {
         <PullPermitsModal
           county={county}
           onClose={() => setShowPullModal(false)}
+        />
+      )}
+
+      {showHistoricalPullModal && (
+        <StartHistoricalPullModal
+          county={county}
+          onClose={() => setShowHistoricalPullModal(false)}
         />
       )}
 
