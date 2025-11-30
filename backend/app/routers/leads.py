@@ -2,12 +2,14 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from app.database import get_db
 from app.models.lead import CreateLeadsRequest, UpdateLeadNotesRequest, SyncLeadsRequest, LeadResponse, LeadListRequest
 from app.services.summit_client import SummitClient
 
 router = APIRouter(prefix="/api/leads", tags=["leads"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=dict)
@@ -504,4 +506,50 @@ async def sync_leads_to_summit(request: SyncLeadsRequest, db=Depends(get_db)):
             "success": False,
             "data": None,
             "error": str(e)
+        }
+
+
+@router.delete("/{lead_id}", response_model=dict)
+async def delete_lead(lead_id: str, db=Depends(get_db)):
+    """
+    Delete a lead by ID.
+
+    This only deletes the lead record. Associated property and permit records
+    are preserved as they contain valuable historical data.
+
+    The property may be re-qualified and generate a new lead in future permit pulls
+    if it still meets qualification criteria (HVAC ≥ 5 years old).
+    """
+    try:
+        # Check if lead exists first
+        check_result = db.table("leads").select("id, property_id").eq("id", lead_id).execute()
+
+        if not check_result.data:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        lead_data = check_result.data[0]
+        property_id = lead_data.get("property_id")
+
+        # Delete the lead
+        delete_result = db.table("leads").delete().eq("id", lead_id).execute()
+
+        return {
+            "success": True,
+            "data": {
+                "message": "Lead deleted successfully",
+                "id": lead_id,
+                "property_id": property_id,
+                "note": "Property and permit records preserved. Property may re-qualify in future permit pulls."
+            },
+            "error": None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting lead {lead_id}: {str(e)}")
+        return {
+            "success": False,
+            "data": None,
+            "error": f"Failed to delete lead: {str(e)}"
         }
