@@ -136,7 +136,7 @@ const PullResultsView = ({ results, county, onClose, onGoToLeads, onViewDetail }
         <div className="card overflow-hidden">
           <div className="card-header">
             <h4 className="text-lg font-semibold text-gray-900">
-              Leads Created ({results.permits.length} total)
+              Leads Created ({results.permits?.length || 0} total)
             </h4>
           </div>
           <div className="overflow-x-auto custom-scrollbar">
@@ -189,7 +189,7 @@ const PullResultsView = ({ results, county, onClose, onGoToLeads, onViewDetail }
           {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
               <div className="text-sm text-gray-700">
-                Showing {startIndex + 1} to {Math.min(endIndex, results.permits.length)} of {results.permits.length} results
+                Showing {startIndex + 1} to {Math.min(endIndex, results.permits?.length || 0)} of {results.permits?.length || 0} results
               </div>
               <div className="flex gap-2">
                 <button
