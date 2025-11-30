@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Send, Loader2, Settings2 } from 'lucide-react';
+import { Send, Loader2, Settings2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LeadRow from './LeadRow';
 import ColumnCustomizer from './ColumnCustomizer';
-import { useSyncLeadsToSummit } from '../../hooks/useLeads';
+import { useSyncLeadsToSummit, useDeleteLead } from '../../hooks/useLeads';
 
 // Column definitions with metadata
 const COLUMN_DEFINITIONS = [
@@ -98,7 +98,10 @@ const STORAGE_KEY = 'hvac_leads_visible_columns';
 const LeadsTable = ({ leads, isLoading, onDelete }) => {
   const [selectedLeads, setSelectedLeads] = useState(new Set());
   const [customizerOpen, setCustomizerOpen] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const syncToSummit = useSyncLeadsToSummit();
+  const deleteLead = useDeleteLead();
 
   // Initialize visible columns from localStorage or defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -162,6 +165,48 @@ const LeadsTable = ({ leads, isLoading, onDelete }) => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    const leadIds = Array.from(selectedLeads);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Delete each lead sequentially
+      for (const leadId of leadIds) {
+        try {
+          await deleteLead.mutateAsync(leadId);
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to delete lead ${leadId}:`, error);
+          failCount++;
+        }
+      }
+
+      // Show results
+      if (successCount > 0) {
+        toast.success(
+          `Successfully deleted ${successCount} lead${successCount > 1 ? 's' : ''}`
+        );
+      }
+
+      if (failCount > 0) {
+        toast.error(
+          `Failed to delete ${failCount} lead${failCount > 1 ? 's' : ''}`
+        );
+      }
+
+      // Clear selection and close modal
+      setSelectedLeads(new Set());
+      setShowBulkDeleteConfirm(false);
+    } catch (error) {
+      console.error('Bulk delete failed:', error);
+      toast.error(`Delete failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSaveColumns = (newVisibleColumns) => {
     setVisibleColumns(newVisibleColumns);
   };
@@ -200,23 +245,33 @@ const LeadsTable = ({ leads, isLoading, onDelete }) => {
             <span className="text-sm font-medium text-blue-900">
               {selectedLeads.size} lead{selectedLeads.size > 1 ? 's' : ''} selected
             </span>
-            <button
-              onClick={handleSyncToSummit}
-              disabled={syncToSummit.isPending}
-              className="btn-primary"
-            >
-              {syncToSummit.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send to Summit.AI
-                </>
-              )}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                disabled={isDeleting}
+                className="btn-secondary text-red-600 hover:bg-red-50 hover:border-red-300 flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Selected
+              </button>
+              <button
+                onClick={handleSyncToSummit}
+                disabled={syncToSummit.isPending}
+                className="btn-primary"
+              >
+                {syncToSummit.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send to Summit.AI
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex-1" />
@@ -282,6 +337,64 @@ const LeadsTable = ({ leads, isLoading, onDelete }) => {
         visibleColumns={visibleColumns}
         onSaveColumns={handleSaveColumns}
       />
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={() => !isDeleting && setShowBulkDeleteConfirm(false)}
+          />
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full animate-fade-in">
+              <div className="px-6 py-4">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex-shrink-0">
+                    <Trash2 className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Delete {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}?
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Are you sure you want to delete the selected {selectedLeads.size} lead{selectedLeads.size > 1 ? 's' : ''}?
+                    </p>
+                    <p className="text-xs text-red-600 font-medium">
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowBulkDeleteConfirm(false)}
+                    disabled={isDeleting}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={isDeleting}
+                    className="btn-primary bg-red-600 hover:bg-red-700 flex items-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        Deleting {selectedLeads.size} lead{selectedLeads.size > 1 ? 's' : ''}...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        Delete {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
