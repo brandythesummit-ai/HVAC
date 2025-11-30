@@ -9,6 +9,7 @@ import {
   Building2,
   ChevronLeft
 } from 'lucide-react';
+import HealthIndicator from './health/HealthIndicator';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -100,10 +101,7 @@ const Layout = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg">
-              <div className="w-2 h-2 mr-2 bg-green-500 rounded-full animate-pulse"></div>
-              System Online
-            </div>
+            <HealthIndicator />
           </div>
         </header>
 
