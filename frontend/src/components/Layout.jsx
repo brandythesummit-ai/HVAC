@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   MapPin,
-  Users,
+  UserCheck,
+  GitBranch,
   Settings,
   Menu,
   X,
@@ -17,14 +18,16 @@ const Layout = () => {
 
   const navItems = [
     { to: '/counties', icon: MapPin, label: 'Counties' },
-    { to: '/leads', icon: Users, label: 'Leads' },
+    { to: '/leads', icon: UserCheck, label: 'Lead Review' },
+    { to: '/pipeline', icon: GitBranch, label: 'Pipeline' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
   const getPageTitle = () => {
     const path = location.pathname;
     if (path.includes('counties')) return 'Counties';
-    if (path.includes('leads')) return 'Leads';
+    if (path.includes('leads')) return 'Lead Review';
+    if (path.includes('pipeline')) return 'Summit.ai Pipeline';
     if (path.includes('settings')) return 'Settings';
     return 'Dashboard';
   };
