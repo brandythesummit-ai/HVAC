@@ -3,7 +3,12 @@ import apiClient from './client';
 export const leadsApi = {
   // Get all leads with filters
   getAll: async (params = {}) => {
-    const response = await apiClient.get('/api/leads', { params });
+    // Filter out empty string values to avoid validation errors
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+    );
+
+    const response = await apiClient.get('/api/leads', { params: cleanParams });
     // Backend returns {success, data: {leads, count}, error}
     // Extract just the leads array
     return response.data?.data?.leads || [];
