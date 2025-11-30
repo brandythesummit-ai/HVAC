@@ -47,6 +47,19 @@ class RailwaySync:
                 "synced": False,
             }
 
+        # Validate all values are ASCII-encodable
+        # HTTP headers (including Authorization) must be ASCII per RFC 7230
+        for var_name, var_value in variables.items():
+            try:
+                var_value.encode('ascii')
+            except UnicodeEncodeError:
+                logger.error(f"Variable {var_name} contains non-ASCII characters")
+                return {
+                    "success": False,
+                    "message": f"{var_name} contains non-ASCII characters. Environment variables should be ASCII-only.",
+                    "synced": False,
+                }
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Railway GraphQL mutation to upsert variables

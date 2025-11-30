@@ -1,6 +1,6 @@
 """Summit.AI configuration and testing endpoints with Private Integration static token."""
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import logging
 
 from app.database import get_db
@@ -15,6 +15,26 @@ class SummitConfigRequest(BaseModel):
     """Model for Summit.AI Private Integration configuration."""
     access_token: str
     location_id: str
+
+    @field_validator('access_token', 'location_id')
+    @classmethod
+    def validate_ascii(cls, v: str, info) -> str:
+        """
+        Validate that credentials contain only ASCII characters.
+
+        HTTP headers (including Authorization) must be ASCII-encodable per RFC 7230.
+        This validation prevents UnicodeEncodeError when making API requests.
+        """
+        try:
+            v.encode('ascii')
+        except UnicodeEncodeError:
+            field_name = info.field_name.replace('_', ' ').title()
+            raise ValueError(
+                f"{field_name} contains non-ASCII characters. "
+                "HTTP headers require ASCII-only values. "
+                "Please ensure credentials don't contain accented characters, emojis, or special Unicode characters."
+            )
+        return v.strip()  # Also strip leading/trailing whitespace
 
 
 @router.get("/config", response_model=dict)

@@ -18,10 +18,33 @@ class SummitClient:
         Args:
             access_token: GHL Private Integration static access token (pit-****)
             location_id: Summit.AI location ID
+
+        Raises:
+            ValueError: If credentials contain non-ASCII characters
         """
         self.access_token = access_token or settings.summit_access_token
         self.location_id = location_id or settings.summit_location_id
         self.base_url = "https://services.leadconnectorhq.com"
+
+        # Defensive validation: Ensure credentials are ASCII-encodable
+        # HTTP headers (including Authorization) must be ASCII per RFC 7230
+        if self.access_token:
+            try:
+                self.access_token.encode('ascii')
+            except UnicodeEncodeError:
+                raise ValueError(
+                    "Summit.AI access token contains non-ASCII characters. "
+                    "HTTP Authorization headers require ASCII-only values."
+                )
+
+        if self.location_id:
+            try:
+                self.location_id.encode('ascii')
+            except UnicodeEncodeError:
+                raise ValueError(
+                    "Summit.AI location ID contains non-ASCII characters. "
+                    "HTTP headers require ASCII-only values."
+                )
 
     def _get_headers(self) -> Dict[str, str]:
         """Get authentication headers with static access token."""
