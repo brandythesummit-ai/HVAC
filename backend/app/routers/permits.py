@@ -173,60 +173,70 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             token_expires_at=county.get("token_expires_at", "")
         )
 
-        # Try API-level filtering first, fall back to client-side if needed
-        hvac_type = "Residential Mechanical Trade Permit"
+        # DIAGNOSTIC MODE: Pull ALL Building permits to analyze actual type values
+        print("🔬 [DIAGNOSTIC] Pulling ALL Building permits to analyze type values...")
+        print(f"   County: {county.get('name')} ({county.get('county_code')})")
+        print(f"   Date range: {request.date_from} to {request.date_to}")
 
-        print(f"🔍 [PULL PERMITS] Trying API-level type filter: {hvac_type}")
-
-        # First attempt: API-level filtering
+        # Pull ALL Building permits WITHOUT type filter
         accela_response = await client.get_permits(
             date_from=request.date_from,
             date_to=request.date_to,
-            limit=request.limit,
+            limit=100,  # Just first page for diagnostic
             status=request.status,
-            permit_type=hvac_type
+            permit_type=None  # ← NO FILTER - get everything
         )
 
         all_permits = accela_response["permits"]
+        print(f"✅ [DIAGNOSTIC] Retrieved {len(all_permits)} total Building permits")
 
-        print(f"✅ [PULL PERMITS] API filter returned {len(all_permits)} permits")
+        # Analyze permit type structure and values
+        from collections import Counter
+        if all_permits:
+            # Log first permit's type object structure
+            first_type = all_permits[0].get("type", {})
+            print(f"\n📋 [DIAGNOSTIC] Sample type object structure:")
+            print(f"   Type: {type(first_type)}")
+            print(f"   Full object: {first_type}")
 
-        # If API filtering returned 0, fall back to client-side filtering
-        if len(all_permits) == 0:
-            print(f"⚠️  [PULL PERMITS] API filter returned 0 - falling back to client-side filtering")
+            # Collect all type values
+            type_values = []
+            for p in all_permits:
+                type_obj = p.get("type", {})
+                if isinstance(type_obj, dict):
+                    type_values.append(type_obj.get("value", ""))
+                else:
+                    type_values.append(str(type_obj))
 
-            # Pull ALL Building permits (no type filter)
-            accela_response = await client.get_permits(
-                date_from=request.date_from,
-                date_to=request.date_to,
-                limit=request.limit,
-                status=request.status,
-                permit_type=None  # No API filter
-            )
+            # Show distribution
+            type_dist = Counter(type_values)
+            print(f"\n📊 [DIAGNOSTIC] Permit type distribution:")
+            for permit_type, count in type_dist.most_common():
+                print(f"   '{permit_type}': {count} permits")
 
-            all_permits = accela_response["permits"]
-            print(f"✅ [PULL PERMITS] Retrieved {len(all_permits)} total Building permits")
-
-            # Client-side filter for HVAC/Mechanical
+            # Filter for HVAC/Mechanical permits to see what we should be using
             hvac_permits = []
             for permit in all_permits:
-                permit_type = permit.get("type", {})
-                type_value = permit_type.get("value", "") if isinstance(permit_type, dict) else str(permit_type)
+                type_obj = permit.get("type", {})
+                type_value = type_obj.get("value", "") if isinstance(type_obj, dict) else str(type_obj)
 
-                # Match: Mechanical, HVAC, Mech (case-insensitive)
+                # Flexible matching for diagnostic
                 if any(keyword.lower() in type_value.lower() for keyword in ["mechanical", "hvac", "mech"]):
                     hvac_permits.append(permit)
 
-            print(f"✅ [PULL PERMITS] Client-side filter: {len(all_permits)} total → {len(hvac_permits)} HVAC/Mechanical")
-            filtering_method = "client-side fallback"
+            print(f"\n🔍 [DIAGNOSTIC] Found {len(hvac_permits)} HVAC/Mechanical permits")
+            if hvac_permits:
+                hvac_type_value = hvac_permits[0].get("type", {}).get("value", "")
+                print(f"   First HVAC permit type value: '{hvac_type_value}'")
+                print(f"   👆 USE THIS VALUE for the type parameter!")
+
         else:
-            # API filtering worked
-            hvac_permits = all_permits
-            filtering_method = "API"
-            print(f"✅ [PULL PERMITS] API filtering successful: {len(hvac_permits)} HVAC permits")
+            hvac_permits = []
+            print("⚠️  [DIAGNOSTIC] No permits found in this date range")
 
         query_info = accela_response["query_info"]
         debug_info = accela_response["debug_info"]
+        filtering_method = "diagnostic"
 
         # Enrich each permit
         saved_permits = []
