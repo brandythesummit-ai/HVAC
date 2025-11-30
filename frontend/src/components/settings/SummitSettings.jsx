@@ -105,9 +105,6 @@ const SummitSettings = () => {
               placeholder="pit-****-****-****-****"
               className="input-field"
             />
-            <p className="mt-1.5 text-xs text-gray-500">
-              Create a Private Integration in your The Summit.AI Agency Settings to get your access token
-            </p>
           </div>
 
           {/* Location ID Field */}

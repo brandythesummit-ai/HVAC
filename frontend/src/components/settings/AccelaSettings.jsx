@@ -95,9 +95,6 @@ const AccelaSettings = () => {
               placeholder="Enter Accela Application ID"
               className="input-field"
             />
-            <p className="mt-1.5 text-xs text-gray-500">
-              Get your App ID from the Accela Developer Portal
-            </p>
           </div>
 
           {/* App Secret Field */}
@@ -114,9 +111,6 @@ const AccelaSettings = () => {
               placeholder="Enter Accela Application Secret"
               className="input-field"
             />
-            <p className="mt-1.5 text-xs text-gray-500">
-              These credentials will be used for all counties via OAuth refresh tokens
-            </p>
           </div>
 
           {/* Save Result Alert */}
