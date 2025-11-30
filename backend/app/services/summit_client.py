@@ -1,7 +1,10 @@
 """Summit.AI (HighLevel) CRM API client with Private Integration static token."""
 import httpx
+import logging
 from typing import Dict, List, Optional, Any
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class SummitClient:
@@ -25,6 +28,12 @@ class SummitClient:
         self.access_token = access_token or settings.summit_access_token
         self.location_id = location_id or settings.summit_location_id
         self.base_url = "https://services.leadconnectorhq.com"
+
+        # Log credential source for debugging
+        if access_token:
+            logger.info("SummitClient initialized with explicit credentials (database)")
+        else:
+            logger.info("SummitClient initialized with environment variable credentials")
 
         # Defensive validation: Ensure credentials are ASCII-encodable
         # HTTP headers (including Authorization) must be ASCII per RFC 7230

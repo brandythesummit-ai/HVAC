@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Save, CheckCircle, AlertCircle, Loader2, Eye, EyeOff, Key } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../api/settings';
-import { maskApiKey } from '../../utils/formatters';
 
 const AccelaSettings = () => {
   const queryClient = useQueryClient();
@@ -97,6 +96,9 @@ const AccelaSettings = () => {
               placeholder="Enter Accela Application ID"
               className="input-field"
             />
+            {formData.app_id && (
+              <p className="mt-1.5 text-sm text-gray-500">{formData.app_id}</p>
+            )}
             <p className="mt-1.5 text-xs text-gray-500">
               Get your App ID from the Accela Developer Portal
             </p>
@@ -136,7 +138,7 @@ const AccelaSettings = () => {
               </button>
             </div>
             {formData.app_secret && !showAppSecret && (
-              <p className="mt-1.5 text-sm text-gray-500">{maskApiKey(formData.app_secret)}</p>
+              <p className="mt-1.5 text-sm text-gray-500">{formData.app_secret}</p>
             )}
             <p className="mt-1.5 text-xs text-gray-500">
               These credentials will be used for all counties via OAuth refresh tokens

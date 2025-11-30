@@ -1,6 +1,9 @@
 import { Clock, CheckCircle, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
-const SyncStatusBadge = ({ status }) => {
+const SyncStatusBadge = ({ status, errorMessage }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
   const configs = {
     pending: {
       icon: Clock,
@@ -24,12 +27,28 @@ const SyncStatusBadge = ({ status }) => {
 
   const config = configs[status] || configs.pending;
   const Icon = config.icon;
+  const hasTooltip = status === 'failed' && errorMessage;
 
   return (
-    <span className={config.className}>
-      <Icon className={`h-3 w-3 mr-1 ${config.iconColor}`} />
-      {config.text}
-    </span>
+    <div className="relative inline-block">
+      <span
+        className={config.className}
+        onMouseEnter={() => hasTooltip && setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        style={{ cursor: hasTooltip ? 'help' : 'default' }}
+      >
+        <Icon className={`h-3 w-3 mr-1 ${config.iconColor}`} />
+        {config.text}
+      </span>
+
+      {showTooltip && errorMessage && (
+        <div className="absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg shadow-lg max-w-xs whitespace-normal">
+          <div className="font-semibold mb-1">Error Details:</div>
+          <div className="text-xs">{errorMessage}</div>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
   );
 };
 

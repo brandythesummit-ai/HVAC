@@ -166,6 +166,25 @@ async def sync_leads_to_summit(request: SyncLeadsRequest, db=Depends(get_db)):
     Now uses property-based data with lead scoring information.
     """
     try:
+        # Get Summit credentials from database (same as connection test)
+        agency_result = db.table("agencies").select("*").limit(1).execute()
+
+        if not agency_result.data:
+            raise HTTPException(
+                status_code=400,
+                detail="No agency configured with Summit.AI credentials"
+            )
+
+        agency = agency_result.data[0]
+        access_token = agency.get("summit_access_token")
+        location_id = agency.get("summit_location_id")
+
+        if not access_token or not location_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Summit.AI credentials not configured. Please configure in Settings."
+            )
+
         # Get leads to sync with properties and permits
         query = db.table("leads").select("*, properties(*), permits(*)")
 
@@ -188,8 +207,11 @@ async def sync_leads_to_summit(request: SyncLeadsRequest, db=Depends(get_db)):
                 "error": None
             }
 
-        # Create Summit client
-        summit = SummitClient()
+        # Create Summit client with DATABASE credentials (explicit, not env vars)
+        summit = SummitClient(
+            access_token=access_token,
+            location_id=location_id
+        )
 
         synced_count = 0
         failed_count = 0

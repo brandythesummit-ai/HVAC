@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Send, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import LeadRow from './LeadRow';
 import { useSyncLeadsToSummit } from '../../hooks/useLeads';
 
@@ -27,10 +28,27 @@ const LeadsTable = ({ leads, isLoading }) => {
 
   const handleSyncToSummit = async () => {
     try {
-      await syncToSummit.mutateAsync(Array.from(selectedLeads));
+      const result = await syncToSummit.mutateAsync(Array.from(selectedLeads));
+
+      const syncedCount = result?.data?.synced || 0;
+      const failedCount = result?.data?.failed || 0;
+
+      if (syncedCount > 0) {
+        toast.success(
+          `Successfully synced ${syncedCount} lead${syncedCount > 1 ? 's' : ''} to Summit.AI`
+        );
+      }
+
+      if (failedCount > 0) {
+        toast.error(
+          `Failed to sync ${failedCount} lead${failedCount > 1 ? 's' : ''}. Check status column for details.`
+        );
+      }
+
       setSelectedLeads(new Set());
     } catch (error) {
       console.error('Failed to sync leads:', error);
+      toast.error(`Sync failed: ${error.message || 'Unknown error'}`);
     }
   };
 

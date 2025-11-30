@@ -1,4 +1,23 @@
-"""Service to sync configuration to Railway environment variables."""
+"""
+Service to sync configuration to Railway environment variables.
+
+NOTE: Railway sync is a CONVENIENCE FEATURE, not a requirement.
+The application uses database credentials as the primary source.
+Environment variables serve as a backup for server restarts.
+
+Flow:
+1. User saves credentials in Settings UI
+2. Credentials saved to database (PRIMARY SOURCE)
+3. Credentials synced to Railway env vars (optional, for server restarts)
+4. Application code ALWAYS reads from database (not env vars)
+
+This architectural decision ensures:
+- Consistency: Both connection test and lead sync use database credentials
+- User Control: Settings UI directly controls what credentials are used
+- Railway Sync Benefits Preserved: Keeps env vars updated as a convenience
+- Simpler Logic: No environment variable lifecycle concerns
+- Platform Agnostic: Works on localhost, Railway, or any deployment platform
+"""
 import os
 import httpx
 import logging

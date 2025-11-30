@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/summit", tags=["summit"])
 
 
+def _mask_credential(value: str) -> str:
+    """Mask credential to show first 4 + last 4 characters."""
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "•" * len(value)
+    return value[:4] + "•" * (len(value) - 8) + value[-4:]
+
+
 class SummitConfigRequest(BaseModel):
     """Model for Summit.AI Private Integration configuration."""
     access_token: str
@@ -47,15 +56,12 @@ async def get_summit_config(db=Depends(get_db)):
         if agency_result.data:
             agency = agency_result.data[0]
             access_token = agency.get("summit_access_token", "")
-            # Mask token (show only last 4 characters)
-            masked_token = ""
-            if access_token:
-                masked_token = "••••" + access_token[-4:] if len(access_token) > 4 else "••••"
+            location_id = agency.get("summit_location_id", "")
 
             return {
-                "access_token": masked_token,
-                "location_id": agency.get("summit_location_id", ""),
-                "configured": bool(access_token and agency.get("summit_location_id"))
+                "access_token": _mask_credential(access_token),
+                "location_id": _mask_credential(location_id),
+                "configured": bool(access_token and location_id)
             }
         else:
             return {

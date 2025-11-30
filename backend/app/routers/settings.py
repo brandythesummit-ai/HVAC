@@ -8,6 +8,15 @@ from app.services.encryption import encryption_service
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
+def _mask_credential(value: str) -> str:
+    """Mask credential to show first 4 + last 4 characters."""
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "•" * len(value)
+    return value[:4] + "•" * (len(value) - 8) + value[-4:]
+
+
 class AccelaSettings(BaseModel):
     """Model for global Accela API credentials."""
     app_id: str = Field(..., description="Accela Application ID")
@@ -24,18 +33,18 @@ async def get_accela_settings(db=Depends(get_db)):
         if result.data:
             settings = result.data[0]
             app_secret = settings.get("app_secret", "")
+            app_id = settings.get("app_id", "")
 
-            # Mask secret (show only last 4 characters)
+            # Decrypt and mask secret
             masked_secret = ""
             if app_secret:
-                # Decrypt to get length, then mask
                 decrypted = encryption_service.decrypt(app_secret)
-                masked_secret = "••••" + decrypted[-4:] if len(decrypted) > 4 else "••••"
+                masked_secret = _mask_credential(decrypted)
 
             return {
-                "app_id": settings.get("app_id", ""),
+                "app_id": _mask_credential(app_id),
                 "app_secret": masked_secret,
-                "configured": bool(settings.get("app_id") and app_secret)
+                "configured": bool(app_id and app_secret)
             }
         else:
             return {

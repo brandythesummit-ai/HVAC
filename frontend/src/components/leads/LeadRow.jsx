@@ -85,7 +85,10 @@ const LeadRow = ({ lead, isSelected, onToggle }) => {
           {formatCurrency(displayData.total_property_value)}
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          <SyncStatusBadge status={lead.summit_sync_status} />
+          <SyncStatusBadge
+            status={lead.summit_sync_status}
+            errorMessage={lead.sync_error_message}
+          />
         </td>
       </tr>
       {expanded && (

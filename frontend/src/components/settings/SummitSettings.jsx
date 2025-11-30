@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Save, CheckCircle, AlertCircle, Loader2, Eye, EyeOff, Cloud } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { summitApi } from '../../api/summit';
-import { maskApiKey } from '../../utils/formatters';
 
 const SummitSettings = () => {
   const queryClient = useQueryClient();
@@ -127,7 +126,7 @@ const SummitSettings = () => {
               </button>
             </div>
             {formData.access_token && !showAccessToken && (
-              <p className="mt-1.5 text-sm text-gray-500">{maskApiKey(formData.access_token)}</p>
+              <p className="mt-1.5 text-sm text-gray-500">{formData.access_token}</p>
             )}
             <p className="mt-1.5 text-xs text-gray-500">
               Create a Private Integration in your The Summit.AI Agency Settings to get your access token
@@ -148,6 +147,9 @@ const SummitSettings = () => {
               placeholder="Enter your The Summit.AI Location ID"
               className="input-field"
             />
+            {formData.location_id && (
+              <p className="mt-1.5 text-sm text-gray-500">{formData.location_id}</p>
+            )}
           </div>
 
           {/* Test Result Alert */}
