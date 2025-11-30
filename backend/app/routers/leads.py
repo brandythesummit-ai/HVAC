@@ -12,55 +12,171 @@ router = APIRouter(prefix="/api/leads", tags=["leads"])
 
 @router.get("", response_model=dict)
 async def list_leads(
+    # County and sync filters
     county_id: str = None,
     sync_status: str = None,
-    lead_tier: str = None,  # NEW: Filter by HOT, WARM, COOL, COLD
-    min_score: int = None,  # NEW: Minimum lead score (0-100)
-    is_qualified: bool = None,  # NEW: Filter by qualification status
+
+    # Lead tier and scoring filters
+    lead_tier: str = None,
+    min_score: int = None,
+    max_score: int = None,
+    is_qualified: bool = None,
+
+    # HVAC age filters
+    min_hvac_age: int = None,
+    max_hvac_age: int = None,
+
+    # Pipeline intelligence filters
+    contact_completeness: str = None,  # complete, partial, minimal
+    affluence_tier: str = None,  # ultra_high, high, medium, standard
+    recommended_pipeline: str = None,  # hot_call, premium_mailer, nurture_drip, retargeting_ads, cold_storage
+    min_pipeline_confidence: int = None,
+
+    # Property value filters
+    min_property_value: float = None,
+    max_property_value: float = None,
+
+    # Contact info filters
+    has_phone: bool = None,
+    has_email: bool = None,
+
+    # Property details filters
+    year_built_min: int = None,
+    year_built_max: int = None,
+    city: str = None,
+    state: str = None,
+
+    # Pagination
     limit: int = 50,
     offset: int = 0,
+
     db=Depends(get_db)
 ):
     """
-    List leads with filters.
+    List leads with comprehensive filtering.
 
-    New property-based filters:
-    - lead_tier: HOT (15+ years), WARM (10-15 years), COOL (5-10 years), COLD (<5 years)
-    - min_score: Minimum lead score (0-100)
-    - is_qualified: Only leads with HVAC 5+ years old
+    Filters:
+    - county_id: Filter by county UUID
+    - sync_status: pending, synced, failed
+    - lead_tier: HOT, WARM, COOL, COLD
+    - min_score/max_score: Lead score range (0-100)
+    - min_hvac_age/max_hvac_age: HVAC system age range in years
+    - contact_completeness: complete (phone+email), partial (phone OR email), minimal (neither)
+    - affluence_tier: ultra_high ($500K+), high ($350K+), medium ($200K+), standard
+    - recommended_pipeline: hot_call, premium_mailer, nurture_drip, retargeting_ads, cold_storage
+    - min_pipeline_confidence: Minimum confidence score (50-95)
+    - min_property_value/max_property_value: Property value range
+    - has_phone/has_email: Filter by contact info availability
+    - year_built_min/year_built_max: Year built range
+    - city/state: Geographic filters
+    - limit: Results per page (default 50, max 200)
+    - offset: Pagination offset
 
-    Returns leads with property and permit data joined.
+    Returns leads with property and permit data joined, plus total count.
     """
     try:
-        # Join with properties and permits
-        query = db.table("leads").select("*, properties(*), permits(*)")
+        # Validate limit
+        if limit > 200:
+            limit = 200
 
+        # Join with properties and permits, get count
+        query = db.table("leads").select("*, properties(*), permits(*)", count="exact")
+
+        # County filter
         if county_id:
             query = query.eq("county_id", county_id)
 
+        # Sync status filter
         if sync_status:
             query = query.eq("summit_sync_status", sync_status)
 
-        # NEW: Property-based filters
+        # Lead tier filter
         if lead_tier:
             query = query.eq("lead_tier", lead_tier.upper())
 
+        # Score range filters
         if min_score is not None:
             query = query.gte("lead_score", min_score)
+        if max_score is not None:
+            query = query.lte("lead_score", max_score)
 
+        # Qualification filter
         if is_qualified is not None:
-            # Filter through properties table
-            # Note: This requires property_id to be populated
             query = query.not_.is_("property_id", "null")
 
-        # Order by lead score (highest first)
-        result = query.order("lead_score", desc=True).range(offset, offset + limit - 1).execute()
+        # HVAC age filters (filter through properties)
+        if min_hvac_age is not None:
+            query = query.gte("properties.hvac_age_years", min_hvac_age)
+        if max_hvac_age is not None:
+            query = query.lte("properties.hvac_age_years", max_hvac_age)
+
+        # Contact completeness filter
+        if contact_completeness:
+            query = query.eq("properties.contact_completeness", contact_completeness.lower())
+
+        # Affluence tier filter
+        if affluence_tier:
+            query = query.eq("properties.affluence_tier", affluence_tier.lower())
+
+        # Recommended pipeline filter
+        if recommended_pipeline:
+            query = query.eq("properties.recommended_pipeline", recommended_pipeline.lower())
+
+        # Pipeline confidence filter
+        if min_pipeline_confidence is not None:
+            query = query.gte("properties.pipeline_confidence", min_pipeline_confidence)
+
+        # Property value range filters
+        if min_property_value is not None:
+            query = query.gte("properties.total_property_value", min_property_value)
+        if max_property_value is not None:
+            query = query.lte("properties.total_property_value", max_property_value)
+
+        # Contact info filters
+        if has_phone is not None:
+            if has_phone:
+                query = query.not_.is_("properties.owner_phone", "null")
+            else:
+                query = query.is_("properties.owner_phone", "null")
+
+        if has_email is not None:
+            if has_email:
+                query = query.not_.is_("properties.owner_email", "null")
+            else:
+                query = query.is_("properties.owner_email", "null")
+
+        # Year built range filters
+        if year_built_min is not None:
+            query = query.gte("properties.year_built", year_built_min)
+        if year_built_max is not None:
+            query = query.lte("properties.year_built", year_built_max)
+
+        # Geographic filters
+        if city:
+            query = query.ilike("properties.city", f"%{city}%")
+        if state:
+            query = query.eq("properties.state", state.upper())
+
+        # Multi-factor sorting: tier → score → HVAC age → property value
+        # Order: HOT before WARM before COOL before COLD
+        # Within tier: highest score first
+        # Within score: oldest HVAC first
+        # Within age: highest value first
+        result = query.order("lead_tier", desc=False) \
+                      .order("lead_score", desc=True) \
+                      .order("properties.hvac_age_years", desc=True) \
+                      .order("properties.total_property_value", desc=True) \
+                      .range(offset, offset + limit - 1) \
+                      .execute()
 
         return {
             "success": True,
             "data": {
                 "leads": result.data,
-                "count": len(result.data)
+                "count": len(result.data),
+                "total": result.count if hasattr(result, 'count') else len(result.data),
+                "limit": limit,
+                "offset": offset
             },
             "error": None
         }

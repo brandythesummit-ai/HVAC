@@ -138,6 +138,115 @@ class PropertyAggregator:
         """
         return hvac_age_years >= self.QUALIFICATION_THRESHOLD
 
+    def calculate_contact_completeness(
+        self,
+        owner_phone: Optional[str],
+        owner_email: Optional[str]
+    ) -> str:
+        """
+        Calculate contact information completeness.
+
+        Args:
+            owner_phone: Owner phone number
+            owner_email: Owner email address
+
+        Returns:
+            'complete', 'partial', or 'minimal'
+        """
+        if owner_phone and owner_email:
+            return 'complete'
+        elif owner_phone or owner_email:
+            return 'partial'
+        else:
+            return 'minimal'
+
+    def calculate_affluence_tier(self, property_value: Optional[float]) -> str:
+        """
+        Calculate affluence tier based on property value.
+
+        Args:
+            property_value: Total property value
+
+        Returns:
+            'ultra_high', 'high', 'medium', or 'standard'
+        """
+        if not property_value:
+            return 'standard'
+
+        if property_value >= 500000:
+            return 'ultra_high'
+        elif property_value >= 350000:
+            return 'high'
+        elif property_value >= 200000:
+            return 'medium'
+        else:
+            return 'standard'
+
+    def calculate_pipeline_assignment(
+        self,
+        lead_tier: str,
+        hvac_age_years: int,
+        contact_completeness: str,
+        affluence_tier: str,
+        property_value: Optional[float] = None
+    ) -> Tuple[str, int]:
+        """
+        Calculate recommended Summit.ai pipeline and confidence score.
+
+        Pipeline Assignment Logic:
+        1. hot_call: HOT leads with complete contact (phone + email)
+        2. premium_mailer: HOT leads with partial contact OR high-value WARM leads
+        3. nurture_drip: WARM leads OR high-value COOL leads
+        4. retargeting_ads: COOL leads (standard value)
+        5. cold_storage: COLD leads (not qualified)
+
+        Args:
+            lead_tier: Lead tier (HOT, WARM, COOL, COLD)
+            hvac_age_years: Age of HVAC system
+            contact_completeness: Contact quality (complete, partial, minimal)
+            affluence_tier: Property value tier
+            property_value: Total property value (optional, for logging)
+
+        Returns:
+            Tuple of (pipeline_name, confidence_score)
+        """
+        # HOT leads (15+ years)
+        if lead_tier == 'HOT':
+            if contact_completeness == 'complete':
+                # Best leads: old HVAC + full contact info = immediate call opportunity
+                return 'hot_call', 95
+            elif contact_completeness == 'partial':
+                # Good leads but missing some contact info = premium mail campaign
+                return 'premium_mailer', 85
+            else:
+                # HOT but no contact info = still worth premium effort
+                return 'premium_mailer', 75
+
+        # WARM leads (10-15 years)
+        elif lead_tier == 'WARM':
+            if affluence_tier in ('ultra_high', 'high'):
+                # High-value properties worth premium mailer even if not urgent yet
+                return 'premium_mailer', 80
+            elif contact_completeness == 'complete':
+                # Good contact info = nurture until ready
+                return 'nurture_drip', 75
+            else:
+                # Standard WARM lead = nurture campaign
+                return 'nurture_drip', 70
+
+        # COOL leads (5-10 years)
+        elif lead_tier == 'COOL':
+            if affluence_tier in ('ultra_high', 'high'):
+                # High-value properties worth nurturing long-term
+                return 'nurture_drip', 65
+            else:
+                # Standard COOL = retargeting ads for brand awareness
+                return 'retargeting_ads', 60
+
+        # COLD leads (<5 years) - not qualified but keep in system
+        else:
+            return 'cold_storage', 50
+
     def create_qualification_reason(
         self,
         hvac_age_years: int,
@@ -262,6 +371,17 @@ class PropertyAggregator:
         lead_tier = self.determine_lead_tier(hvac_age)
         is_qualified = self.is_qualified_lead(hvac_age)
 
+        # Calculate pipeline intelligence
+        owner_phone = permit_data.get('owner_phone')
+        owner_email = permit_data.get('owner_email')
+        property_value = permit_data.get('property_value')
+
+        contact_completeness = self.calculate_contact_completeness(owner_phone, owner_email)
+        affluence_tier = self.calculate_affluence_tier(property_value)
+        recommended_pipeline, pipeline_confidence = self.calculate_pipeline_assignment(
+            lead_tier, hvac_age, contact_completeness, affluence_tier, property_value
+        )
+
         property_data = {
             'county_id': county_id,
             'normalized_address': parsed_address.normalized_address,
@@ -279,19 +399,23 @@ class PropertyAggregator:
             'lead_tier': lead_tier,
             'is_qualified': is_qualified,
             'owner_name': permit_data.get('owner_name'),
-            'owner_phone': permit_data.get('owner_phone'),
-            'owner_email': permit_data.get('owner_email'),
+            'owner_phone': owner_phone,
+            'owner_email': owner_email,
             'parcel_number': permit_data.get('raw_data', {}).get('parcelNumber'),
             'year_built': permit_data.get('year_built'),
             'lot_size_sqft': int(permit_data.get('lot_size')) if permit_data.get('lot_size') else None,
-            'total_property_value': permit_data.get('property_value'),
+            'total_property_value': property_value,
             'total_hvac_permits': 1,
+            'contact_completeness': contact_completeness,
+            'affluence_tier': affluence_tier,
+            'recommended_pipeline': recommended_pipeline,
+            'pipeline_confidence': pipeline_confidence,
         }
 
         result = self.db.table('properties').insert(property_data).execute()
 
         if result.data:
-            logger.info(f"Created property {result.data[0]['id']} at {parsed_address.normalized_address}")
+            logger.info(f"Created property {result.data[0]['id']} at {parsed_address.normalized_address} (Pipeline: {recommended_pipeline})")
             return result.data[0]['id']
         else:
             raise Exception("Failed to create property record")
@@ -310,6 +434,17 @@ class PropertyAggregator:
         lead_tier = self.determine_lead_tier(hvac_age)
         is_qualified = self.is_qualified_lead(hvac_age)
 
+        # Calculate pipeline intelligence
+        owner_phone = permit_data.get('owner_phone')
+        owner_email = permit_data.get('owner_email')
+        property_value = permit_data.get('property_value')
+
+        contact_completeness = self.calculate_contact_completeness(owner_phone, owner_email)
+        affluence_tier = self.calculate_affluence_tier(property_value)
+        recommended_pipeline, pipeline_confidence = self.calculate_pipeline_assignment(
+            lead_tier, hvac_age, contact_completeness, affluence_tier, property_value
+        )
+
         # Get current total_hvac_permits count
         current = self.db.table('properties').select('total_hvac_permits').eq('id', property_id).execute()
         current_count = current.data[0]['total_hvac_permits'] if current.data else 1
@@ -322,19 +457,23 @@ class PropertyAggregator:
             'lead_tier': lead_tier,
             'is_qualified': is_qualified,
             'owner_name': permit_data.get('owner_name'),
-            'owner_phone': permit_data.get('owner_phone'),
-            'owner_email': permit_data.get('owner_email'),
+            'owner_phone': owner_phone,
+            'owner_email': owner_email,
             'year_built': permit_data.get('year_built'),
             'lot_size_sqft': int(permit_data.get('lot_size')) if permit_data.get('lot_size') else None,
-            'total_property_value': permit_data.get('property_value'),
+            'total_property_value': property_value,
             'total_hvac_permits': current_count + 1,
+            'contact_completeness': contact_completeness,
+            'affluence_tier': affluence_tier,
+            'recommended_pipeline': recommended_pipeline,
+            'pipeline_confidence': pipeline_confidence,
             'updated_at': datetime.utcnow().isoformat(),
         }
 
         result = self.db.table('properties').update(update_data).eq('id', property_id).execute()
 
         if result.data:
-            logger.info(f"Updated property {property_id} with more recent HVAC from {hvac_date}")
+            logger.info(f"Updated property {property_id} with more recent HVAC from {hvac_date} (Pipeline: {recommended_pipeline})")
             return property_id
         else:
             raise Exception(f"Failed to update property {property_id}")
