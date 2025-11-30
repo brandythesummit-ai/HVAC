@@ -25,7 +25,18 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.detail || error.message || 'An error occurred';
+    let message = error.response?.data?.detail || error.message || 'An error occurred';
+
+    // If detail is an array (FastAPI validation errors), extract messages
+    if (Array.isArray(message)) {
+      message = message.map(err => err.msg || JSON.stringify(err)).join(', ');
+    }
+
+    // If detail is an object, stringify it
+    if (typeof message === 'object' && message !== null) {
+      message = JSON.stringify(message);
+    }
+
     return Promise.reject(new Error(message));
   }
 );
