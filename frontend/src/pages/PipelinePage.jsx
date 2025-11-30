@@ -1,17 +1,44 @@
 import { useState } from 'react';
-import { Filter, AlertCircle, GitBranch, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, GitBranch, CheckCircle, XCircle } from 'lucide-react';
 import { useLeads } from '../hooks/useLeads';
 import { useCounties } from '../hooks/useCounties';
 import LeadsTable from '../components/leads/LeadsTable';
+import FilterPanel from '../components/leads/FilterPanel';
 
 const PipelinePage = () => {
   // Pipeline: Show ONLY synced or failed leads
   const [filters, setFilters] = useState({
-    county_id: '',
+    // Sync status filter (toggleable on this page)
     sync_status: 'synced', // Default to synced leads
+
+    // Basic filters
+    county_id: '',
     lead_tier: '',
     min_score: '',
+    max_score: '',
     is_qualified: '',
+
+    // Pipeline intelligence filters
+    recommended_pipeline: '',
+    min_pipeline_confidence: '',
+    contact_completeness: '',
+    affluence_tier: '',
+
+    // Property details
+    min_hvac_age: '',
+    max_hvac_age: '',
+    min_property_value: '',
+    max_property_value: '',
+    year_built_min: '',
+    year_built_max: '',
+
+    // Contact information
+    has_phone: '',
+    has_email: '',
+
+    // Advanced
+    city: '',
+    state: '',
   });
 
   const { data: leadsData, isLoading, error } = useLeads(filters);
@@ -59,130 +86,58 @@ const PipelinePage = () => {
                 </p>
               </div>
             </div>
-            <div className="flex gap-6">
-              <div className="text-right">
-                <div className="flex items-center text-sm font-medium text-gray-700">
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFilters({ ...filters, sync_status: 'synced' })}
+                className={`flex flex-col items-center px-4 py-2 rounded-lg transition-all ${
+                  filters.sync_status === 'synced'
+                    ? 'bg-green-50 border-2 border-green-600'
+                    : 'bg-gray-50 border-2 border-gray-200 hover:border-green-400'
+                }`}
+              >
+                <div className="flex items-center text-sm font-medium text-gray-700 mb-1">
                   <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
                   Synced
                 </div>
-                <p className="text-2xl font-bold text-green-600">{syncedCount}</p>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center text-sm font-medium text-gray-700">
+                <p className={`text-2xl font-bold ${
+                  filters.sync_status === 'synced' ? 'text-green-600' : 'text-gray-400'
+                }`}>
+                  {syncedCount}
+                </p>
+              </button>
+              <button
+                onClick={() => setFilters({ ...filters, sync_status: 'failed' })}
+                className={`flex flex-col items-center px-4 py-2 rounded-lg transition-all ${
+                  filters.sync_status === 'failed'
+                    ? 'bg-red-50 border-2 border-red-600'
+                    : 'bg-gray-50 border-2 border-gray-200 hover:border-red-400'
+                }`}
+              >
+                <div className="flex items-center text-sm font-medium text-gray-700 mb-1">
                   <XCircle className="h-4 w-4 text-red-600 mr-1" />
                   Failed
                 </div>
-                <p className="text-2xl font-bold text-red-600">{failedCount}</p>
-              </div>
+                <p className={`text-2xl font-bold ${
+                  filters.sync_status === 'failed' ? 'text-red-600' : 'text-gray-400'
+                }`}>
+                  {failedCount}
+                </p>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card animate-fade-in">
-        <div className="card-header">
-          <div className="flex items-center">
-            <Filter className="h-5 w-5 text-gray-400 mr-2" />
-            <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
-          </div>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label htmlFor="sync_status" className="block text-sm font-medium text-gray-700 mb-1">
-                Sync Status
-              </label>
-              <select
-                id="sync_status"
-                name="sync_status"
-                value={filters.sync_status}
-                onChange={handleFilterChange}
-                className="input-field"
-              >
-                <option value="synced">✅ Synced</option>
-                <option value="failed">❌ Failed</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="county_id" className="block text-sm font-medium text-gray-700 mb-1">
-                County
-              </label>
-              <select
-                id="county_id"
-                name="county_id"
-                value={filters.county_id}
-                onChange={handleFilterChange}
-                className="input-field"
-              >
-                <option value="">All Counties</option>
-                {counties?.map((county) => (
-                  <option key={county.id} value={county.id}>
-                    {county.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="lead_tier" className="block text-sm font-medium text-gray-700 mb-1">
-                Lead Tier
-              </label>
-              <select
-                id="lead_tier"
-                name="lead_tier"
-                value={filters.lead_tier}
-                onChange={handleFilterChange}
-                className="input-field"
-              >
-                <option value="">All Tiers</option>
-                <option value="HOT">🔥 HOT (15+ years)</option>
-                <option value="WARM">🌡️ WARM (10-15 years)</option>
-                <option value="COOL">❄️ COOL (5-10 years)</option>
-                <option value="COLD">🧊 COLD (&lt;5 years)</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="min_score" className="block text-sm font-medium text-gray-700 mb-1">
-                Min Score
-              </label>
-              <input
-                type="number"
-                id="min_score"
-                name="min_score"
-                value={filters.min_score}
-                onChange={handleFilterChange}
-                min="0"
-                max="100"
-                placeholder="0-100"
-                className="input-field"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="is_qualified" className="block text-sm font-medium text-gray-700 mb-1">
-                Qualified Status
-              </label>
-              <select
-                id="is_qualified"
-                name="is_qualified"
-                value={filters.is_qualified}
-                onChange={handleFilterChange}
-                className="input-field"
-              >
-                <option value="">All Leads</option>
-                <option value="true">Qualified Only (5+ yrs)</option>
-                <option value="false">Not Qualified</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FilterPanel
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        counties={counties}
+        fixedFilters={[]}
+      />
 
       {/* Leads Table */}
-      <LeadsTable leads={leads} isLoading={isLoading} showSyncActions={true} />
+      <LeadsTable leads={leads} isLoading={isLoading} />
     </div>
   );
 };
