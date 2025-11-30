@@ -236,15 +236,12 @@ async def list_leads(
         count_result = count_query.execute()
         total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else 0
 
-        # Multi-factor sorting: tier → score → HVAC age → property value
+        # Multi-factor sorting: tier → score
         # Order: HOT before WARM before COOL before COLD
         # Within tier: highest score first
-        # Within score: oldest HVAC first
-        # Within age: highest value first
+        # Note: Cannot order by related table columns (properties.*) in Supabase
         result = query.order("lead_tier", desc=False) \
                       .order("lead_score", desc=True) \
-                      .order("properties.hvac_age_years", desc=True) \
-                      .order("properties.total_property_value", desc=True) \
                       .range(offset, offset + limit - 1) \
                       .execute()
 
