@@ -1,10 +1,12 @@
 """FastAPI application entry point."""
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import counties, permits, leads, summit, background_jobs, properties
+from app.routers import counties, permits, leads, summit, background_jobs, properties, health
 from app.routers import settings as settings_router
 from app.workers.job_processor import start_job_processor, stop_job_processor
+from app.services.health_checker import background_health_checker
 
 # Create FastAPI app
 app = FastAPI(
@@ -23,6 +25,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(health.router)
 app.include_router(counties.router)
 app.include_router(permits.router)
 app.include_router(leads.router)
@@ -35,8 +38,12 @@ app.include_router(properties.router)
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
-    """Start background job processor on application startup."""
+    """Start background services on application startup."""
+    # Start job processor
     await start_job_processor()
+
+    # Start background health checker
+    asyncio.create_task(background_health_checker())
 
 
 @app.on_event("shutdown")
@@ -57,7 +64,11 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """
+    Simple health check endpoint (legacy).
+
+    For comprehensive health monitoring, use /api/health instead.
+    """
     return {
         "status": "healthy",
         "environment": settings.environment
