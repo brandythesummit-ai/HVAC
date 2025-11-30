@@ -173,22 +173,36 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             token_expires_at=county.get("token_expires_at", "")
         )
 
-        print(f"🔍 [PULL PERMITS] Created Accela client, pulling Mechanical permits...")
+        # Use EXACT permit type from HCFL Accela portal
+        # From portal screenshots: "Residential Mechanical Trade Permit"
+        hvac_type = "Residential Mechanical Trade Permit"
 
-        # Pull ONLY Mechanical permits (filtered at API level for efficiency)
+        print(f"🔍 [PULL PERMITS] Using API-level type filter: {hvac_type}")
+
+        # Pull permits with API-level type filtering
         accela_response = await client.get_permits(
             date_from=request.date_from,
             date_to=request.date_to,
             limit=request.limit,
             status=request.status,
-            permit_type="Mechanical"
+            permit_type=hvac_type  # ← USE EXACT API TYPE
         )
 
-        hvac_permits = accela_response["permits"]
+        all_permits = accela_response["permits"]
         query_info = accela_response["query_info"]
         debug_info = accela_response["debug_info"]
 
-        print(f"✅ [PULL PERMITS] Retrieved {len(hvac_permits)} Mechanical permits from Accela")
+        print(f"✅ [PULL PERMITS] Retrieved {len(all_permits)} permits from Accela (API-filtered for HVAC)")
+
+        # API already filtered for exact type - all_permits ARE hvac_permits
+        hvac_permits = all_permits
+
+        print(f"✅ [PULL PERMITS] API-level filtering returned {len(hvac_permits)} HVAC permits")
+
+        if len(hvac_permits) == 0:
+            print(f"⚠️  [PULL PERMITS] Got 0 HVAC permits from API")
+            print(f"   API type filter used: {hvac_type}")
+            print(f"   This may mean no permits of this exact type exist in the date range")
 
         # Enrich each permit
         saved_permits = []
@@ -317,13 +331,13 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         # Generate suggestions if 0 results
         suggestions = []
         if len(hvac_permits) == 0:
-            suggestions.append("No Mechanical permits found in this date range")
+            suggestions.append(f"No permits found with type: '{hvac_type}'")
             suggestions.append("Try widening your date range")
             if request.status:
                 suggestions.append(f"Try removing the '{request.status}' status filter")
-            suggestions.append("Verify Mechanical permits exist in Accela for this period")
             if date_range_days < 30:
                 suggestions.append("Date range is narrow (< 30 days) - try a longer period")
+            suggestions.append("Verify this exact permit type exists in Accela for this county")
 
         return {
             "success": True,
@@ -349,7 +363,8 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                     "date_range_days": date_range_days,
                     "limit": request.limit,
                     "status_filter": request.status,
-                    "permit_type_filter": "Mechanical",
+                    "permit_type_filter": hvac_type + " (API-level filtered)",
+                    "filtering_method": "API",
                     "county_name": county.get("name"),
                     "county_code": county.get("county_code")
                 },

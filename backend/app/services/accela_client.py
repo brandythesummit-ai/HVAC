@@ -329,52 +329,90 @@ class AccelaClient:
         permit_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Get permits from Accela with diagnostic information.
+        Get permits from Accela with automatic pagination.
+
+        Fetches permits in chunks of 100 (Accela max per request)
+        until reaching requested limit or no more results available.
 
         Args:
             date_from: Start date (YYYY-MM-DD)
             date_to: End date (YYYY-MM-DD)
             limit: Max results (default 100)
             status: Optional status filter (e.g., 'Finaled')
-            permit_type: Optional type filter (e.g., 'Mechanical') - filters at API level
+            permit_type: Optional type filter (e.g., 'Residential Mechanical Trade Permit') - filters at API level
 
         Returns:
             Dict containing permits, query_info, and debug_info
+
+        Future Enhancement:
+            The Accela API supports an 'expand' parameter to include related data
+            in a single request. Could use: expand=addresses,owners,parcels,contacts
+            This would reduce from 4 API calls to 1 per permit.
+            See: https://developer.accela.com/docs/construct-partialResponse.html
         """
-        params = {
-            "module": "Building",
-            "openedDateFrom": date_from,
-            "openedDateTo": date_to,
-            "limit": limit
-        }
+        all_permits = []
+        offset = 0
+        page_size = 100  # Accela API max per request
+        pages_fetched = 0
 
-        if status:
-            params["status"] = status
+        print(f"🔍 [ACCELA API] Fetching up to {limit} permits with pagination")
 
-        if permit_type:
-            params["type"] = permit_type
+        while offset < limit:
+            current_page_size = min(page_size, limit - offset)
 
-        # Enhanced logging
-        print(f"🔍 [ACCELA API] GET /v4/records")
-        print(f"   Params: {params}")
+            params = {
+                "module": "Building",
+                "openedDateFrom": date_from,
+                "openedDateTo": date_to,
+                "limit": current_page_size,
+                "offset": offset  # ← KEY: Pagination offset
+            }
 
-        result = await self._make_request("GET", "/v4/records", params=params)
-        permits = result.get("result", [])
+            if status:
+                params["status"] = status
+
+            if permit_type:
+                params["type"] = permit_type  # ← API-level filtering
+
+            print(f"   📄 Fetching page {pages_fetched + 1}: offset={offset}, limit={current_page_size}")
+
+            result = await self._make_request("GET", "/v4/records", params=params)
+            page_permits = result.get("result", [])
+
+            if not page_permits:
+                print(f"   ✅ No more permits (empty page)")
+                break
+
+            all_permits.extend(page_permits)
+            pages_fetched += 1
+
+            print(f"   ✅ Got {len(page_permits)} permits (total: {len(all_permits)})")
+
+            # If we got fewer than requested, we've hit the end
+            if len(page_permits) < current_page_size:
+                print(f"   ✅ Last page (partial)")
+                break
+
+            offset += current_page_size
+
+        print(f"✅ [ACCELA API] Pagination complete: {len(all_permits)} permits across {pages_fetched} pages")
 
         # Return permits with diagnostics
         return {
-            "permits": permits,
+            "permits": all_permits,
             "query_info": {
                 "date_from": date_from,
                 "date_to": date_to,
                 "limit": limit,
                 "status": status,
                 "permit_type": permit_type,
-                "module": "Building"
+                "module": "Building",
+                "pages_fetched": pages_fetched,
+                "total_fetched": len(all_permits)
             },
             "debug_info": {
-                "total_returned": len(permits),
-                "api_params": params,
+                "total_returned": len(all_permits),
+                "pagination_enabled": True,
                 "api_endpoint": "/v4/records"
             }
         }
