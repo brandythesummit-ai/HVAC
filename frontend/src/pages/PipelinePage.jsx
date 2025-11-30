@@ -4,6 +4,7 @@ import { useLeads } from '../hooks/useLeads';
 import { useCounties } from '../hooks/useCounties';
 import LeadsTable from '../components/leads/LeadsTable';
 import FilterPanel from '../components/leads/FilterPanel';
+import PaginationControls from '../components/leads/PaginationControls';
 
 const PipelinePage = () => {
   // Pipeline: Show ONLY synced or failed leads
@@ -39,6 +40,10 @@ const PipelinePage = () => {
     // Advanced
     city: '',
     state: '',
+
+    // Pagination
+    limit: 50,
+    offset: 0,
   });
 
   const { data: leadsData, isLoading, error } = useLeads(filters);
@@ -48,7 +53,15 @@ const PipelinePage = () => {
   const total = leadsData?.total || 0;
 
   const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+    setFilters({ ...filters, [e.target.name]: e.target.value, offset: 0 });
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setFilters({ ...filters, limit: newLimit, offset: 0 });
+  };
+
+  const handlePageChange = (newOffset) => {
+    setFilters({ ...filters, offset: newOffset });
   };
 
   // Calculate stats
@@ -88,7 +101,7 @@ const PipelinePage = () => {
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setFilters({ ...filters, sync_status: 'synced' })}
+                onClick={() => setFilters({ ...filters, sync_status: 'synced', offset: 0 })}
                 className={`flex flex-col items-center px-4 py-2 rounded-lg transition-all ${
                   filters.sync_status === 'synced'
                     ? 'bg-green-50 border-2 border-green-600'
@@ -106,7 +119,7 @@ const PipelinePage = () => {
                 </p>
               </button>
               <button
-                onClick={() => setFilters({ ...filters, sync_status: 'failed' })}
+                onClick={() => setFilters({ ...filters, sync_status: 'failed', offset: 0 })}
                 className={`flex flex-col items-center px-4 py-2 rounded-lg transition-all ${
                   filters.sync_status === 'failed'
                     ? 'bg-red-50 border-2 border-red-600'
@@ -138,6 +151,15 @@ const PipelinePage = () => {
 
       {/* Leads Table */}
       <LeadsTable leads={leads} isLoading={isLoading} />
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        total={total}
+        limit={filters.limit}
+        offset={filters.offset}
+        onLimitChange={handleLimitChange}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 };
