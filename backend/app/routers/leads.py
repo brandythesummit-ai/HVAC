@@ -101,8 +101,11 @@ async def list_leads(
             query = query.lte("lead_score", max_score)
 
         # Qualification filter
-        if is_qualified is not None:
+        if is_qualified is True:
             query = query.not_.is_("property_id", "null")
+        elif is_qualified is False:
+            query = query.is_("property_id", "null")
+        # If is_qualified is None, don't apply any filter
 
         # HVAC age filters (filter through properties)
         if min_hvac_age is not None:
@@ -172,8 +175,11 @@ async def list_leads(
             count_query = count_query.gte("lead_score", min_score)
         if max_score is not None:
             count_query = count_query.lte("lead_score", max_score)
-        if is_qualified is not None:
+        if is_qualified is True:
             count_query = count_query.not_.is_("property_id", "null")
+        elif is_qualified is False:
+            count_query = count_query.is_("property_id", "null")
+        # If is_qualified is None, don't apply any filter
 
         # HVAC age filters
         if min_hvac_age is not None:
