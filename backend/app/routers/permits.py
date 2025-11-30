@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
 from datetime import datetime
+import logging
 
 from app.database import get_db
 from app.models.permit import PullPermitsRequest, PermitResponse, PermitListRequest
@@ -10,6 +11,7 @@ from app.services.encryption import encryption_service
 from app.services.property_aggregator import PropertyAggregator
 
 router = APIRouter(prefix="/api", tags=["permits"])
+logger = logging.getLogger(__name__)
 
 
 def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: List[Dict], parcels: List[Dict]) -> Dict[str, Any]:
@@ -452,7 +454,7 @@ async def get_permit(permit_id: str, db=Depends(get_db)):
 
 @router.delete("/permits/{permit_id}", response_model=dict)
 async def delete_permit(permit_id: str, db=Depends(get_db)):
-    """Delete a permit/lead by ID."""
+    """Delete a permit/lead by ID with proper cascade handling."""
     try:
         # Check if permit exists first
         check_result = db.table("permits").select("id").eq("id", permit_id).execute()
@@ -460,20 +462,36 @@ async def delete_permit(permit_id: str, db=Depends(get_db)):
         if not check_result.data:
             raise HTTPException(status_code=404, detail="Permit not found")
 
-        # Delete the permit
+        # Step 1: Delete all leads associated with this permit
+        # This must happen first to avoid foreign key constraint violations
+        leads_result = db.table("leads").delete().eq("permit_id", permit_id).execute()
+        leads_deleted = len(leads_result.data) if leads_result.data else 0
+
+        # Step 2: Update properties that reference this permit as most_recent_hvac_permit
+        # Set most_recent_hvac_permit_id to NULL where it matches this permit
+        db.table("properties").update({
+            "most_recent_hvac_permit_id": None
+        }).eq("most_recent_hvac_permit_id", permit_id).execute()
+
+        # Step 3: Now delete the permit itself
         db.table("permits").delete().eq("id", permit_id).execute()
 
         return {
             "success": True,
-            "data": {"message": "Permit deleted successfully", "id": permit_id},
+            "data": {
+                "message": "Permit deleted successfully",
+                "id": permit_id,
+                "leads_deleted": leads_deleted
+            },
             "error": None
         }
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error deleting permit {permit_id}: {str(e)}")
         return {
             "success": False,
             "data": None,
-            "error": str(e)
+            "error": f"Failed to delete permit: {str(e)}"
         }

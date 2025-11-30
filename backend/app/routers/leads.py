@@ -79,8 +79,8 @@ async def list_leads(
         if limit > 200:
             limit = 200
 
-        # Join with properties and permits, get count
-        query = db.table("leads").select("*, properties(*), permits(*)", count="exact")
+        # Build the base query for filtering
+        query = db.table("leads").select("*, properties(*), permits(*)")
 
         # County filter
         if county_id:
@@ -157,6 +157,79 @@ async def list_leads(
         if state:
             query = query.eq("properties.state", state.upper())
 
+        # Get total count first (before pagination)
+        # Build a count-only query with same filters including property join
+        count_query = db.table("leads").select("id, properties(id)", count="exact")
+
+        # Apply ALL the same filters to the count query
+        if county_id:
+            count_query = count_query.eq("county_id", county_id)
+        if sync_status:
+            count_query = count_query.eq("summit_sync_status", sync_status)
+        if lead_tier:
+            count_query = count_query.eq("lead_tier", lead_tier.upper())
+        if min_score is not None:
+            count_query = count_query.gte("lead_score", min_score)
+        if max_score is not None:
+            count_query = count_query.lte("lead_score", max_score)
+        if is_qualified is not None:
+            count_query = count_query.not_.is_("property_id", "null")
+
+        # HVAC age filters
+        if min_hvac_age is not None:
+            count_query = count_query.gte("properties.hvac_age_years", min_hvac_age)
+        if max_hvac_age is not None:
+            count_query = count_query.lte("properties.hvac_age_years", max_hvac_age)
+
+        # Contact completeness filter
+        if contact_completeness:
+            count_query = count_query.eq("properties.contact_completeness", contact_completeness.lower())
+
+        # Affluence tier filter
+        if affluence_tier:
+            count_query = count_query.eq("properties.affluence_tier", affluence_tier.lower())
+
+        # Recommended pipeline filter
+        if recommended_pipeline:
+            count_query = count_query.eq("properties.recommended_pipeline", recommended_pipeline.lower())
+
+        # Pipeline confidence filter
+        if min_pipeline_confidence is not None:
+            count_query = count_query.gte("properties.pipeline_confidence", min_pipeline_confidence)
+
+        # Property value range filters
+        if min_property_value is not None:
+            count_query = count_query.gte("properties.total_property_value", min_property_value)
+        if max_property_value is not None:
+            count_query = count_query.lte("properties.total_property_value", max_property_value)
+
+        # Contact info filters
+        if has_phone is not None:
+            if has_phone:
+                count_query = count_query.not_.is_("properties.owner_phone", "null")
+            else:
+                count_query = count_query.is_("properties.owner_phone", "null")
+        if has_email is not None:
+            if has_email:
+                count_query = count_query.not_.is_("properties.owner_email", "null")
+            else:
+                count_query = count_query.is_("properties.owner_email", "null")
+
+        # Year built range filters
+        if year_built_min is not None:
+            count_query = count_query.gte("properties.year_built", year_built_min)
+        if year_built_max is not None:
+            count_query = count_query.lte("properties.year_built", year_built_max)
+
+        # Geographic filters
+        if city:
+            count_query = count_query.ilike("properties.city", f"%{city}%")
+        if state:
+            count_query = count_query.eq("properties.state", state.upper())
+
+        count_result = count_query.execute()
+        total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else 0
+
         # Multi-factor sorting: tier → score → HVAC age → property value
         # Order: HOT before WARM before COOL before COLD
         # Within tier: highest score first
@@ -174,7 +247,7 @@ async def list_leads(
             "data": {
                 "leads": result.data,
                 "count": len(result.data),
-                "total": result.count if hasattr(result, 'count') else len(result.data),
+                "total": total_count,
                 "limit": limit,
                 "offset": offset
             },

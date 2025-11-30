@@ -51,8 +51,14 @@ const PipelinePage = () => {
   const { data: counties } = useCounties();
   const deleteLead = useDeleteLead();
 
+  // Fetch synced and failed counts separately to display both simultaneously
+  const { data: syncedData } = useLeads({ sync_status: 'synced', limit: 0 });
+  const { data: failedData } = useLeads({ sync_status: 'failed', limit: 0 });
+
   const leads = leadsData?.leads || [];
   const total = leadsData?.total || 0;
+  const syncedCount = syncedData?.total || 0;
+  const failedCount = failedData?.total || 0;
 
   const handleDelete = async (leadId) => {
     try {
@@ -80,10 +86,6 @@ const PipelinePage = () => {
   const handlePageChange = (newOffset) => {
     setFilters({ ...filters, offset: newOffset });
   };
-
-  // Calculate stats
-  const syncedCount = filters.sync_status === 'synced' ? total : 0;
-  const failedCount = filters.sync_status === 'failed' ? total : 0;
 
   if (error) {
     return (
