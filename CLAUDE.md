@@ -298,6 +298,49 @@ This is why we store the complete `raw_data` - to capture everything regardless 
 - ✅ Exact type matching (uses county's actual permit type name)
 - ✅ Complete logging for diagnostics (pages fetched, total returned)
 
+## Supabase MCP Configuration
+
+### Project Identification ⚠️ CRITICAL
+
+**Always use the correct Supabase project ID from environment variables:**
+- Project ID: `jlammryvteuhrlygpqif` (stored in `$SUPABASE_PROJECT_REF`)
+- Project Name: `hvac-lead-gen`
+- Dashboard: https://supabase.com/dashboard/project/jlammryvteuhrlygpqif
+
+**IMPORTANT:**
+Never hardcode project IDs. Always use the `$SUPABASE_PROJECT_REF` environment variable when calling Supabase MCP tools. Using the wrong project ID will result in permission errors even though you have full access.
+
+### MCP Tool Capabilities
+
+The Supabase MCP provides write access:
+- `mcp__supabase__execute_sql` - Full DDL/DML permissions (CREATE, ALTER, INSERT, UPDATE, DELETE)
+- `mcp__supabase__apply_migration` - Apply named migrations with SQL
+- `mcp__supabase__list_tables` - View schema structure
+- `mcp__supabase__list_migrations` - Track applied migrations
+
+### PostgREST Schema Cache
+
+**What is it:**
+PostgREST (Supabase's REST API layer) caches the database schema for performance. When you add columns via direct SQL migrations, PostgREST doesn't automatically know about them.
+
+**When to reload:**
+After applying migrations that:
+- Add new columns to existing tables
+- Create new tables that will be accessed via REST API
+- Modify table constraints or indexes used by the API
+
+**How to reload manually:**
+1. Go to: https://supabase.com/dashboard/project/jlammryvteuhrlygpqif/settings/api
+2. Click: "Reload schema" button under PostgREST Settings
+3. Wait ~5 seconds for confirmation
+
+**Symptoms of stale cache:**
+- `PGRST204` errors (column not found in schema cache)
+- Inserts/updates failing on new columns despite migrations being applied
+- REST API returning 400 errors for valid column names
+
+**Note:** Schema cache usually auto-reloads within minutes, but manual reload ensures immediate availability.
+
 ## Project Documentation
 
 Key reference files:
