@@ -95,7 +95,7 @@ const COLUMN_DEFINITIONS = [
 
 const STORAGE_KEY = 'hvac_leads_visible_columns';
 
-const LeadsTable = ({ leads, isLoading }) => {
+const LeadsTable = ({ leads, isLoading, onDelete }) => {
   const [selectedLeads, setSelectedLeads] = useState(new Set());
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const syncToSummit = useSyncLeadsToSummit();
@@ -266,6 +266,7 @@ const LeadsTable = ({ leads, isLoading }) => {
                   isSelected={selectedLeads.has(lead.id)}
                   onToggle={() => toggleLead(lead.id)}
                   visibleColumns={visibleColumns}
+                  onDelete={onDelete}
                 />
               ))}
             </tbody>

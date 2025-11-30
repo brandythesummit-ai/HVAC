@@ -40,3 +40,14 @@ export const useSyncLeadsToSummit = () => {
     },
   });
 };
+
+export const useDeleteLead = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: leadsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+};

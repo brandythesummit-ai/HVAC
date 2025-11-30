@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Target } from 'lucide-react';
+import { ChevronDown, ChevronRight, Target, Trash2 } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 import SyncStatusBadge from './SyncStatusBadge';
 import LeadDetailView from './LeadDetailView';
 import LeadTierBadge from './LeadTierBadge';
 
-const LeadRow = ({ lead, isSelected, onToggle, visibleColumns }) => {
+const LeadRow = ({ lead, isSelected, onToggle, visibleColumns, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Extract property and permit data from nested structure
   const property = lead.properties || {};
@@ -107,6 +109,23 @@ const LeadRow = ({ lead, isSelected, onToggle, visibleColumns }) => {
         {badge.emoji} {badge.label}
       </span>
     );
+  };
+
+  // Handle lead deletion
+  const handleDelete = async () => {
+    if (!onDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(lead.id);
+      // Close confirmation dialog on success
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Failed to delete lead:', error);
+      // Keep dialog open on error so user can retry
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Render individual columns based on visibility
@@ -239,7 +258,76 @@ const LeadRow = ({ lead, isSelected, onToggle, visibleColumns }) => {
       {expanded && (
         <tr>
           <td colSpan={visibleColumns.length} className="p-0">
-            <LeadDetailView lead={lead} />
+            <div className="relative">
+              {/* Delete Confirmation Dialog */}
+              {showDeleteConfirm && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 z-10 flex items-center justify-center">
+                  <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4 animate-fade-in">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0">
+                        <Trash2 className="h-6 w-6 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          Delete Lead?
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-1">
+                          Are you sure you want to delete this lead?
+                        </p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {displayData.owner_name || 'Unknown'} - {cleanAddress(displayData.address)}
+                        </p>
+                        <p className="text-xs text-red-600 mt-2">
+                          This action cannot be undone.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        disabled={isDeleting}
+                        className="btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="btn-primary bg-red-600 hover:bg-red-700 flex items-center gap-2"
+                      >
+                        {isDeleting ? (
+                          <>
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            Delete Lead
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Lead Details */}
+              <LeadDetailView lead={lead} />
+
+              {/* Delete Button */}
+              {onDelete && (
+                <div className="px-6 pb-4 bg-gray-50 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="btn-secondary text-red-600 hover:bg-red-50 hover:border-red-300 flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Lead
+                  </button>
+                </div>
+              )}
+            </div>
           </td>
         </tr>
       )}

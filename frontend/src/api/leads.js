@@ -35,4 +35,10 @@ export const leadsApi = {
     });
     return response.data;
   },
+
+  // Delete a lead by ID
+  delete: async (id) => {
+    const response = await apiClient.delete(`/api/permits/${id}`);
+    return response.data;
+  },
 };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertCircle, GitBranch, CheckCircle, XCircle } from 'lucide-react';
-import { useLeads } from '../hooks/useLeads';
+import toast from 'react-hot-toast';
+import { useLeads, useDeleteLead } from '../hooks/useLeads';
 import { useCounties } from '../hooks/useCounties';
 import LeadsTable from '../components/leads/LeadsTable';
 import FilterPanel from '../components/leads/FilterPanel';
@@ -48,9 +49,21 @@ const PipelinePage = () => {
 
   const { data: leadsData, isLoading, error } = useLeads(filters);
   const { data: counties } = useCounties();
+  const deleteLead = useDeleteLead();
 
   const leads = leadsData?.leads || [];
   const total = leadsData?.total || 0;
+
+  const handleDelete = async (leadId) => {
+    try {
+      await deleteLead.mutateAsync(leadId);
+      toast.success('Lead deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete lead:', error);
+      toast.error(`Failed to delete lead: ${error.message || 'Unknown error'}`);
+      throw error; // Re-throw to let LeadRow know deletion failed
+    }
+  };
 
   const handleFilterChange = (e) => {
     if (e.type === 'reset') {
@@ -154,7 +167,7 @@ const PipelinePage = () => {
       />
 
       {/* Leads Table */}
-      <LeadsTable leads={leads} isLoading={isLoading} />
+      <LeadsTable leads={leads} isLoading={isLoading} onDelete={handleDelete} />
 
       {/* Pagination Controls */}
       <PaginationControls
