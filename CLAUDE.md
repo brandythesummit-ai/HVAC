@@ -318,6 +318,16 @@ FastAPI auto-generates API docs:
 VITE_API_URL=http://localhost:8000  # Backend API URL
 ```
 
+### Frontend (.env.production) ⚠️ CRITICAL
+```
+VITE_API_URL=https://hvac-backend-production-11e6.up.railway.app
+```
+**IMPORTANT:** Vercel deployments use `.env.production` to configure the backend API URL. Without this file, the frontend will default to `localhost:8000` and API calls will fail in production.
+
+**Current Production Configuration:**
+- Backend: Railway at `https://hvac-backend-production-11e6.up.railway.app`
+- Frontend: Vercel at `https://hvac-liard.vercel.app`
+
 ### Backend (.env)
 ```
 SUPABASE_URL=...
