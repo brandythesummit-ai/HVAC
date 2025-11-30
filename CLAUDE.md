@@ -339,6 +339,8 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173,https://*.vercel.app
 
 ## When to Update CLAUDE.md
 
+⚠️ **IMPORTANT:** ALWAYS ask the user for approval before committing changes to CLAUDE.md
+
 **Claude should recommend updating this file when:**
 - Adding new dependencies or changing tech stack
 - Establishing new coding conventions or patterns
