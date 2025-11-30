@@ -16,7 +16,8 @@ This is a full-stack HVAC lead generation platform that pulls permit data from c
 - **Styling:** TailwindCSS 4.1.17 with PostCSS
 - **Icons:** Lucide React
 - **Language:** JavaScript ES modules
-- **Deployment:** Vercel (https://hvac-liard.vercel.app)
+- **Deployment:** Vercel
+- **Production URL:** https://hvac-liard.vercel.app/leads
 
 ### Backend
 - **Framework:** FastAPI 0.104.0+
