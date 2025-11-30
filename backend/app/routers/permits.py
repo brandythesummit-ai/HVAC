@@ -173,70 +173,28 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             token_expires_at=county.get("token_expires_at", "")
         )
 
-        # DIAGNOSTIC MODE: Pull ALL Building permits to analyze actual type values
-        print("🔬 [DIAGNOSTIC] Pulling ALL Building permits to analyze type values...")
-        print(f"   County: {county.get('name')} ({county.get('county_code')})")
-        print(f"   Date range: {request.date_from} to {request.date_to}")
+        # Use correct Accela API type value (discovered via diagnostic logging)
+        # Portal displays: "Residential Mechanical Trade Permit"
+        # API expects: "Building/Residential/Trade/Mechanical"
+        hvac_type = "Building/Residential/Trade/Mechanical"
 
-        # Pull ALL Building permits WITHOUT type filter
+        print(f"🔍 [PULL PERMITS] Pulling permits with type: {hvac_type}")
+
+        # Pull HVAC permits with API-level type filtering
         accela_response = await client.get_permits(
             date_from=request.date_from,
             date_to=request.date_to,
-            limit=100,  # Just first page for diagnostic
+            limit=request.limit,
             status=request.status,
-            permit_type=None  # ← NO FILTER - get everything
+            permit_type=hvac_type
         )
 
-        all_permits = accela_response["permits"]
-        print(f"✅ [DIAGNOSTIC] Retrieved {len(all_permits)} total Building permits")
-
-        # Analyze permit type structure and values
-        from collections import Counter
-        if all_permits:
-            # Log first permit's type object structure
-            first_type = all_permits[0].get("type", {})
-            print(f"\n📋 [DIAGNOSTIC] Sample type object structure:")
-            print(f"   Type: {type(first_type)}")
-            print(f"   Full object: {first_type}")
-
-            # Collect all type values
-            type_values = []
-            for p in all_permits:
-                type_obj = p.get("type", {})
-                if isinstance(type_obj, dict):
-                    type_values.append(type_obj.get("value", ""))
-                else:
-                    type_values.append(str(type_obj))
-
-            # Show distribution
-            type_dist = Counter(type_values)
-            print(f"\n📊 [DIAGNOSTIC] Permit type distribution:")
-            for permit_type, count in type_dist.most_common():
-                print(f"   '{permit_type}': {count} permits")
-
-            # Filter for HVAC/Mechanical permits to see what we should be using
-            hvac_permits = []
-            for permit in all_permits:
-                type_obj = permit.get("type", {})
-                type_value = type_obj.get("value", "") if isinstance(type_obj, dict) else str(type_obj)
-
-                # Flexible matching for diagnostic
-                if any(keyword.lower() in type_value.lower() for keyword in ["mechanical", "hvac", "mech"]):
-                    hvac_permits.append(permit)
-
-            print(f"\n🔍 [DIAGNOSTIC] Found {len(hvac_permits)} HVAC/Mechanical permits")
-            if hvac_permits:
-                hvac_type_value = hvac_permits[0].get("type", {}).get("value", "")
-                print(f"   First HVAC permit type value: '{hvac_type_value}'")
-                print(f"   👆 USE THIS VALUE for the type parameter!")
-
-        else:
-            hvac_permits = []
-            print("⚠️  [DIAGNOSTIC] No permits found in this date range")
-
+        hvac_permits = accela_response["permits"]
         query_info = accela_response["query_info"]
         debug_info = accela_response["debug_info"]
-        filtering_method = "diagnostic"
+        filtering_method = "API"
+
+        print(f"✅ [PULL PERMITS] Retrieved {len(hvac_permits)} HVAC permits")
 
         # Enrich each permit
         saved_permits = []
