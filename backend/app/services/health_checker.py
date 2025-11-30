@@ -16,7 +16,7 @@ from supabase import Client
 from app.database import get_db
 from app.services.encryption import encryption_service
 from app.config import settings
-from app.workers.job_processor import _processor_instance
+import app.workers.job_processor as job_processor
 
 
 @dataclass
@@ -242,7 +242,7 @@ async def check_job_processor() -> HealthCheck:
 
     try:
         # Check if processor instance exists and is running
-        if _processor_instance is None:
+        if job_processor._processor_instance is None:
             response_time = (time.time() - start_time) * 1000
             return HealthCheck(
                 status="down",
@@ -251,7 +251,7 @@ async def check_job_processor() -> HealthCheck:
                 response_time_ms=response_time
             )
 
-        if not _processor_instance.is_running:
+        if not job_processor._processor_instance.is_running:
             response_time = (time.time() - start_time) * 1000
             return HealthCheck(
                 status="down",
