@@ -1,7 +1,7 @@
 import apiClient from './client';
 
 export const leadsApi = {
-  // Get all leads with filters
+  // Get all leads with filters and pagination metadata
   getAll: async (params = {}) => {
     // Filter out empty string values to avoid validation errors
     const cleanParams = Object.fromEntries(
@@ -9,9 +9,9 @@ export const leadsApi = {
     );
 
     const response = await apiClient.get('/api/leads', { params: cleanParams });
-    // Backend returns {success, data: {leads, count}, error}
-    // Extract just the leads array
-    return response.data?.data?.leads || [];
+    // Backend returns {success, data: {leads, count, total, limit, offset}, error}
+    // Return full data object with pagination metadata
+    return response.data?.data || { leads: [], count: 0, total: 0, limit: 50, offset: 0 };
   },
 
   // Create leads from permits

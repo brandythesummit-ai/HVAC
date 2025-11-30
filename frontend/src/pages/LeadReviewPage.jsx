@@ -17,8 +17,11 @@ const LeadReviewPage = () => {
     is_qualified: '',
   });
 
-  const { data: leads, isLoading, error } = useLeads(filters);
+  const { data: leadsData, isLoading, error } = useLeads(filters);
   const { data: counties } = useCounties();
+
+  const leads = leadsData?.leads || [];
+  const total = leadsData?.total || 0;
 
   const handleFilterChange = (e) => {
     // Don't allow changing sync_status on Lead Review page
@@ -59,7 +62,7 @@ const LeadReviewPage = () => {
             </div>
             <div className="text-right">
               <p className="text-sm font-medium text-gray-700">Unsynced Leads</p>
-              <p className="text-2xl font-bold text-blue-600">{leads?.length || 0}</p>
+              <p className="text-2xl font-bold text-blue-600">{total}</p>
             </div>
           </div>
         </div>
@@ -152,7 +155,7 @@ const LeadReviewPage = () => {
       </div>
 
       {/* Leads Table */}
-      <LeadsTable leads={leads || []} isLoading={isLoading} />
+      <LeadsTable leads={leads} isLoading={isLoading} />
     </div>
   );
 };

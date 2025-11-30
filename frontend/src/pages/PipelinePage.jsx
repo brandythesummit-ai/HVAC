@@ -14,16 +14,19 @@ const PipelinePage = () => {
     is_qualified: '',
   });
 
-  const { data: leads, isLoading, error } = useLeads(filters);
+  const { data: leadsData, isLoading, error } = useLeads(filters);
   const { data: counties } = useCounties();
+
+  const leads = leadsData?.leads || [];
+  const total = leadsData?.total || 0;
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
   // Calculate stats
-  const syncedCount = leads?.filter(l => l.summit_sync_status === 'synced').length || 0;
-  const failedCount = leads?.filter(l => l.summit_sync_status === 'failed').length || 0;
+  const syncedCount = filters.sync_status === 'synced' ? total : 0;
+  const failedCount = filters.sync_status === 'failed' ? total : 0;
 
   if (error) {
     return (
@@ -179,7 +182,7 @@ const PipelinePage = () => {
       </div>
 
       {/* Leads Table */}
-      <LeadsTable leads={leads || []} isLoading={isLoading} showSyncActions={true} />
+      <LeadsTable leads={leads} isLoading={isLoading} showSyncActions={true} />
     </div>
   );
 };
