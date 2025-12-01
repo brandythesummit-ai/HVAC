@@ -321,9 +321,9 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         print(f"✅ [PULL PERMITS] Complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Properties: {properties_created}/{properties_updated}, Leads: {leads_created}")
 
         # Calculate helpful metrics
-        from datetime import datetime as dt
-        date_from_obj = dt.fromisoformat(request.date_from)
-        date_to_obj = dt.fromisoformat(request.date_to)
+        # datetime already imported at module level (line 4)
+        date_from_obj = datetime.fromisoformat(request.date_from)
+        date_to_obj = datetime.fromisoformat(request.date_to)
         date_range_days = (date_to_obj - date_from_obj).days
 
         # Generate suggestions if 0 results
