@@ -280,7 +280,20 @@ async def delete_county(county_id: str, db=Depends(get_db)):
         db.table("background_jobs").delete().eq("county_id", county_id).execute()
 
         # Step 7: Delete the county
-        result = db.table("counties").delete().eq("id", county_id).execute()
+        delete_result = db.table("counties").delete().eq("id", county_id).execute()
+
+        # Verify the deletion actually happened
+        print(f"Delete result: {delete_result}")
+        print(f"Delete result data: {delete_result.data}")
+        print(f"Delete result count: {getattr(delete_result, 'count', 'N/A')}")
+
+        # Check if the county was actually deleted
+        verify_result = db.table("counties").select("id").eq("id", county_id).execute()
+        if verify_result.data:
+            raise HTTPException(
+                status_code=500,
+                detail=f"County delete failed - county still exists in database. Delete result: {delete_result.data}"
+            )
 
         return {
             "success": True,
