@@ -8,6 +8,8 @@
     "test": "tests"
   },
   "scripts": {
+    "cleanup": "./scripts/cleanup-test-processes.sh",
+    "pretest": "npm run cleanup",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",

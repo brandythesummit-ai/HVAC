@@ -13,7 +13,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 20000,  // 20 second timeout for each test
+  timeout: 15000,  // 15 second timeout per test (CLAUDE.md requirement)
+  globalTimeout: 600000,  // 10 minute absolute timeout for entire test suite
+  globalSetup: require.resolve('./tests/global-setup.ts'),  // Initialize graceful shutdown
   /* Run tests in files in parallel */
   fullyParallel: false,  // Sequential execution for data validation tests
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -42,8 +44,8 @@ export default defineConfig({
     video: 'retain-on-failure',
 
     /* Action timeout */
-    actionTimeout: 20000,  // 20 seconds for actions
-    navigationTimeout: 20000,  // 20 seconds for navigation
+    actionTimeout: 15000,  // 15 seconds for actions (matches test timeout)
+    navigationTimeout: 15000,  // 15 seconds for navigation (matches test timeout)
   },
 
   /* Configure projects for major browsers */
