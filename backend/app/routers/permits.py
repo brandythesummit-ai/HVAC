@@ -34,7 +34,8 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
     if opened_date:
         try:
             extracted["opened_date"] = datetime.fromisoformat(opened_date.replace('Z', '+00:00')).date().isoformat()
-        except:
+        except (ValueError, AttributeError, TypeError) as e:
+            logger.debug(f"Failed to parse opened_date '{opened_date}': {e}")
             extracted["opened_date"] = None
 
     # Extract job value
