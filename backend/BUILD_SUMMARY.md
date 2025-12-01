@@ -36,8 +36,7 @@ backend/
 ├── .gitignore
 ├── README.md
 ├── QUICKSTART.md
-├── BUILD_SUMMARY.md
-└── test_server.py
+└── BUILD_SUMMARY.md
 ```
 
 ### 2. Core Features Implemented
@@ -156,7 +155,7 @@ Created comprehensive documentation:
 
 ### 8. Testing
 
-- ✓ `test_server.py` - Automated test script
+- ✓ E2E test suite (Playwright) - Comprehensive integration tests
 - ✓ Health check endpoint
 - ✓ All endpoints tested for successful import
 - ✓ 24 routes registered and verified
@@ -281,8 +280,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ### 6. Quick Test
 ```bash
-# Run automated tests
-python test_server.py
+# Test health endpoint
+curl http://localhost:8000/health
+
+# Run E2E test suite (from project root)
+npm run test
 ```
 
 ## What's Working
@@ -337,7 +339,7 @@ Key files:
 - **Services:** `app/services/*.py`
 - **Models:** `app/models/*.py`
 - **Documentation:** `README.md`, `QUICKSTART.md`
-- **Tests:** `test_server.py`
+- **Tests:** E2E tests via Playwright (`npm run test` from project root)
 
 ## Summary
 

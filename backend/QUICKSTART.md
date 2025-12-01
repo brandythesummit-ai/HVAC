@@ -33,9 +33,13 @@ The server will start at: **http://localhost:8000**
 
 ## Quick Test
 
-Run the test script:
+Test the API endpoints:
 ```bash
-python test_server.py
+# Health check
+curl http://localhost:8000/health
+
+# Or run the E2E test suite (from project root)
+npm run test
 ```
 
 ## API Documentation

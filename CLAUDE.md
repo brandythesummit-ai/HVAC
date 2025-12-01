@@ -400,3 +400,19 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173,https://*.vercel.app
 - **JSONB storage:** Full Accela API response stored in permits.raw_data for complete data preservation
 - **Multi-tenant:** System supports multiple agencies via agencies table
 - **Test target:** E2E tests run against production Vercel deployment at https://hvac-liard.vercel.app/counties
+
+## Project-Specific Process Guidelines
+
+### Testing
+- **Playwright tests:** Always use foreground (2-3 minutes is acceptable)
+- **Exception:** Only use background if test suite >5 minutes AND you're doing other work
+
+### Railway Logs
+- **Never** run multiple `railway logs` streams simultaneously
+- Kill existing log stream before starting new one
+- Use `railway logs --service hvac-backend 2>&1 | tail -50` (one-time) instead of streaming
+- If you need to monitor: Use BashOutput every minute, then kill when done
+
+### API Testing
+- `curl` commands: **Always foreground** (takes <5 seconds)
+- Never use background for one-off API calls
