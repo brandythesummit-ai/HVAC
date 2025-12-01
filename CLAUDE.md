@@ -28,10 +28,140 @@ This is a full-stack HVAC lead generation platform that pulls permit data from c
 - **Security:** Fernet encryption for credentials
 - **Language:** Python 3.11
 - **Deployment:** Railway
+- **Rate Limiting:** Custom AccelaRateLimiter (header-based dynamic throttling)
 
 ### External APIs
 - **Accela Civic Platform V4 API** (OAuth refresh_token flow, 15-min expiration)
 - **Summit.AI CRM API** (Private integration with static token)
+
+## Accela API Rate Limiting
+
+### Overview
+
+Accela API enforces **dynamic rate limits** that vary by application, agency, and traffic patterns. The system implements header-based adaptive throttling to prevent 429 errors and API account suspension.
+
+### Architecture
+
+**Three-Layer Defense Strategy:**
+
+1. **Proactive Throttling** (85% threshold)
+   - Monitors `x-ratelimit-remaining` before each request
+   - Pauses when < 15% of quota remains
+   - Calculates safe pacing delays based on time until reset
+
+2. **Reactive Recovery** (429 handling)
+   - On 429 error, waits until `x-ratelimit-reset` timestamp
+   - Auto-retries with jitter (up to 3 attempts)
+   - Logs all throttling events
+
+3. **Fallback Safety** (missing headers)
+   - 500ms delay between pagination requests
+   - 100ms delay between enrichment requests
+   - Used when Accela doesn't return rate limit headers
+
+### Rate Limit Headers
+
+Accela communicates limits via response headers:
+- `x-ratelimit-limit`: Max calls allowed per hour
+- `x-ratelimit-remaining`: Calls left in current window
+- `x-ratelimit-reset`: Unix timestamp when window resets (UTC)
+
+**Note:** These limits are **dynamic** and may change based on traffic patterns. Never hardcode assumptions about limits.
+
+### Implementation Details
+
+**File:** `backend/app/services/rate_limiter.py:1-268`
+
+```python
+class AccelaRateLimiter:
+    """
+    Tracks and enforces Accela API rate limits based on response headers.
+
+    Key Methods:
+    - update_from_headers(headers): Updates state from response
+    - should_pause(): Checks if we're approaching limit
+    - wait_if_needed(request_type): Pauses if needed before request
+    - handle_429(headers): Handles rate limit exceeded errors
+    - get_stats(): Returns current state for monitoring
+    """
+```
+
+**Integration Point:** `backend/app/services/accela_client.py:315-386`
+
+Every Accela API call flows through `_make_request()` which:
+1. Calls `await self.rate_limiter.wait_if_needed(request_type)`
+2. Makes the HTTP request
+3. Calls `self.rate_limiter.update_from_headers(response.headers)`
+4. Handles 429 errors with `await self.rate_limiter.handle_429()`
+
+### Configuration
+
+**File:** `backend/app/config.py:31-39`
+
+Environment variables (with defaults):
+```python
+# Rate limiting configuration
+accela_rate_limit_threshold: float = 0.15       # Pause at 85% usage
+accela_pagination_delay_fallback: float = 0.5   # 500ms fallback
+accela_enrichment_delay_fallback: float = 0.1   # 100ms fallback
+accela_max_retries: int = 3                     # Max 429 retries
+accela_request_timeout: float = 30.0            # Request timeout
+```
+
+### Monitoring
+
+**Endpoint:** `GET /api/counties/{county_id}/rate-limit-stats`
+
+Returns current configuration and session statistics:
+```json
+{
+  "success": true,
+  "data": {
+    "county_id": "...",
+    "rate_limiter_config": {
+      "threshold": 0.15,
+      "fallback_pagination_delay": 0.5,
+      "fallback_enrichment_delay": 0.1
+    },
+    "current_session_stats": {
+      "limit": 1000,
+      "remaining": 847,
+      "reset": 1733097600,
+      "total_429s": 0,
+      "total_pauses": 2
+    }
+  }
+}
+```
+
+**Log Messages to Watch For:**
+
+```
+[RATE LIMIT] Updated: 847/1000 remaining, resets at 2025-12-01T16:00:00Z
+[RATE LIMIT] Approaching limit: 120/1000 (12.0% remaining) - pausing before next request
+[RATE LIMIT] Pausing 3.45s before pagination request (pause #1)
+[RATE LIMIT] 429 response, waiting 45.2s until reset (429 #1)
+```
+
+### Best Practices
+
+1. **Never disable rate limiting** - It prevents API account suspension
+2. **Monitor logs during large pulls** - Watch for 429 errors
+3. **Adjust thresholds via config** if experiencing frequent throttling
+4. **Keep fallback delays conservative** (≥100ms minimum)
+5. **Test with small batches first** when pulling from new counties
+
+### Request Types
+
+The rate limiter categorizes requests for different fallback delays:
+
+- **`pagination`**: Fetching multiple pages of permits (500ms fallback)
+- **`enrichment`**: Fetching addresses/owners/parcels (100ms fallback)
+- **`general`**: All other API calls (100ms fallback)
+
+### Stats Are Per-Session
+
+**Important:** Rate limiter stats are per-client-instance, not persistent across requests. For cross-session monitoring, implement Redis-based stats storage (future enhancement).
 
 ## Architecture Patterns
 
@@ -44,6 +174,10 @@ This is a full-stack HVAC lead generation platform that pulls permit data from c
 ├── /models              # Pydantic request/response models
 ├── /routers             # API endpoint definitions
 └── /services            # Business logic (Accela, Summit clients)
+    ├── accela_client.py     # Accela API client (with rate limiting)
+    ├── rate_limiter.py      # AccelaRateLimiter class
+    ├── summit_client.py     # Summit.AI CRM client
+    └── encryption.py        # Credential encryption
 ```
 
 **Pattern:** Routers → Models → Services (layered architecture)
@@ -378,6 +512,13 @@ SUPABASE_KEY=...
 SUMMIT_API_KEY=...
 ENCRYPTION_KEY=...  # Fernet key for credential encryption
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173,https://*.vercel.app
+
+# Accela API Rate Limiting (Optional - defaults shown)
+ACCELA_RATE_LIMIT_THRESHOLD=0.15              # 85% usage threshold
+ACCELA_PAGINATION_DELAY_FALLBACK=0.5          # 500ms pagination fallback
+ACCELA_ENRICHMENT_DELAY_FALLBACK=0.1          # 100ms enrichment fallback
+ACCELA_MAX_RETRIES=3                          # Max 429 retry attempts
+ACCELA_REQUEST_TIMEOUT=30.0                   # Request timeout (seconds)
 ```
 
 ## When to Update CLAUDE.md

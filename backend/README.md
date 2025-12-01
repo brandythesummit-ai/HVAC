@@ -5,6 +5,7 @@ FastAPI backend for the HVAC Lead Generation platform with Accela API and Summit
 ## Features
 
 - **Multi-county permit pulling** with Accela Civic Platform V4 API
+- **Adaptive rate limiting** (header-based dynamic throttling for Accela API)
 - **Background job processing** (30-year historical pulls, automated incremental pulls)
 - **Property-centric data model** with intelligent lead scoring (HOT/WARM/COOL/COLD tiers)
 - **Automated scheduler** for daily incremental pulls
@@ -48,6 +49,7 @@ backend/
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── accela_client.py       # Accela API integration
+│   │   ├── rate_limiter.py        # Accela API rate limiting
 │   │   ├── summit_client.py       # Summit.AI integration
 │   │   ├── property_aggregator.py # Property aggregation & lead scoring
 │   │   ├── scheduler.py           # Automated pull scheduler
@@ -95,6 +97,13 @@ SUPABASE_KEY=your-supabase-anon-key
 SUMMIT_API_KEY=your-summit-api-key
 SUMMIT_LOCATION_ID=your-summit-location-id
 ENCRYPTION_KEY=your-generated-encryption-key
+
+# Accela API Rate Limiting (Optional - defaults shown)
+ACCELA_RATE_LIMIT_THRESHOLD=0.15              # 85% usage threshold
+ACCELA_PAGINATION_DELAY_FALLBACK=0.5          # 500ms pagination fallback
+ACCELA_ENRICHMENT_DELAY_FALLBACK=0.1          # 100ms enrichment fallback
+ACCELA_MAX_RETRIES=3                          # Max 429 retry attempts
+ACCELA_REQUEST_TIMEOUT=30.0                   # Request timeout (seconds)
 ```
 
 ### 4. Set Up Supabase Database
@@ -193,13 +202,14 @@ GET /api/health
 ### County Management
 
 ```
-POST   /api/counties              - Create county with credentials
-GET    /api/counties              - List all counties
-GET    /api/counties/{id}         - Get county details
-PUT    /api/counties/{id}         - Update county
-DELETE /api/counties/{id}         - Delete county
-POST   /api/counties/{id}/test    - Test Accela connection
-POST   /api/counties/test-credentials - Test credentials without saving
+POST   /api/counties                       - Create county with credentials
+GET    /api/counties                       - List all counties
+GET    /api/counties/{id}                  - Get county details
+PUT    /api/counties/{id}                  - Update county
+DELETE /api/counties/{id}                  - Delete county
+POST   /api/counties/{id}/test             - Test Accela connection
+POST   /api/counties/test-credentials      - Test credentials without saving
+GET    /api/counties/{id}/rate-limit-stats - Get Accela API rate limit statistics
 ```
 
 ### Permit Operations
@@ -439,6 +449,23 @@ The `AccelaClient` automatically:
 1. Checks token expiration before each API call
 2. Refreshes the token if expired or expiring within 1 minute
 3. Updates the database with new token and expiration time
+
+### Rate Limiting
+
+The `AccelaRateLimiter` implements **header-based adaptive throttling** to prevent 429 errors:
+
+**Three-Layer Defense:**
+1. **Proactive** - Monitors `x-ratelimit-remaining` header, pauses at 85% usage
+2. **Reactive** - Handles 429 errors with wait-until-reset logic
+3. **Fallback** - Uses fixed delays (500ms/100ms) when headers unavailable
+
+**Key Features:**
+- Dynamic throttling based on Accela's response headers
+- Auto-retry on 429 errors (up to 3 attempts)
+- Categorized delays for pagination vs enrichment requests
+- Real-time monitoring via `/api/counties/{id}/rate-limit-stats`
+
+See [CLAUDE.md](../CLAUDE.md#accela-api-rate-limiting) for complete documentation.
 
 ### HVAC Filtering
 

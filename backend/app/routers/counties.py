@@ -647,3 +647,71 @@ async def oauth_callback(
             "data": None,
             "error": str(e)
         }
+
+
+@router.get("/{county_id}/rate-limit-stats")
+async def get_rate_limit_stats(county_id: str, db=Depends(get_db)):
+    """
+    Get Accela API rate limit statistics for a specific county.
+
+    Returns configuration and current rate limit state.
+    Note: Stats are per-client-session. For persistent monitoring across
+    requests, stats would need to be stored in Redis or similar cache.
+    """
+    try:
+        # Get county from database
+        result = db.table("counties").select("*").eq("id", county_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail=f"County {county_id} not found")
+
+        county = result.data[0]
+
+        # Get app credentials
+        app_result = db.table("app_settings").select("*").eq("key", "accela").execute()
+        if not app_result.data:
+            raise HTTPException(status_code=500, detail="Accela app credentials not configured")
+
+        app_settings = app_result.data[0]
+        app_secret_decrypted = encryption_service.decrypt(app_settings["app_secret"])
+
+        # Create client (fresh instance, so stats will be initial state)
+        client = AccelaClient(
+            app_id=app_settings["app_id"],
+            app_secret=app_secret_decrypted,
+            county_code=county["county_code"],
+            refresh_token=county.get("refresh_token", ""),
+            access_token="",
+            token_expires_at=""
+        )
+
+        # Get stats from rate limiter
+        rate_limit_stats = client.rate_limiter.get_stats()
+
+        return {
+            "success": True,
+            "data": {
+                "county_id": county_id,
+                "county_name": county["name"],
+                "county_code": county["county_code"],
+                "rate_limiter_config": {
+                    "threshold": settings.accela_rate_limit_threshold,
+                    "fallback_pagination_delay": settings.accela_pagination_delay_fallback,
+                    "fallback_enrichment_delay": settings.accela_enrichment_delay_fallback,
+                    "max_retries": settings.accela_max_retries,
+                    "request_timeout": settings.accela_request_timeout
+                },
+                "current_session_stats": rate_limit_stats,
+                "note": "Stats reflect current client session only. For persistent monitoring, implement Redis-based stats storage."
+            },
+            "error": None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting rate limit stats: {str(e)}")
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }

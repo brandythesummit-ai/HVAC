@@ -19,6 +19,7 @@ County Permits → Property Enrichment → Lead Scoring → CRM Sync
 
 ### 🏢 Multi-County Permit Pulling
 - Connect to any county using Accela Civic Platform V4 API
+- **Adaptive rate limiting** - header-based throttling prevents API account suspension
 - Pull 30 years of historical HVAC permits for comprehensive lead database
 - Automated daily incremental pulls to catch new installations
 - Automatic pagination (handles 1,000+ permits per pull)
@@ -55,6 +56,7 @@ County Permits → Property Enrichment → Lead Scoring → CRM Sync
 ### 🛡️ Security & Reliability
 - **Encrypted Credentials** - Fernet encryption for Accela secrets and API keys
 - **Automatic Token Refresh** - Handles Accela's 15-minute OAuth expiration
+- **Adaptive Rate Limiting** - Dynamic throttling prevents 429 errors and API suspension
 - **Comprehensive Health Monitoring** - 8 components with priority-based checking
 - **CORS Protection** - Restricted to configured frontend origins
 
@@ -224,6 +226,7 @@ Uses PostgreSQL-based polling (no external queue needed):
 - `POST /api/counties` - Add county with Accela credentials
 - `GET /api/counties` - List all counties
 - `POST /api/counties/{id}/test` - Test Accela connection
+- `GET /api/counties/{id}/rate-limit-stats` - Get Accela API rate limit stats
 - `DELETE /api/counties/{id}` - Remove county
 
 ### Permit Operations

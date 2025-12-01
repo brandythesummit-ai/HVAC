@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
 
+    # Accela API Rate Limiting
+    # Threshold: fraction remaining before pausing (0.15 = pause at 15% remaining, i.e., 85% threshold)
+    accela_rate_limit_threshold: float = 0.15
+    # Fallback delays (used when rate limit headers not available)
+    accela_pagination_delay_fallback: float = 0.5  # 500ms between pagination requests
+    accela_enrichment_delay_fallback: float = 0.1  # 100ms between enrichment requests
+    # Request settings
+    accela_max_retries: int = 3  # Max retries on 429 errors
+    accela_request_timeout: float = 30.0  # Request timeout in seconds
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

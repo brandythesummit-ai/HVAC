@@ -1,9 +1,12 @@
 """Accela Civic Platform API client with OAuth refresh_token flow."""
 import httpx
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 import logging
 from app.services.encryption import encryption_service
+from app.services.rate_limiter import AccelaRateLimiter
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,13 @@ class AccelaClient:
         # Use production Accela API
         self.base_url = "https://apis.accela.com"
         self.auth_url = "https://auth.accela.com"
+
+        # Initialize rate limiter (configurable via environment)
+        self.rate_limiter = AccelaRateLimiter(
+            threshold=settings.accela_rate_limit_threshold,
+            fallback_delay_pagination=settings.accela_pagination_delay_fallback,
+            fallback_delay_enrichment=settings.accela_enrichment_delay_fallback,
+        )
 
     @property
     def access_token(self) -> str:
@@ -302,13 +312,40 @@ class AccelaClient:
         if self._is_token_expired():
             await self.refresh_access_token()
 
-    async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    async def _make_request(
+        self,
+        method: str,
+        endpoint: str,
+        request_type: str = "general",
+        max_retries: int = None,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Make authenticated request to Accela API.
+        Make authenticated request to Accela API with rate limiting.
 
         CRITICAL: Uses Authorization header WITHOUT 'Bearer ' prefix!
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint path
+            request_type: Type of request for rate limiter ("pagination", "enrichment", "general")
+            max_retries: Maximum number of retries on 429 errors
+            **kwargs: Additional arguments passed to httpx request
+
+        Returns:
+            Response JSON data
+
+        Raises:
+            httpx.HTTPStatusError: On non-429 HTTP errors
         """
+        # Use configured max_retries if not specified
+        if max_retries is None:
+            max_retries = settings.accela_max_retries
+
         await self._ensure_valid_token()
+
+        # Wait if needed before making request (proactive throttling)
+        await self.rate_limiter.wait_if_needed(request_type=request_type)
 
         url = f"{self.base_url}{endpoint}"
         headers = {
@@ -318,10 +355,40 @@ class AccelaClient:
             **kwargs.pop("headers", {})
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.request(method, url, headers=headers, **kwargs)
-            response.raise_for_status()
-            return response.json()
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.request(method, url, headers=headers, **kwargs)
+
+                    # Update rate limiter state from response headers
+                    self.rate_limiter.update_from_headers(dict(response.headers))
+
+                    # Handle 429 Too Many Requests
+                    if response.status_code == 429:
+                        if attempt < max_retries - 1:
+                            logger.warning(
+                                f"[ACCELA API] 429 Too Many Requests (attempt {attempt + 1}/{max_retries})"
+                            )
+                            await self.rate_limiter.handle_429(dict(response.headers))
+                            continue  # Retry after waiting
+                        else:
+                            # Final attempt, raise error
+                            response.raise_for_status()
+
+                    # Raise for other error status codes
+                    response.raise_for_status()
+                    return response.json()
+
+            except httpx.HTTPStatusError as e:
+                # Re-raise non-429 errors immediately
+                if e.response.status_code != 429:
+                    raise
+                # 429 on final attempt - raise
+                if attempt == max_retries - 1:
+                    raise
+
+        # Should not reach here, but if we do, raise generic error
+        raise httpx.HTTPError(f"Max retries ({max_retries}) exceeded for {endpoint}")
 
     async def get_permits(
         self,
@@ -379,7 +446,12 @@ class AccelaClient:
 
             logger.debug(f"   📄 Fetching page {pages_fetched + 1}: offset={offset}, limit={current_page_size}")
 
-            result = await self._make_request("GET", "/v4/records", params=params)
+            result = await self._make_request(
+                "GET",
+                "/v4/records",
+                request_type="pagination",  # Rate limiter applies pagination delays
+                params=params
+            )
             page_permits = result.get("result", [])
 
             if not page_permits:
@@ -422,17 +494,29 @@ class AccelaClient:
 
     async def get_addresses(self, record_id: str) -> List[Dict[str, Any]]:
         """Get addresses for a record."""
-        result = await self._make_request("GET", f"/v4/records/{record_id}/addresses")
+        result = await self._make_request(
+            "GET",
+            f"/v4/records/{record_id}/addresses",
+            request_type="enrichment"  # Rate limiter applies enrichment delays
+        )
         return result.get("result", [])
 
     async def get_owners(self, record_id: str) -> List[Dict[str, Any]]:
         """Get owners for a record."""
-        result = await self._make_request("GET", f"/v4/records/{record_id}/owners")
+        result = await self._make_request(
+            "GET",
+            f"/v4/records/{record_id}/owners",
+            request_type="enrichment"  # Rate limiter applies enrichment delays
+        )
         return result.get("result", [])
 
     async def get_parcels(self, record_id: str) -> List[Dict[str, Any]]:
         """Get parcels (property data) for a record."""
-        result = await self._make_request("GET", f"/v4/records/{record_id}/parcels")
+        result = await self._make_request(
+            "GET",
+            f"/v4/records/{record_id}/parcels",
+            request_type="enrichment"  # Rate limiter applies enrichment delays
+        )
         return result.get("result", [])
 
     async def test_connection(self) -> Dict[str, Any]:
