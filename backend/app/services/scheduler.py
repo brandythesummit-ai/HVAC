@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 import logging
-from app.database import get_supabase
+from app.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class PullScheduler:
 
     async def _check_and_schedule_pulls(self):
         """Check for counties due for incremental pull and create jobs."""
-        db = get_supabase()
+        db = get_db()
         now = datetime.utcnow()
 
         # Find counties due for pull (next_pull_at <= now)
