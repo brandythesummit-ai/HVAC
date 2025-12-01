@@ -65,7 +65,7 @@ const PipelinePage = () => {
       await deleteLead.mutateAsync(leadId);
       toast.success('Lead deleted successfully');
     } catch (error) {
-      console.error('Failed to delete lead:', error);
+      // Lead deletion failed - error shown via toast notification
       toast.error(`Failed to delete lead: ${error.message || 'Unknown error'}`);
       throw error; // Re-throw to let LeadRow know deletion failed
     }

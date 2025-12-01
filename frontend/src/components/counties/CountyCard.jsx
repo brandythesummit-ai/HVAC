@@ -14,8 +14,8 @@ const CountyCard = ({ county }) => {
     try {
       const { authorization_url } = await getOAuthUrl.mutateAsync(county.id);
       window.open(authorization_url, '_blank', 'width=600,height=700');
-    } catch (error) {
-      console.error('Failed to get OAuth URL:', error);
+    } catch {
+      // OAuth authorization failed - error handled by mutation
     }
   };
 
@@ -23,8 +23,8 @@ const CountyCard = ({ county }) => {
     try {
       await deleteCounty.mutateAsync(county.id);
       setShowDeleteConfirm(false);
-    } catch (error) {
-      console.error('Failed to delete county:', error);
+    } catch {
+      // County deletion failed - error handled by mutation
     }
   };
 

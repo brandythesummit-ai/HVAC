@@ -34,8 +34,8 @@ const AddCountyModal = ({ onClose }) => {
       // Extract county from {success: true, data: {...}} response
       setCreatedCounty(result.data || result);
       setStep(2);
-    } catch (error) {
-      console.error('Failed to create county:', error);
+    } catch {
+      // County creation failed - error handled by mutation
     }
   };
 
@@ -48,8 +48,8 @@ const AddCountyModal = ({ onClose }) => {
       setTimeout(() => {
         onClose();
       }, 1000);
-    } catch (error) {
-      console.error('Failed to get OAuth URL:', error);
+    } catch {
+      // OAuth authorization failed - error handled by mutation
     }
   };
 
@@ -66,8 +66,8 @@ const AddCountyModal = ({ onClose }) => {
       });
       // Success! Close modal
       onClose();
-    } catch (error) {
-      console.error('Failed to setup with password:', error);
+    } catch {
+      // Password setup failed - error handled by mutation
     }
   };
 
