@@ -252,8 +252,7 @@ async def update_county(county_id: str, county: CountyUpdate, db=Depends(get_db)
 async def delete_county(county_id: str, db=Depends(get_db)):
     """
     Delete a county record and all related data.
-    Permits, properties, and leads are preserved (county_id set to null).
-    Background jobs, pull history, and schedules are permanently deleted.
+    This will permanently delete permits, properties, leads, pull history, schedules, and background jobs.
     """
     try:
         # Verify county exists
@@ -261,14 +260,14 @@ async def delete_county(county_id: str, db=Depends(get_db)):
         if not county_result.data:
             raise HTTPException(status_code=404, detail="County not found")
 
-        # Step 1: Preserve permits by setting their county_id to null
-        db.table("permits").update({"county_id": None}).eq("county_id", county_id).execute()
+        # Step 1: Delete all associated permits
+        db.table("permits").delete().eq("county_id", county_id).execute()
 
-        # Step 2: Preserve properties by setting their county_id to null
-        db.table("properties").update({"county_id": None}).eq("county_id", county_id).execute()
+        # Step 2: Delete all associated properties
+        db.table("properties").delete().eq("county_id", county_id).execute()
 
-        # Step 3: Preserve leads by setting their county_id to null
-        db.table("leads").update({"county_id": None}).eq("county_id", county_id).execute()
+        # Step 3: Delete all associated leads
+        db.table("leads").delete().eq("county_id", county_id).execute()
 
         # Step 4: Delete pull history (historical record, safe to delete)
         db.table("pull_history").delete().eq("county_id", county_id).execute()
@@ -297,7 +296,7 @@ async def delete_county(county_id: str, db=Depends(get_db)):
 
         return {
             "success": True,
-            "data": {"message": "County deleted successfully. Permits, properties, and leads preserved."},
+            "data": {"message": "County and all associated data deleted successfully."},
             "error": None
         }
 
