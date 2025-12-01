@@ -43,13 +43,13 @@ Florida's climate and aging HVAC systems create high replacement demand. Statewi
 ### 🏢 Multi-County Permit Pulling
 - Connect to any county using Accela Civic Platform V4 API
 - **Adaptive rate limiting** - header-based throttling prevents API account suspension
-- Pull 25 years of historical HVAC permits for comprehensive lead database
+- Pull 30 years of historical HVAC permits for comprehensive lead database
 - Automated daily incremental pulls to catch new installations
 - Automatic pagination (handles 1,000+ permits per pull)
 - API-level filtering for HVAC permits only (more efficient)
 
 **Pull Strategy:**
-- **Initial Pull:** 25 years historical, oldest→newest (2000→2025)
+- **Initial Pull:** 30 years historical, oldest→newest (1995→2025)
 - **Post-Initial:** Every 7 days, pull last 8 days (1-day overlap prevents gaps)
 - **Lead Qualification:** Only HVAC systems 5+ years old qualify for CRM sync
 
@@ -86,14 +86,14 @@ Florida's climate and aging HVAC systems create high replacement demand. Statewi
 This intelligent aggregation ensures contractors target properties genuinely needing replacement, not recent installations that would waste sales effort.
 
 ### 🤖 Background Job Processing
-- **25-Year Historical Pulls** - Process decades of permits automatically
+- **30-Year Historical Pulls** - Process decades of permits automatically
 - **PostgreSQL-Based** - No Redis, Celery, or external dependencies
 - **Real-Time Progress Tracking** - Monitor permits/second, ETA, stats
 - **Automatic Retries** - Handles transient API failures
 - **Graceful Cancellation** - Stop long-running jobs without data loss
 
 ### 📅 Automated Scheduling
-- **Initial Historical Pull** - Automatically pulls 25 years of historical permits when county is added (oldest→newest: 2000→2025)
+- **Initial Historical Pull** - Automatically pulls 30 years of historical permits when county is added (oldest→newest: 1995→2025)
 - **Incremental Pulls Every 7 Days** - After initial pull completes, automatically fetches last 8 days of permits every 7 days
 - **Overlap for Gap Prevention** - 8-day window with 7-day frequency ensures no permits missed (1-day overlap)
 - **Hourly Background Checks** - Scheduler monitors for due counties every hour
