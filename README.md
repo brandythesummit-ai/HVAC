@@ -28,9 +28,10 @@ County Permits → Property Enrichment → Lead Scoring → CRM Sync
 - Connection status (Connected, Pending, Not Configured)
 
 **Current Status (V1):**
-- ✅ **Accela Integration:** Production-ready (validated with Hillsborough County)
+- ✅ **Accela Integration:** Production-ready (validated with Hillsborough County pilot)
+- 📊 **Current Deployment:** 0 counties configured (pending statewide rollout)
+- 🎯 **Potential V1 Coverage:** ~25-30 Florida counties use Accela (can be added immediately)
 - 🚧 **Multi-Platform Support:** Planned for V2 (see Future Vision below)
-- 📊 **Current Coverage:** ~25-30 Florida counties use Accela (immediately accessible)
 - 🎯 **Remaining Counties:** 37-42 counties require V2 multi-platform integrations
 
 **Why All 67 Counties?**
@@ -413,7 +414,7 @@ See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for complete deployment instructi
 ### Why Multi-Platform Support?
 
 **The Problem:** Florida's 67 counties use diverse permit platforms:
-- **Accela:** 40-45% of counties (~25-30 counties) - ✅ V1 Complete
+- **Accela:** 40-45% of counties (~25-30 counties) - ✅ V1 Proven (0 deployed, pending configuration)
 - **EnerGov:** 15-22% of counties (~10-15 counties) - 🚧 V2 Required
 - **Custom Systems:** 22-30% of counties (~15-20 counties) - 🚧 V2 Required
 - **Tyler/eTRAKiT/OpenGov:** 8-23% combined (~5-15 counties) - 🚧 V2 Required
@@ -601,11 +602,12 @@ Like Wappalyzer but tuned for government permitting stacks. Checks for:
 
 **Integration Strategy Per Platform:**
 
-#### Accela (✅ Complete - V1)
-- **Status:** Production-ready
+#### Accela (✅ Proven - V1)
+- **Status:** Production-ready (integration validated with HCFL pilot)
 - **Approach:** AccelaClient with OAuth refresh token flow
-- **Effort:** 0 weeks (done)
-- **Coverage:** Immediate access to 25-30 counties
+- **Effort:** 0 weeks (integration complete)
+- **Current Deployment:** 0 counties (pending statewide configuration)
+- **Potential Coverage:** 25-30 Florida counties can be added immediately
 
 #### EnerGov (🚧 V2 - High Priority)
 - **Status:** Not implemented
@@ -893,9 +895,10 @@ Start with 2-3 high-demand non-Accela counties (e.g., Orange County if EnerGov) 
 **This entire section describes V2 functionality that does NOT exist in the current system.**
 
 **V1 Status (Current):**
-- ✅ Accela integration complete
-- ✅ Single county configuration (manual, one-by-one)
-- ✅ 25-30 Florida counties accessible now
+- ✅ Accela integration proven (validated with Hillsborough County pilot)
+- ✅ County configuration capability (manual, one-by-one)
+- 📊 0 counties currently deployed (HCFL pilot deleted for statewide rebuild)
+- 🎯 25-30 Florida Accela counties can be configured when ready
 
 **V2 Status (Future):**
 - ❌ Platform detection: Not implemented
