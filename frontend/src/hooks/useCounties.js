@@ -22,7 +22,10 @@ export const useCreateCounty = () => {
   return useMutation({
     mutationFn: countiesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counties'] });
+      queryClient.invalidateQueries({
+        queryKey: ['counties'],
+        refetchType: 'all'
+      });
     },
   });
 };
@@ -33,7 +36,10 @@ export const useUpdateCounty = () => {
   return useMutation({
     mutationFn: ({ id, data }) => countiesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counties'] });
+      queryClient.invalidateQueries({
+        queryKey: ['counties'],
+        refetchType: 'all'
+      });
     },
   });
 };
@@ -44,7 +50,10 @@ export const useDeleteCounty = () => {
   return useMutation({
     mutationFn: countiesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counties'] });
+      queryClient.invalidateQueries({
+        queryKey: ['counties'],
+        refetchType: 'all'
+      });
     },
   });
 };
@@ -67,7 +76,10 @@ export const useSetupCountyWithPassword = () => {
   return useMutation({
     mutationFn: ({ id, credentials }) => countiesApi.setupWithPassword(id, credentials),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counties'] });
+      queryClient.invalidateQueries({
+        queryKey: ['counties'],
+        refetchType: 'all'
+      });
     },
   });
 };
