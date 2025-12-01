@@ -12,14 +12,14 @@ React frontend for the HVAC Lead Generation platform that pulls permit data from
 
 ## Tech Stack
 
-- React 18
-- Vite (build tool)
-- React Router (routing)
-- TanStack React Query (API state management)
-- Axios (HTTP client)
-- TailwindCSS (styling)
-- Lucide React (icons)
-- date-fns (date formatting)
+- React 19.2.0 with React DOM 19.2.0
+- Vite 7.2.4 (build tool)
+- React Router 7.9.6 (routing)
+- TanStack React Query 5.90.11 (API state management)
+- Axios 1.13.2 (HTTP client)
+- TailwindCSS 4.1.17 (styling)
+- Lucide React 0.555.0 (icons)
+- date-fns 4.1.0 (date formatting)
 
 ## Getting Started
 

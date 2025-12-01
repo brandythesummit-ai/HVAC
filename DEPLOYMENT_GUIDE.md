@@ -12,7 +12,7 @@ Follow these steps in order to deploy your HVAC Lead Generation platform to prod
 Before you start, make sure you have:
 - [ ] GitHub account
 - [ ] Supabase account (create at https://supabase.com)
-- [ ] Railway account (create at https://railway.app) OR Render account (https://render.com)
+- [ ] Railway account (create at https://railway.app)
 - [ ] Vercel account (create at https://vercel.com)
 - [ ] Git installed locally
 - [ ] This code committed (✅ Already done!)

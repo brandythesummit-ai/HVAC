@@ -60,8 +60,8 @@ Use Railway MCP to:
 ### Step 2: Configure Railway Environment Variables
 Add ALL variables from `vercel-backend.env`:
 ```bash
-SUPABASE_URL=https://jlammryvteuhrlyepqif.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsYW1tcnl2dGV1aHJseWVwcWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQwMTMxMzgsImV4cCI6MjA0OTU4OTEzOH0.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsYW1tcnl2dGV1aHJseWVwcWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQwMTMxMzgsImV4cCI6MjA0OTU4OTEzOH0.0C6QngrPTmwU6DHCs5kikUWLW-BffUTPFV4z4Ym_1eU
+SUPABASE_URL=https://jlammryvteuhrlygpqif.supabase.co
+SUPABASE_KEY=<your-supabase-anon-key>
 ENCRYPTION_KEY=jkYMzeybIKViHfSg2C8jChxh7OnanInvcTH6EOgOMG8=
 CORS_ORIGINS=https://hvac-liard.vercel.app,http://localhost:3000,http://localhost:5173
 ENVIRONMENT=production
@@ -121,8 +121,8 @@ After deployment, verify:
 ### Railway Backend (All Required)
 | Variable | Value | Source |
 |----------|-------|--------|
-| SUPABASE_URL | https://jlammryvteuhrlyepqif.supabase.co | vercel-backend.env |
-| SUPABASE_KEY | eyJhbG... (see file) | vercel-backend.env |
+| SUPABASE_URL | https://jlammryvteuhrlygpqif.supabase.co | vercel-backend.env |
+| SUPABASE_KEY | <your-supabase-anon-key> | vercel-backend.env |
 | ENCRYPTION_KEY | jkYMzeybI... (see file) | vercel-backend.env |
 | CORS_ORIGINS | https://hvac-*.vercel.app,... | vercel-backend.env (update) |
 | ENVIRONMENT | production | vercel-backend.env |
@@ -164,9 +164,9 @@ After deployment, verify:
 - **Git Repo**: github.com/brandythesummit-ai/HVAC
 
 ### Supabase
-- **Project**: jlammryvteuhrlyepqif
+- **Project**: jlammryvteuhrlygpqif
 - **Region**: US East
-- **Tables**: agencies, counties, permits, leads
+- **Tables**: agencies, counties, permits, leads, sync_config, properties, background_jobs, pull_history, county_pull_schedules (9 total)
 
 ### Railway (To Be Created)
 - **Project Name**: hvac-backend

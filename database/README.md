@@ -4,17 +4,21 @@ This directory contains the PostgreSQL database schema for the HVAC Lead Generat
 
 ## Schema Overview
 
-The database uses a multi-tenant architecture with 5 core tables:
+The database uses a multi-tenant architecture with 9 core tables:
 
 ```
 agencies (tenant/organization)
   └── counties (Accela API configurations)
-        └── permits (pulled from Accela)
-              └── leads (synced to The Summit.AI)
-  └── sync_config (sync settings)
+        ├── permits (pulled from Accela)
+        │     ├── leads (synced to The Summit.AI)
+        │     └── properties (property-centric data)
+        ├── pull_history (historical pull tracking)
+        └── county_pull_schedules (automated pull schedules)
+  ├── sync_config (sync settings)
+  └── background_jobs (async job tracking)
 ```
 
-### Tables
+### Core Tables
 
 1. **agencies** - HVAC contractor organizations
    - Stores The Summit.AI CRM credentials
@@ -38,6 +42,36 @@ agencies (tenant/organization)
 5. **sync_config** - Sync configuration per agency
    - Currently supports manual mode
    - Designed for future scheduled/realtime modes
+
+6. **properties** - Property-centric data model with intelligent lead scoring
+   - **Address Normalization:** Uses `normalized_address` (uppercase, no punctuation) to match multiple permits to the same property
+   - **HVAC Age Tracking:** Automatically calculates `hvac_age_years` from most recent HVAC permit date
+   - **Lead Qualification:** Properties with HVAC age ≥5 years marked as `is_qualified = TRUE`
+   - **Intelligent Scoring:** 0-100 lead score based on HVAC age, property value, and permit history
+   - **Lead Tiers:** Automatic classification based on replacement urgency:
+     - **HOT (80-100):** 15-20+ years old - Replacement imminent, highest priority
+     - **WARM (60-75):** 10-15 years old - Maintenance + potential replacement soon
+     - **COOL (40-55):** 5-10 years old - Maintenance focus, monitor for future
+     - **COLD (0-35):** <5 years old - Not qualified, too new for outreach
+   - **Denormalized Owner Data:** Stores most recent owner info for fast queries without joins
+   - **Property Metadata:** Year built, lot size, total value, bedrooms, bathrooms
+   - **Statistics:** Tracks `total_hvac_permits` counter for property activity level
+   - **Use Case:** Enables targeting high-value properties with aging HVAC systems for replacement campaigns
+
+7. **background_jobs** - Background task tracking
+   - Tracks async job execution (historical pulls, etc.)
+   - Stores job type, status, start/completion times
+   - Manages error messages for failed jobs
+
+8. **pull_history** - Historical permit pull tracking
+   - Records each permit pull operation
+   - Tracks date ranges, totals pulled, HVAC permits saved
+   - Useful for audit trail and analytics
+
+9. **county_pull_schedules** - Automated pull scheduling
+   - Configures automated permit pulls per county
+   - Supports daily, weekly, monthly schedules
+   - Tracks last run and next scheduled run times
 
 ## Directory Structure
 
@@ -177,6 +211,10 @@ ALTER TABLE counties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE permits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE background_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pull_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE county_pull_schedules ENABLE ROW LEVEL SECURITY;
 
 -- Example policy: Users can only see their own agency's data
 CREATE POLICY "Users can view own agency" ON agencies
@@ -226,6 +264,53 @@ JOIN permits p ON l.permit_id = p.id
 WHERE l.summit_sync_status = 'pending'
   AND p.job_value > 10000
 ORDER BY p.job_value DESC;
+
+-- Properties: Find HOT tier leads (HVAC 15+ years old)
+SELECT
+  normalized_address,
+  owner_name,
+  owner_phone,
+  hvac_age_years,
+  lead_score,
+  lead_tier,
+  most_recent_hvac_date,
+  total_property_value,
+  total_hvac_permits
+FROM properties
+WHERE lead_tier = 'HOT'
+  AND is_qualified = TRUE
+ORDER BY lead_score DESC, total_property_value DESC
+LIMIT 50;
+
+-- Properties: Score distribution by tier
+SELECT
+  lead_tier,
+  COUNT(*) AS count,
+  AVG(hvac_age_years) AS avg_hvac_age,
+  AVG(total_property_value) AS avg_property_value,
+  AVG(lead_score) AS avg_score
+FROM properties
+WHERE is_qualified = TRUE
+GROUP BY lead_tier
+ORDER BY CASE lead_tier
+  WHEN 'HOT' THEN 1
+  WHEN 'WARM' THEN 2
+  WHEN 'COOL' THEN 3
+  WHEN 'COLD' THEN 4
+END;
+
+-- Properties: Multi-permit properties (high activity)
+SELECT
+  normalized_address,
+  owner_name,
+  total_hvac_permits,
+  hvac_age_years,
+  lead_tier,
+  total_property_value
+FROM properties
+WHERE total_hvac_permits > 1
+  AND is_qualified = TRUE
+ORDER BY total_hvac_permits DESC, lead_score DESC;
 ```
 
 ## Backend Integration
@@ -280,7 +365,16 @@ DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres
 | 003 | Create permits table | 2025-11-28 |
 | 004 | Create leads table | 2025-11-28 |
 | 005 | Create sync_config table | 2025-11-28 |
-| 006 | Create indexes | 2025-11-28 |
+| 006 | Create indexes (initial) | 2025-11-28 |
+| 006_rename | Rename summit_api_key column | 2025-11-28 |
+| 008 | Add global Accela settings | 2025-11-28 |
+| 009 | Add county OAuth refresh tokens | 2025-11-28 |
+| 010 | **Create properties table** (property-centric model with lead scoring) | 2025-11-29 |
+| 011 | **Create background_jobs table** (async job tracking) | 2025-11-29 |
+| 012 | Modify leads table structure | 2025-11-29 |
+| 013 | **Create pull_history table** (audit trail for permit pulls) | 2025-11-29 |
+| 014 | **Create county_pull_schedules table** (automated scheduling) | 2025-11-29 |
+| 015 | Alter counties status field | 2025-11-29 |
 
 ## Next Steps
 

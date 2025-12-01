@@ -27,7 +27,7 @@ This is a full-stack HVAC lead generation platform that pulls permit data from c
 - **HTTP Client:** httpx (async)
 - **Security:** Fernet encryption for credentials
 - **Language:** Python 3.11
-- **Deployment:** Railway/Render
+- **Deployment:** Railway
 
 ### External APIs
 - **Accela Civic Platform V4 API** (OAuth refresh_token flow, 15-min expiration)

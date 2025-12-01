@@ -29,7 +29,7 @@ A lead generation platform for HVAC contractors that pulls permit data from coun
 - Python 3.11+ FastAPI
 - SQLAlchemy (ORM)
 - Pydantic (validation)
-- Deployed on Railway/Render
+- Deployed on Railway
 
 **Database:**
 - Supabase (PostgreSQL)
@@ -305,7 +305,7 @@ User workflow:
 ## Deployment
 
 **Frontend:** Vercel (auto-deploy from GitHub)
-**Backend:** Railway/Render (auto-deploy from GitHub)
+**Backend:** Railway (auto-deploy from GitHub) - https://hvac-backend-production-11e6.up.railway.app
 **Database:** Supabase (cloud-hosted PostgreSQL)
 
 **Environment Variables:**

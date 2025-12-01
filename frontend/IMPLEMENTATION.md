@@ -91,21 +91,21 @@ A complete, production-ready React frontend for the HVAC Lead Generation platfor
 ```json
 {
   "dependencies": {
-    "react": "^18.x",
-    "react-dom": "^18.x",
-    "react-router-dom": "^6.x",
-    "@tanstack/react-query": "^5.x",
-    "axios": "^1.x",
-    "lucide-react": "^0.x",
-    "date-fns": "^4.x"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6",
+    "@tanstack/react-query": "^5.90.11",
+    "axios": "^1.13.2",
+    "lucide-react": "^0.555.0",
+    "date-fns": "^4.1.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.x",
-    "vite": "^7.x",
-    "tailwindcss": "^4.x",
-    "@tailwindcss/postcss": "^4.x",
-    "autoprefixer": "^10.x",
-    "postcss": "^8.x"
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "^7.2.4",
+    "tailwindcss": "^4.1.17",
+    "@tailwindcss/postcss": "^4.1.17",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6"
   }
 }
 ```

@@ -4,13 +4,16 @@ FastAPI backend for the HVAC Lead Generation platform with Accela API and Summit
 
 ## Features
 
-- Multi-county permit pulling with Accela Civic Platform V4 API
-- Automatic token refresh (handles 15-minute expiration)
-- Property data enrichment (parcels, owners, addresses)
-- Lead management and batch selection
-- Summit.AI (HighLevel) CRM integration
-- Encrypted credential storage
-- RESTful API with automatic documentation
+- **Multi-county permit pulling** with Accela Civic Platform V4 API
+- **Background job processing** (30-year historical pulls, automated incremental pulls)
+- **Property-centric data model** with intelligent lead scoring (HOT/WARM/COOL/COLD tiers)
+- **Automated scheduler** for daily incremental pulls
+- **Automatic token refresh** (handles 15-minute expiration)
+- **Property data enrichment** (parcels, owners, addresses from Accela)
+- **Lead management** with batch selection and CRM sync
+- **Summit.AI (HighLevel) CRM integration**
+- **Encrypted credential storage** (Fernet encryption)
+- **RESTful API** with automatic documentation (Swagger/ReDoc)
 
 ## Technology Stack
 
@@ -33,17 +36,25 @@ backend/
 │   │   ├── county.py              # County Pydantic models
 │   │   ├── permit.py              # Permit Pydantic models
 │   │   ├── lead.py                # Lead Pydantic models
+│   │   ├── property.py            # Property Pydantic models
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   ├── counties.py            # County endpoints
 │   │   ├── permits.py             # Permit endpoints
 │   │   ├── leads.py               # Lead endpoints
+│   │   ├── properties.py          # Property endpoints
 │   │   ├── summit.py              # Summit.AI endpoints
+│   │   ├── background_jobs.py     # Background job endpoints
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── accela_client.py       # Accela API integration
 │   │   ├── summit_client.py       # Summit.AI integration
+│   │   ├── property_aggregator.py # Property aggregation & lead scoring
+│   │   ├── scheduler.py           # Automated pull scheduler
 │   │   ├── encryption.py          # Credential encryption
+│   ├── workers/
+│   │   ├── __init__.py
+│   │   ├── job_processor.py       # Background job processor
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -124,10 +135,60 @@ Once the server is running, visit:
 ### Health Check
 
 ```
-GET /health
+GET /api/health
 ```
 
-Returns server health status.
+**Comprehensive system health monitoring** for all components:
+
+**Critical Priority:**
+- ✅ Database (Supabase connectivity, query response time)
+- ✅ Encryption (Fernet encryption/decryption verification)
+- ✅ Configuration (Required environment variables validation)
+
+**High Priority:**
+- 🔄 Job Processor (Background worker status, pending jobs count)
+
+**Medium Priority:**
+- 🌐 External APIs (Accela, Summit.AI connectivity - cached)
+- 🏗️ Infrastructure (Vercel frontend, Railway backend health - cached)
+
+**Low Priority:**
+- 🔧 Network (Internet connectivity - cached)
+
+**Response Format:**
+```json
+{
+  "status": "healthy|degraded|down",
+  "uptime_seconds": 86400,
+  "components": {
+    "database": { "status": "healthy", "priority": "critical", "message": "...", "response_time_ms": 45 },
+    "encryption": { "status": "healthy", "priority": "critical", "message": "..." },
+    "configuration": { "status": "healthy", "priority": "critical", "message": "..." },
+    "job_processor": { "status": "healthy", "priority": "high", "message": "..." },
+    "accela_api": { "status": "unknown", "priority": "medium", "message": "...", "last_checked": "..." },
+    "summit_api": { "status": "unknown", "priority": "medium", "message": "...", "last_checked": "..." },
+    "vercel_frontend": { "status": "healthy", "priority": "medium", "message": "...", "last_checked": "..." },
+    "railway_backend": { "status": "healthy", "priority": "medium", "message": "...", "last_checked": "..." }
+  },
+  "summary": {
+    "total": 8,
+    "healthy": 7,
+    "degraded": 0,
+    "down": 0,
+    "unknown": 1
+  }
+}
+```
+
+**Hybrid Checking Strategy:**
+- **Fast checks** (database, encryption, config, job processor): Run inline on every request
+- **Slow checks** (external APIs, infrastructure): Cached and updated in background every 60 seconds
+
+**Use Cases:**
+- Kubernetes liveness/readiness probes
+- Uptime monitoring (Pingdom, UptimeRobot, etc.)
+- Load balancer health checks
+- Automated alerting on degraded status
 
 ### County Management
 
@@ -185,6 +246,179 @@ GET    /api/summit/config         - Get config (masked)
 PUT    /api/summit/config         - Update config
 POST   /api/summit/test           - Test connection
 GET    /api/summit/sync-status    - Get sync status
+```
+
+### Background Jobs
+
+```
+POST   /api/background-jobs/counties/{id}/jobs
+       Body: { job_type, parameters }
+       - Create async background job (initial_pull, incremental_pull)
+       - Prevents concurrent jobs per county
+
+GET    /api/background-jobs/counties/{id}/jobs
+       Query: status, limit
+       - List jobs with real-time progress
+
+GET    /api/background-jobs/jobs/{id}
+       - Get detailed job status with progress tracking
+       - Returns: permits_pulled, properties_created, leads_created
+       - Returns: progress_percent, permits_per_second, estimated_completion_at
+
+POST   /api/background-jobs/jobs/{id}/cancel
+       - Cancel pending or running job (graceful, finishes current batch)
+
+DELETE /api/background-jobs/jobs/{id}
+       - Delete completed/failed job
+```
+
+## Background Job System
+
+### Architecture
+
+The backend uses a **PostgreSQL-based polling system** for background jobs - no external dependencies like Celery, Redis, or ARQ required.
+
+**Components:**
+- `JobProcessor` (`app/workers/job_processor.py`) - Polls `background_jobs` table every 5 seconds
+- `PullScheduler` (`app/services/scheduler.py`) - Checks every hour for due incremental pulls
+- `PropertyAggregator` (`app/services/property_aggregator.py`) - Processes permits into property records with lead scoring
+
+Both services start automatically when FastAPI launches and run as background asyncio tasks.
+
+### Job Types
+
+#### 1. Initial Pull (30-Year Historical Pull)
+
+**Purpose:** Pull 30 years of historical HVAC permits to build complete lead database
+
+**Strategy:**
+- Pulls oldest permits first (1995 → 2025) for best lead prioritization
+- Processes year-by-year in batches of 1,000 permits
+- Real-time progress tracking with ETA
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/api/background-jobs/counties/{county_id}/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_type": "initial_pull",
+    "parameters": {
+      "years": 30,
+      "permit_type": "Building/Residential/Trade/Mechanical"
+    }
+  }'
+```
+
+**Progress Tracking:**
+- `current_year`: Year being processed (e.g., 2015)
+- `current_batch`: Batch number within year
+- `permits_pulled`: Total permits fetched from Accela
+- `permits_saved`: Unique permits saved to database
+- `properties_created`: New property records created
+- `properties_updated`: Existing properties updated
+- `leads_created`: Qualified leads generated (HVAC age ≥5 years)
+- `permits_per_second`: Processing rate
+- `estimated_completion_at`: ETA timestamp
+
+**Typical Performance:**
+- ~10-20 permits/second (depending on Accela API latency)
+- 30 years with 10,000 permits = ~10-15 minutes
+
+#### 2. Incremental Pull (Daily New Permits)
+
+**Purpose:** Pull recent permits to catch new HVAC installations
+
+**Strategy:**
+- Pulls last 2 days of permits (overlap ensures no gaps)
+- Triggered manually or by automated scheduler
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/api/background-jobs/counties/{county_id}/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_type": "incremental_pull",
+    "parameters": {
+      "days_back": 2,
+      "permit_type": "Building/Residential/Trade/Mechanical"
+    }
+  }'
+```
+
+**Automated Scheduling:**
+The `PullScheduler` automatically creates incremental_pull jobs for counties with:
+- `auto_pull_enabled = TRUE` in `county_pull_schedules`
+- `incremental_pull_enabled = TRUE`
+- `next_pull_at <= NOW()`
+- `initial_pull_completed = TRUE` (in counties table)
+
+Scheduler checks every hour and creates jobs for due counties, then reschedules for 7 days later.
+
+### Error Handling & Retries
+
+**Automatic Retry:**
+- Jobs automatically retry up to 3 times on failure
+- Each retry increments `retry_count`
+- After 3 failures, job status = `failed` permanently
+
+**Statuses:**
+- `pending` - Waiting for processor to pick up
+- `running` - Currently being processed
+- `completed` - Successfully finished
+- `failed` - Permanently failed after max retries
+- `cancelled` - User-cancelled (graceful shutdown)
+
+**Logging:**
+- All job progress logged to backend console
+- Detailed error messages stored in `error_message` field
+- Full stack trace in `error_details` (JSON)
+
+### Data Enrichment Pipeline
+
+Each permit goes through this pipeline:
+
+1. **Fetch from Accela API:** Get base permit data
+2. **Enrich with Details:**
+   - Addresses (primary address extracted)
+   - Owners (primary owner extracted)
+   - Parcels (year built, square footage, property value)
+3. **Save to `permits` table** with full `raw_data` JSONB
+4. **Property Aggregation:**
+   - Normalize address (uppercase, no punctuation)
+   - Find or create property record
+   - Calculate HVAC age from `opened_date`
+   - Calculate lead score (0-100) and tier (HOT/WARM/COOL/COLD)
+   - Create lead if qualified (HVAC age ≥5 years)
+
+### Monitoring Jobs
+
+**Real-time Progress:**
+```bash
+# Watch job progress
+curl http://localhost:8000/api/background-jobs/jobs/{job_id}
+```
+
+**Response includes:**
+```json
+{
+  "id": "...",
+  "status": "running",
+  "progress_percent": 45,
+  "current_year": 2010,
+  "current_batch": 3,
+  "permits_pulled": 4500,
+  "permits_saved": 4250,
+  "properties_created": 3800,
+  "leads_created": 2100,
+  "permits_per_second": 12.5,
+  "estimated_completion_at": "2025-11-30T15:45:00Z",
+  "elapsed_seconds": 360
+}
+```
+
+**Cancel Long-Running Job:**
+```bash
+curl -X POST http://localhost:8000/api/background-jobs/jobs/{job_id}/cancel
 ```
 
 ## Important Implementation Details
@@ -264,11 +498,13 @@ flake8 app/
 
 ## Deployment
 
-### Railway/Render
+### Railway
 
 1. Connect your GitHub repository
 2. Set environment variables
 3. Deploy command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+**Production URL:** https://hvac-backend-production-11e6.up.railway.app
 
 ### Docker (Optional)
 

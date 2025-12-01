@@ -213,7 +213,6 @@ backend/
 │       └── encryption.py    # Credential encryption
 ├── requirements.txt
 ├── .env
-├── test_server.py
 └── README.md
 ```
 
