@@ -4,6 +4,8 @@ from typing import List, Dict, Any
 from datetime import datetime
 import logging
 
+logger = logging.getLogger(__name__)
+
 from app.database import get_db
 from app.models.permit import PullPermitsRequest, PermitResponse, PermitListRequest
 from app.services.accela_client import AccelaClient
@@ -137,7 +139,7 @@ def extract_permit_data(permit: Dict[str, Any], addresses: List[Dict], owners: L
 async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(get_db)):
     """Pull permits from Accela and enrich with property data."""
     try:
-        print(f"🔍 [PULL PERMITS] Starting permit pull for county {county_id}")
+        logger.debug(f"Starting permit pull for county {county_id}")
 
         # Get county
         result = db.table("counties").select("*").eq("id", county_id).execute()
@@ -146,7 +148,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
             raise HTTPException(status_code=404, detail="County not found")
 
         county = result.data[0]
-        print(f"✅ [PULL PERMITS] Found county: {county.get('name')} ({county.get('county_code')})")
+        logger.info(f"Found county: {county.get('name')} ({county.get('county_code')})")
 
         # Verify county has refresh token
         if not county.get("refresh_token"):
@@ -164,7 +166,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         app_secret_encrypted = app_settings.data[0]["app_secret"]
         app_secret = encryption_service.decrypt(app_secret_encrypted)
 
-        print(f"✅ [PULL PERMITS] Retrieved app credentials")
+        logger.info("Retrieved app credentials")
 
         # Create Accela client
         client = AccelaClient(
@@ -181,7 +183,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         # API expects: "Building/Residential/Trade/Mechanical"
         hvac_type = "Building/Residential/Trade/Mechanical"
 
-        print(f"🔍 [PULL PERMITS] Pulling permits with type: {hvac_type}")
+        logger.debug(f"Pulling permits with type: {hvac_type}")
 
         # Pull HVAC permits with API-level type filtering
         accela_response = await client.get_permits(
@@ -197,7 +199,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         debug_info = accela_response["debug_info"]
         filtering_method = "API"
 
-        print(f"✅ [PULL PERMITS] Retrieved {len(hvac_permits)} HVAC permits")
+        logger.info(f"Retrieved {len(hvac_permits)} HVAC permits")
 
         # Enrich each permit
         saved_permits = []
@@ -267,7 +269,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                     "record_id": record_id,
                     "error": str(save_error)
                 })
-                print(f"⚠️  [PULL PERMITS] Failed to save permit {record_id}: {str(save_error)}")
+                logger.warning(f"Failed to save permit {record_id}: {str(save_error)}")
 
         # Process permits through PropertyAggregator for property-based lead generation
         aggregator = PropertyAggregator(db)
@@ -276,7 +278,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         leads_created = 0
         failed_aggregations = []
 
-        print(f"🏠 [PROPERTY AGGREGATOR] Processing {len([p for p in saved_permits if p])} permits...")
+        logger.info(f"Processing {len([p for p in saved_permits if p])} permits through property aggregator")
 
         for permit in saved_permits:
             if not permit:
@@ -294,21 +296,21 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
                         properties_created += 1
                         if lead_id:
                             leads_created += 1
-                            print(f"  ✅ Created property {property_id} and lead {lead_id}")
+                            logger.info(f"Created property {property_id} and lead {lead_id}")
                         else:
-                            print(f"  ✅ Created property {property_id} (not qualified)")
+                            logger.info(f"Created property {property_id} (not qualified)")
                     else:
                         properties_updated += 1
-                        print(f"  ♻️  Updated property {property_id}")
+                        logger.info(f"Updated property {property_id}")
 
             except Exception as agg_error:
                 failed_aggregations.append({
                     "permit_id": permit["id"],
                     "error": str(agg_error)
                 })
-                print(f"⚠️  [PROPERTY AGGREGATOR] Failed to process permit {permit['id']}: {str(agg_error)}")
+                logger.warning(f"Failed to process permit {permit['id']}: {str(agg_error)}")
 
-        print(f"✅ [PROPERTY AGGREGATOR] Complete! Properties: {properties_created} created, {properties_updated} updated. Leads: {leads_created} created")
+        logger.info(f"Property aggregator complete! Properties: {properties_created} created, {properties_updated} updated. Leads: {leads_created} created")
 
         # Update county last_pull_at and store updated tokens
         # Update last pull timestamp
@@ -318,7 +320,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
         db.table("counties").update(update_data).eq("id", county_id).execute()
 
         saved_count = len([p for p in saved_permits if p])
-        print(f"✅ [PULL PERMITS] Complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Properties: {properties_created}/{properties_updated}, Leads: {leads_created}")
+        logger.info(f"Pull permits complete! Total: {len(hvac_permits)}, HVAC: {len(hvac_permits)}, Saved: {saved_count}, Properties: {properties_created}/{properties_updated}, Leads: {leads_created}")
 
         # Calculate helpful metrics
         # datetime already imported at module level (line 4)
@@ -376,7 +378,7 @@ async def pull_permits(county_id: str, request: PullPermitsRequest, db=Depends(g
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ [PULL PERMITS] Error: {str(e)}")
+        logger.error(f"Pull permits error: {str(e)}")
         import traceback
         traceback.print_exc()
         return {

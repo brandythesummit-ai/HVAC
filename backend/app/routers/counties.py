@@ -4,6 +4,9 @@ from typing import List
 from datetime import datetime, timedelta
 import secrets
 import urllib.parse
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.county import CountyCreate, CountyUpdate, CountyResponse
@@ -282,9 +285,9 @@ async def delete_county(county_id: str, db=Depends(get_db)):
         delete_result = db.table("counties").delete().eq("id", county_id).execute()
 
         # Verify the deletion actually happened
-        print(f"Delete result: {delete_result}")
-        print(f"Delete result data: {delete_result.data}")
-        print(f"Delete result count: {getattr(delete_result, 'count', 'N/A')}")
+        logger.debug(f"Delete result: {delete_result}")
+        logger.debug(f"Delete result data: {delete_result.data}")
+        logger.debug(f"Delete result count: {getattr(delete_result, 'count', 'N/A')}")
 
         # Check if the county was actually deleted
         verify_result = db.table("counties").select("id").eq("id", county_id).execute()

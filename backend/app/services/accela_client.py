@@ -2,7 +2,10 @@
 import httpx
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
+import logging
 from app.services.encryption import encryption_service
+
+logger = logging.getLogger(__name__)
 
 
 class AccelaClient:
@@ -87,11 +90,11 @@ class AccelaClient:
         }
 
         # DETAILED LOGGING - Before request
-        print(f"🔍 [AUTH CODE EXCHANGE] Starting token exchange")
-        print(f"   URL: {url}")
-        print(f"   Redirect URI: {redirect_uri}")
-        print(f"   Code (first 20 chars): {code[:20]}...")
-        print(f"   Client ID: {self.app_id}")
+        logger.debug(f" [AUTH CODE EXCHANGE] Starting token exchange")
+        logger.debug(f"   URL: {url}")
+        logger.debug(f"   Redirect URI: {redirect_uri}")
+        logger.debug(f"   Code (first 20 chars): {code[:20]}...")
+        logger.debug(f"   Client ID: {self.app_id}")
 
         try:
             async with httpx.AsyncClient() as client:
@@ -105,14 +108,14 @@ class AccelaClient:
                 )
 
                 # DETAILED LOGGING - After request
-                print(f"✅ [AUTH CODE EXCHANGE] Response received")
-                print(f"   Status: {response.status_code}")
-                print(f"   Headers: {dict(response.headers)}")
+                logger.info(f" [AUTH CODE EXCHANGE] Response received")
+                logger.debug(f"   Status: {response.status_code}")
+                logger.debug(f"   Headers: {dict(response.headers)}")
 
                 response.raise_for_status()
                 result = response.json()
 
-                print(f"✅ [AUTH CODE EXCHANGE] Token exchange successful")
+                logger.info(f" [AUTH CODE EXCHANGE] Token exchange successful")
 
             # Calculate expiration
             expires_in = result.get("expires_in", 3600)  # Default 1 hour
@@ -132,16 +135,16 @@ class AccelaClient:
             error_status = e.response.status_code
             trace_id = e.response.headers.get('x-accela-traceid') or e.response.headers.get('x-accela-trace-id')
 
-            print(f"❌ [AUTH CODE EXCHANGE] Failed:")
-            print(f"   Status: {error_status}")
-            print(f"   URL: {url}")
-            print(f"   Redirect URI sent: {redirect_uri}")
-            print(f"   Request headers: {dict(e.response.request.headers)}")
-            print(f"   Request body: {e.response.request.content.decode()}")
-            print(f"   Response headers: {dict(e.response.headers)}")
-            print(f"   Response body: {error_body}")
+            logger.error(f" [AUTH CODE EXCHANGE] Failed:")
+            logger.debug(f"   Status: {error_status}")
+            logger.debug(f"   URL: {url}")
+            logger.debug(f"   Redirect URI sent: {redirect_uri}")
+            logger.debug(f"   Request headers: {dict(e.response.request.headers)}")
+            logger.debug(f"   Request body: {e.response.request.content.decode()}")
+            logger.debug(f"   Response headers: {dict(e.response.headers)}")
+            logger.debug(f"   Response body: {error_body}")
             if trace_id:
-                print(f"   Trace ID: {trace_id}")
+                logger.debug(f"   Trace ID: {trace_id}")
 
             return {
                 "success": False,
@@ -149,7 +152,7 @@ class AccelaClient:
                 "trace_id": trace_id
             }
         except Exception as e:
-            print(f"❌ [AUTH CODE EXCHANGE] Unexpected error: {str(e)}")
+            logger.error(f" [AUTH CODE EXCHANGE] Unexpected error: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
@@ -189,11 +192,11 @@ class AccelaClient:
             "environment": "PROD"
         }
 
-        print(f"🔍 [PASSWORD GRANT] Starting token exchange")
-        print(f"   URL: {url}")
-        print(f"   Username: {username}")
-        print(f"   Agency: {self.county_code}")
-        print(f"   Scope: {scope}")
+        logger.debug(f" [PASSWORD GRANT] Starting token exchange")
+        logger.debug(f"   URL: {url}")
+        logger.debug(f"   Username: {username}")
+        logger.debug(f"   Agency: {self.county_code}")
+        logger.debug(f"   Scope: {scope}")
 
         try:
             async with httpx.AsyncClient() as client:
@@ -206,13 +209,13 @@ class AccelaClient:
                     }
                 )
 
-                print(f"✅ [PASSWORD GRANT] Response received")
-                print(f"   Status: {response.status_code}")
+                logger.info(f" [PASSWORD GRANT] Response received")
+                logger.debug(f"   Status: {response.status_code}")
 
                 response.raise_for_status()
                 result = response.json()
 
-                print(f"✅ [PASSWORD GRANT] Token exchange successful")
+                logger.info(f" [PASSWORD GRANT] Token exchange successful")
 
             # Calculate expiration
             expires_in = result.get("expires_in", 3600)  # Default 1 hour
@@ -231,11 +234,11 @@ class AccelaClient:
             error_status = e.response.status_code
             trace_id = e.response.headers.get('x-accela-traceid') or e.response.headers.get('x-accela-trace-id')
 
-            print(f"❌ [PASSWORD GRANT] Failed:")
-            print(f"   Status: {error_status}")
-            print(f"   Response body: {error_body}")
+            logger.error(f" [PASSWORD GRANT] Failed:")
+            logger.debug(f"   Status: {error_status}")
+            logger.debug(f"   Response body: {error_body}")
             if trace_id:
-                print(f"   Trace ID: {trace_id}")
+                logger.debug(f"   Trace ID: {trace_id}")
 
             return {
                 "success": False,
@@ -243,7 +246,7 @@ class AccelaClient:
                 "trace_id": trace_id
             }
         except Exception as e:
-            print(f"❌ [PASSWORD GRANT] Unexpected error: {str(e)}")
+            logger.error(f" [PASSWORD GRANT] Unexpected error: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
@@ -355,7 +358,7 @@ class AccelaClient:
         page_size = 100  # Accela API max per request
         pages_fetched = 0
 
-        print(f"🔍 [ACCELA API] Fetching up to {limit} permits with pagination")
+        logger.debug(f" [ACCELA API] Fetching up to {limit} permits with pagination")
 
         while offset < limit:
             current_page_size = min(page_size, limit - offset)
@@ -374,28 +377,28 @@ class AccelaClient:
             if permit_type:
                 params["type"] = permit_type  # ← API-level filtering
 
-            print(f"   📄 Fetching page {pages_fetched + 1}: offset={offset}, limit={current_page_size}")
+            logger.debug(f"   📄 Fetching page {pages_fetched + 1}: offset={offset}, limit={current_page_size}")
 
             result = await self._make_request("GET", "/v4/records", params=params)
             page_permits = result.get("result", [])
 
             if not page_permits:
-                print(f"   ✅ No more permits (empty page)")
+                logger.debug(f"   ✅ No more permits (empty page)")
                 break
 
             all_permits.extend(page_permits)
             pages_fetched += 1
 
-            print(f"   ✅ Got {len(page_permits)} permits (total: {len(all_permits)})")
+            logger.debug(f"   ✅ Got {len(page_permits)} permits (total: {len(all_permits)})")
 
             # If we got fewer than requested, we've hit the end
             if len(page_permits) < current_page_size:
-                print(f"   ✅ Last page (partial)")
+                logger.debug(f"   ✅ Last page (partial)")
                 break
 
             offset += current_page_size
 
-        print(f"✅ [ACCELA API] Pagination complete: {len(all_permits)} permits across {pages_fetched} pages")
+        logger.info(f" [ACCELA API] Pagination complete: {len(all_permits)} permits across {pages_fetched} pages")
 
         # Return permits with diagnostics
         return {
