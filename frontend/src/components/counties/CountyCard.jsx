@@ -2,12 +2,8 @@ import { useState } from 'react';
 import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2, Database, RefreshCw, Calendar } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty, useCountyPullStatus } from '../../hooks/useCounties';
-import PullPermitsModal from './PullPermitsModal';
-import StartHistoricalPullModal from './StartHistoricalPullModal';
 
 const CountyCard = ({ county }) => {
-  const [showPullModal, setShowPullModal] = useState(false);
-  const [showHistoricalPullModal, setShowHistoricalPullModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
   const { data: pullStatus } = useCountyPullStatus(county.id);
@@ -171,22 +167,13 @@ const CountyCard = ({ county }) => {
           <div className="space-y-2">
             {county.oauth_authorized ? (
               <>
+                {/* Delete Button */}
                 <button
-                  onClick={() => setShowPullModal(true)}
-                  disabled={!county.is_active}
-                  className="btn-primary w-full"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="btn-secondary w-full text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Pull Permits
-                </button>
-
-                <button
-                  onClick={() => setShowHistoricalPullModal(true)}
-                  disabled={!county.is_active}
-                  className="btn-secondary w-full"
-                >
-                  <Database className="h-4 w-4 mr-2" />
-                  Start 30-Year Pull
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete County
                 </button>
               </>
             ) : (
@@ -205,32 +192,9 @@ const CountyCard = ({ county }) => {
                 )}
               </button>
             )}
-
-            {/* Delete Button */}
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="btn-secondary w-full text-red-600 hover:bg-red-50 hover:text-red-700"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete County
-            </button>
           </div>
         </div>
       </div>
-
-      {showPullModal && (
-        <PullPermitsModal
-          county={county}
-          onClose={() => setShowPullModal(false)}
-        />
-      )}
-
-      {showHistoricalPullModal && (
-        <StartHistoricalPullModal
-          county={county}
-          onClose={() => setShowHistoricalPullModal(false)}
-        />
-      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
