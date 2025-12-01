@@ -11,7 +11,7 @@ const { test, expect } = require('@playwright/test');
  * 5. Network disconnection
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
 
 test.describe('Error Scenarios', () => {
   let testCounty;

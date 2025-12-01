@@ -10,7 +10,7 @@ const { test, expect } = require('@playwright/test');
  * 4. Filter reset/clear works as expected
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
 
 test.describe('Leads Filtering', () => {
   let counties = [];

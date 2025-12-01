@@ -15,7 +15,7 @@ const { test, expect } = require('@playwright/test');
  * 9. Validate database state
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
 
 test.describe('Complete User Journey', () => {
   test('complete workflow: Pull → Verify → Filter → Sync', async ({ page, request }) => {

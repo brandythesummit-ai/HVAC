@@ -10,7 +10,7 @@ const { test, expect } = require('@playwright/test');
  * 4. Data integrity is maintained throughout the system
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
 
 test.describe('Leads Data Validation', () => {
   let testCountyId;
