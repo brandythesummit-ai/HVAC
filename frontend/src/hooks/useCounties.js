@@ -79,3 +79,15 @@ export const useCountyMetrics = (id) => {
     enabled: !!id,
   });
 };
+
+export const useCountyPullStatus = (id) => {
+  return useQuery({
+    queryKey: ['counties', id, 'pull-status'],
+    queryFn: () => countiesApi.getPullStatus(id),
+    enabled: !!id,
+    refetchInterval: (data) => {
+      // Auto-refresh every 10 seconds if initial pull is in progress
+      return data?.initial_pull_progress !== null && !data?.initial_pull_completed ? 10000 : false;
+    },
+  });
+};

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2, Database } from 'lucide-react';
+import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2, Database, RefreshCw, Calendar } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/formatters';
-import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty } from '../../hooks/useCounties';
+import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty, useCountyPullStatus } from '../../hooks/useCounties';
 import PullPermitsModal from './PullPermitsModal';
 import StartHistoricalPullModal from './StartHistoricalPullModal';
 
@@ -10,6 +10,7 @@ const CountyCard = ({ county }) => {
   const [showHistoricalPullModal, setShowHistoricalPullModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
+  const { data: pullStatus } = useCountyPullStatus(county.id);
   const getOAuthUrl = useGetOAuthUrl();
   const deleteCounty = useDeleteCounty();
 
@@ -109,8 +110,57 @@ const CountyCard = ({ county }) => {
             </div>
           )}
 
-          {/* Last Pull Time */}
-          {county.last_pull_at && (
+          {/* Pull Status Section */}
+          {county.oauth_authorized && pullStatus && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {/* Initial Pull Progress */}
+              {pullStatus.initial_pull_progress !== null && !pullStatus.initial_pull_completed && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center text-sm font-medium text-blue-700">
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      30-Year Historical Pull
+                    </div>
+                    <span className="text-sm font-semibold text-blue-700">
+                      {pullStatus.initial_pull_progress}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${pullStatus.initial_pull_progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Initial Pull Complete */}
+              {pullStatus.initial_pull_completed && (
+                <div className="flex items-center text-sm text-green-700 mb-2">
+                  <CheckCircle className="h-4 w-4 mr-1.5" />
+                  Historical pull complete
+                </div>
+              )}
+
+              {/* Next Pull Schedule */}
+              {pullStatus.auto_pull_enabled && pullStatus.next_pull_at && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                  Next auto-pull: {formatRelativeTime(pullStatus.next_pull_at)}
+                </div>
+              )}
+
+              {/* Last Pull Stats */}
+              {pullStatus.last_pull_at && pullStatus.last_pull_permits > 0 && (
+                <div className="flex items-center text-xs text-gray-500 mt-1.5">
+                  Last pull: {pullStatus.last_pull_permits} permits • {formatRelativeTime(pullStatus.last_pull_at)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Legacy Last Pull Time */}
+          {county.last_pull_at && !pullStatus && (
             <div className="flex items-center text-sm text-gray-500 mb-4">
               <Clock className="h-4 w-4 mr-1.5" />
               Last pull: {formatRelativeTime(county.last_pull_at)}

@@ -56,4 +56,10 @@ export const countiesApi = {
     const response = await apiClient.get(`/api/counties/${id}/metrics`);
     return response.data?.data || {};
   },
+
+  // Get pull status (for automated historical pulls)
+  getPullStatus: async (id) => {
+    const response = await apiClient.get(`/api/counties/${id}/pull-status`);
+    return response.data?.data || {};
+  },
 };
