@@ -7,6 +7,7 @@ from app.routers import counties, permits, leads, summit, background_jobs, prope
 from app.routers import settings as settings_router
 from app.workers.job_processor import start_job_processor, stop_job_processor
 from app.services.health_checker import background_health_checker
+from app.services.scheduler import get_scheduler
 
 # Create FastAPI app
 app = FastAPI(
@@ -42,14 +43,22 @@ async def startup_event():
     # Start job processor
     await start_job_processor()
 
+    # Start pull scheduler for weekly incremental pulls
+    scheduler = get_scheduler()
+    scheduler.start()
+
     # Start background health checker
     asyncio.create_task(background_health_checker())
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Stop background job processor on application shutdown."""
+    """Stop background services on application shutdown."""
     await stop_job_processor()
+
+    # Stop pull scheduler
+    scheduler = get_scheduler()
+    scheduler.stop()
 
 
 @app.get("/")
