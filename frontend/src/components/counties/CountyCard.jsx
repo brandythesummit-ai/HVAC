@@ -117,9 +117,23 @@ const CountyCard = ({ county }) => {
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                       30-Year Historical Pull
                     </div>
-                    <span className="text-sm font-semibold text-blue-700">
-                      {pullStatus.initial_pull_progress}%
-                    </span>
+                    {/* Show year progress instead of just percentage */}
+                    {pullStatus.years_info ? (
+                      <div className="text-sm font-semibold text-blue-700">
+                        <div className="text-right">
+                          {pullStatus.years_info.current_year && (
+                            <div>Processing {pullStatus.years_info.current_year}</div>
+                          )}
+                          <div className="text-xs">
+                            {pullStatus.years_info.years_completed} of {pullStatus.years_info.total_years} years
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-semibold text-blue-700">
+                        {pullStatus.initial_pull_progress}%
+                      </span>
+                    )}
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -127,6 +141,12 @@ const CountyCard = ({ county }) => {
                       style={{ width: `${pullStatus.initial_pull_progress}%` }}
                     ></div>
                   </div>
+                  {/* Show year range below progress bar */}
+                  {pullStatus.years_info && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {pullStatus.years_info.start_year}–{pullStatus.years_info.end_year}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -138,11 +158,37 @@ const CountyCard = ({ county }) => {
                 </div>
               )}
 
-              {/* Next Pull Schedule */}
+              {/* Next Pull Schedule with Status */}
               {pullStatus.auto_pull_enabled && pullStatus.next_pull_at && (
-                <div className="flex items-center text-sm text-gray-600">
-                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                  Next auto-pull: {formatRelativeTime(pullStatus.next_pull_at)}
+                <div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                    Next auto-pull: {formatRelativeTime(pullStatus.next_pull_at)}
+                  </div>
+
+                  {/* Last pull status indicator */}
+                  {pullStatus.last_pull_status && (
+                    <div className="flex items-center text-xs mt-1">
+                      {pullStatus.last_pull_status === 'success' && (
+                        <span className="flex items-center text-green-600">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Last pull successful
+                        </span>
+                      )}
+                      {pullStatus.last_pull_status === 'failed' && (
+                        <span className="flex items-center text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Last pull failed
+                        </span>
+                      )}
+                      {pullStatus.last_pull_status === 'pending' && (
+                        <span className="flex items-center text-yellow-600">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pull pending
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

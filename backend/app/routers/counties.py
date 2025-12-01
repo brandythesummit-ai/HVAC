@@ -309,14 +309,42 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
 
         # Get active job progress (if any)
         job_progress = None
+        years_info = None
         if county.data.get("initial_pull_job_id"):
             job_result = db.table("background_jobs")\
-                .select("status, progress_percent, permits_pulled")\
+                .select("status, progress_percent, permits_pulled, current_year, parameters")\
                 .eq("id", county.data["initial_pull_job_id"])\
                 .execute()
 
             if job_result.data and job_result.data[0]["status"] in ["pending", "running"]:
-                job_progress = job_result.data[0].get("progress_percent", 0)
+                job_data = job_result.data[0]
+                job_progress = job_data.get("progress_percent", 0)
+
+                # Extract year information
+                parameters = job_data.get("parameters", {})
+                if isinstance(parameters, str):
+                    import json
+                    parameters = json.loads(parameters)
+
+                years = parameters.get("years", 30)
+                current_year = job_data.get("current_year")
+
+                # Calculate derived values
+                from datetime import datetime
+                end_year = datetime.now().year
+                start_year = end_year - years
+
+                # Calculate years completed based on progress
+                total_years = years
+                years_completed = int((job_progress / 100) * total_years)
+
+                years_info = {
+                    "current_year": current_year,
+                    "start_year": start_year,
+                    "end_year": end_year,
+                    "years_completed": years_completed,
+                    "total_years": total_years
+                }
 
         # Get last incremental pull stats
         last_pull_result = db.table("pull_history")\
@@ -334,10 +362,12 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
             "data": {
                 "initial_pull_completed": county.data.get("initial_pull_completed", False),
                 "initial_pull_progress": job_progress,
+                "years_info": years_info,
                 "next_pull_at": schedule["next_pull_at"] if schedule else None,
                 "last_pull_at": last_pull["created_at"] if last_pull else None,
                 "last_pull_permits": last_pull["permits_pulled"] if last_pull else 0,
-                "auto_pull_enabled": schedule["auto_pull_enabled"] if schedule else False
+                "auto_pull_enabled": schedule["auto_pull_enabled"] if schedule else False,
+                "last_pull_status": schedule["last_pull_status"] if schedule else None
             },
             "error": None
         }
