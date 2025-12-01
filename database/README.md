@@ -18,6 +18,20 @@ agencies (tenant/organization)
   └── background_jobs (async job tracking)
 ```
 
+## Current Status
+
+**Database Deployment:**
+- ✅ Supabase PostgreSQL (jlammryvteuhrlygpqif.supabase.co)
+- ✅ All 9 tables deployed with full schema
+- ✅ Indexes configured for optimal query performance
+- ✅ Property-centric aggregation with intelligent lead scoring active
+
+**Current Data:**
+- 📊 **0 permits stored** (HCFL pilot deleted for statewide rebuild)
+- 📊 **0 properties tracked**
+- 📊 **0 qualified leads**
+- 🎯 Ready for ~25-30 Florida Accela counties (V1 immediate onboarding)
+
 ### Core Tables
 
 1. **agencies** - HVAC contractor organizations

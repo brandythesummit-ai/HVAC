@@ -6,6 +6,20 @@ This is a full-stack HVAC lead generation platform that pulls permit data from c
 
 **Core Workflow:** Pull HVAC permits → Enrich with property data → Convert to leads → Sync to CRM
 
+## MVP Requirements
+
+**Scope:** All **67 Florida counties** must be pre-configured for MVP launch.
+
+**Current Status (V1):**
+- ✅ **Accela Integration:** Production-ready (validated with Hillsborough County pilot)
+- 📊 **Current Deployment:** 0 counties configured (HCFL pilot deleted for statewide rebuild)
+- 🎯 **Potential V1 Coverage:** ~25-30 Florida counties use Accela (can be added immediately)
+- 🚧 **Multi-Platform Support:** Planned for V2 (see README.md Future Vision section)
+- 🎯 **Remaining Counties:** 37-42 counties require V2 multi-platform integrations
+
+**Why All 67 Counties?**
+Florida's climate and aging HVAC systems create high replacement demand. Statewide coverage ensures HVAC contractors can target any Florida market without artificial geographic limitations.
+
 ## Tech Stack
 
 ### Frontend
@@ -371,7 +385,7 @@ Parameters we currently use:
 - `openedDateFrom` / `openedDateTo` - Date range
 - `limit` - Max results (default 100, max 9999)
 - `status` - Optional (e.g., 'Finaled', 'Issued')
-- `type` - Optional (e.g., 'Mechanical') - we filter client-side instead
+- `type` = "Building/Residential/Trade/Mechanical" - API-level filtering (exact permit type from county)
 
 **Available but not used:**
 - `offset` - Pagination
@@ -411,6 +425,23 @@ This is why we store the complete `raw_data` - to capture everything regardless 
 3. **Sync to CRM:** User selects leads → POST to Summit.AI API → Update sync_status
 4. **Frontend State:** React Query caches API responses, auto-refetches on mutations
 
+### Pull Strategy Specification
+
+**Initial Pull:** 30 years historical permits
+- Rolling 30-year window calculated dynamically as `current_year - 30` (e.g., 1995→2025 in 2025)
+- Pulls oldest→newest for complete historical coverage
+- Dates are NEVER hardcoded into the system
+
+**Post-Initial:** Automated incremental pulls
+- Every 7 days, pull last 8 days of permits
+- 1-day overlap prevents gaps from missed permits
+- Configured per county via `county_pull_schedules` table
+
+**Lead Qualification Rule:**
+- Only properties with HVAC systems **5+ years old** qualify for CRM sync
+- Properties with <5 year old systems are tracked in database but NOT converted to leads or synced
+- Rationale: HVAC systems typically last 10-20 years; <5 year systems unlikely to need replacement
+
 ### Permit Filtering & Pagination (Updated 2025-11-29)
 
 **API-Level Filtering:**
@@ -431,6 +462,27 @@ This is why we store the complete `raw_data` - to capture everything regardless 
 - ✅ More efficient (API does filtering, not client-side)
 - ✅ Exact type matching (uses county's actual permit type name)
 - ✅ Complete logging for diagnostics (pages fetched, total returned)
+
+### Lead Qualification & Scoring
+
+**Property-Centric Data Model:**
+The system aggregates multiple permits by property address and uses the **most recent permit date** to calculate HVAC system age.
+
+**Scoring Algorithm (0-100 points):**
+- **HVAC Age** (70% weight) - Older systems = higher urgency
+- **Property Value** (15% weight) - Higher value = better customer
+- **Permit History** (15% weight) - Multiple permits = active maintenance
+
+**Lead Tiers:**
+- 🔥 **HOT (80-100):** 15-20+ years old - Replacement imminent
+- 🌡️ **WARM (60-75):** 10-15 years old - Maintenance + potential replacement
+- 🧊 **COOL (40-55):** 5-10 years old - Maintenance focus
+- ❄️ **COLD (0-35):** <5 years old - **Not qualified for CRM sync**
+
+**Critical Filtering Rule:**
+Only properties with HVAC systems **5+ years old** are created as leads and synced to Summit.AI CRM. Properties with <5 year old systems are tracked in the database but NOT converted to leads or synced to avoid wasting sales effort on unlikely replacement opportunities.
+
+**Example:** If a property has permits from 2005 and 2025, the system uses 2025 (most recent) for age calculation, resulting in a 0-year-old system that is NOT qualified as a lead until 2030+.
 
 ## Supabase MCP Configuration
 
@@ -537,7 +589,7 @@ ACCELA_REQUEST_TIMEOUT=30.0                   # Request timeout (seconds)
 
 ## Important Notes
 
-- **Client-side filtering:** HVAC permits filtered by "Mechanical" type in backend due to Accela API limitations
+- **API-level filtering:** HVAC permits filtered using Accela type parameter `'Building/Residential/Trade/Mechanical'` (hierarchical type path from county portal)
 - **JSONB storage:** Full Accela API response stored in permits.raw_data for complete data preservation
 - **Multi-tenant:** System supports multiple agencies via agencies table
 - **Test target:** E2E tests run against production Vercel deployment at https://hvac-liard.vercel.app/counties

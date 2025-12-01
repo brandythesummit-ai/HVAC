@@ -5,6 +5,12 @@ Follow these steps in order to deploy your HVAC Lead Generation platform to prod
 **Estimated Time:** 30-45 minutes
 **Cost:** Free tier for all services (initially)
 
+**⚠️ IMPORTANT - Current Deployment Status:**
+- This guide describes deploying a production-ready V1 Accela integration
+- **0 counties are currently deployed** (HCFL pilot was deleted for statewide rebuild)
+- Infrastructure is validated and ready for Florida's ~25-30 Accela counties
+- MVP requires all 67 Florida counties (37-42 require V2 multi-platform support - see README.md Future Vision)
+
 ---
 
 ## ✅ Prerequisites Checklist
@@ -305,19 +311,21 @@ You'll need to contact each county to get Accela API credentials:
 ### Step 7.2: Pull Some Permits
 
 1. Click "Pull Permits" on your county card
-2. Set date range:
-   - Start: `2010-01-01`
-   - End: `2015-12-31`
+2. Set date range (example - not hardcoded, dates calculated dynamically):
+   - Start: `2010-01-01` (or use rolling 30-year window: current_year - 30)
+   - End: `2015-12-31` (or current date)
 3. Max results: `50`
 4. Check "Finaled only"
 5. Click "Pull Permits"
 6. Wait for the process to complete
 
 **What happens:**
-- Backend calls Accela API
-- Filters for "Mechanical" permits
+- Backend calls Accela API with `type='Building/Residential/Trade/Mechanical'` parameter (API-level filtering)
+- Only HVAC permits returned (more efficient than pulling all Building permits and filtering client-side)
 - Enriches with property data (parcels, owners, addresses)
-- Stores in database
+- Stores in database with full raw_data JSONB
+
+**Note:** All date ranges are calculated dynamically. The system never hardcodes dates - it uses rolling windows (e.g., 30-year historical pull = current_year - 30).
 
 ### Step 7.3: View Leads
 
@@ -357,7 +365,10 @@ Your HVAC Lead Generation platform is now **fully deployed** and operational!
 
 ### Next Steps
 
-1. **Add more counties** - Repeat the process for each county
+1. **Add more counties** - MVP requires all 67 Florida counties:
+   - ~25-30 Accela counties can be configured immediately using this V1 integration
+   - Remaining 37-42 counties require V2 multi-platform support (see README.md Future Vision)
+   - Each county repeats the Accela API credential process above
 2. **Set up monitoring** - Railway and Vercel have built-in logs
 3. **Configure custom domain** - Add your own domain in Vercel settings
 4. **Set up alerts** - Monitor for failed syncs or API errors

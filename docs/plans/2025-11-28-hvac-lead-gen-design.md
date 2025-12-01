@@ -3,6 +3,22 @@
 **Date:** November 28, 2025
 **Version:** 1.0
 
+**⚠️ HISTORICAL DOCUMENT - For Reference Only**
+
+This document describes the original V1 system design from November 2025. While the core architecture remains valid, several implementation details have evolved:
+
+- **Current Source of Truth:** See `/README.md`, `/CLAUDE.md`, and component READMEs for up-to-date specs
+- **What Changed:**
+  - Permit type filtering: Now uses `'Building/Residential/Trade/Mechanical'` (hierarchical type path)
+  - Rate limiting: Implemented header-based adaptive throttling (see `/backend/app/services/rate_limiter.py`)
+  - Pull strategy: Rolling 30-year window (`current_year - 30`), automated every 7 days with 8-day pulls
+  - Deployment status: 0 counties configured (HCFL pilot deleted for statewide rebuild)
+- **Still Accurate:** Database schema, API architecture, property aggregation logic, lead scoring algorithm
+
+Refer to this document for architectural context, but verify implementation details in current codebase and READMEs.
+
+---
+
 ## Executive Summary
 
 A lead generation platform for HVAC contractors that pulls permit data from county governments using the Accela API, enriches it with property information, and syncs qualified leads to The Summit.AI (white-label HighLevel CRM).

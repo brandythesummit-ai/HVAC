@@ -47,12 +47,24 @@ Florida's climate and aging HVAC systems create high replacement demand. Statewi
 - Pull 30 years of historical HVAC permits for comprehensive lead database
 - Automated daily incremental pulls to catch new installations
 - Automatic pagination (handles 1,000+ permits per pull)
-- API-level filtering for HVAC permits only (more efficient)
+- API-level filtering using Accela type `'Building/Residential/Trade/Mechanical'` (more efficient than client-side filtering)
+
+**Intelligent Fast Pulling Strategy:**
+The platform implements adaptive rate limiting to maximize pull speed while preventing API account suspension:
+- **Proactive Throttling:** Pauses when <15% of API quota remains (85% usage threshold)
+- **Header-Based Delays:** Calculates safe pacing from `x-ratelimit-remaining` and `x-ratelimit-reset` headers
+- **429 Recovery:** Auto-waits until rate limit window resets, then retries (up to 3 attempts)
+- **Categorized Delays:** Different fallback delays for pagination (500ms) vs enrichment (100ms) requests
+- **Result:** Can safely pull 1,000+ permits in 10-15 seconds without triggering rate limits
+
+See `backend/app/services/rate_limiter.py` for implementation details.
 
 **Pull Strategy:**
-- **Initial Pull:** 30 years historical, oldest→newest (1995→2025)
+- **Initial Pull:** 30 years historical, oldest→newest (rolling 30-year window, e.g., 1995→2025 in 2025, calculated dynamically as `current_year - 30`)
 - **Post-Initial:** Every 7 days, pull last 8 days (1-day overlap prevents gaps)
 - **Lead Qualification:** Only HVAC systems 5+ years old qualify for CRM sync
+
+**Note:** All date ranges are calculated dynamically based on the current year. Dates are never hardcoded into the system.
 
 ### 🏠 Property-Centric Data Model
 - **Address Normalization** - Matches multiple permits to same property
@@ -94,7 +106,7 @@ This intelligent aggregation ensures contractors target properties genuinely nee
 - **Graceful Cancellation** - Stop long-running jobs without data loss
 
 ### 📅 Automated Scheduling
-- **Initial Historical Pull** - Automatically pulls 30 years of historical permits when county is added (oldest→newest: 1995→2025)
+- **Initial Historical Pull** - Automatically pulls 30 years of historical permits when county is added (rolling 30-year window calculated dynamically)
 - **Incremental Pulls Every 7 Days** - After initial pull completes, automatically fetches last 8 days of permits every 7 days
 - **Overlap for Gap Prevention** - 8-day window with 7-day frequency ensures no permits missed (1-day overlap)
 - **Hourly Background Checks** - Scheduler monitors for due counties every hour

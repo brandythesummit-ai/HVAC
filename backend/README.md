@@ -16,6 +16,23 @@ FastAPI backend for the HVAC Lead Generation platform with Accela API and Summit
 - **Encrypted credential storage** (Fernet encryption)
 - **RESTful API** with automatic documentation (Swagger/ReDoc)
 
+## Current Status
+
+**V1 - Accela Integration (Production-Ready):**
+- ✅ Accela Civic Platform V4 API integration validated (HCFL pilot)
+- ✅ Header-based adaptive rate limiting prevents API suspension
+- ✅ 30-year historical pull capability (rolling window: `current_year - 30`)
+- ✅ Automated incremental pulls every 7 days (8-day window with 1-day overlap)
+- ✅ Property aggregation with intelligent lead scoring (HOT/WARM/COOL/COLD tiers)
+- ✅ Summit.AI CRM integration with deduplication
+
+**Current Deployment:**
+- 📊 **0 counties configured** (HCFL pilot deleted for statewide rebuild)
+- 🎯 **~25-30 Florida Accela counties** ready for immediate configuration
+- 🚧 **37-42 remaining counties** require V2 multi-platform support (see README.md Future Vision)
+
+**Backend Production URL:** https://hvac-backend-production-11e6.up.railway.app
+
 ## Technology Stack
 
 - **Framework:** FastAPI
@@ -334,12 +351,12 @@ curl -X POST http://localhost:8000/api/background-jobs/counties/{county_id}/jobs
 - ~10-20 permits/second (depending on Accela API latency)
 - 30 years with 10,000 permits = ~10-15 minutes
 
-#### 2. Incremental Pull (Daily New Permits)
+#### 2. Incremental Pull (Automated Every 7 Days)
 
 **Purpose:** Pull recent permits to catch new HVAC installations
 
 **Strategy:**
-- Pulls last 2 days of permits (overlap ensures no gaps)
+- Pulls last 8 days of permits (1-day overlap with 7-day frequency ensures no gaps)
 - Triggered manually or by automated scheduler
 
 **Example:**
@@ -349,7 +366,7 @@ curl -X POST http://localhost:8000/api/background-jobs/counties/{county_id}/jobs
   -d '{
     "job_type": "incremental_pull",
     "parameters": {
-      "days_back": 2,
+      "days_back": 8,
       "permit_type": "Building/Residential/Trade/Mechanical"
     }
   }'
@@ -469,11 +486,24 @@ See [CLAUDE.md](../CLAUDE.md#accela-api-rate-limiting) for complete documentatio
 
 ### HVAC Filtering
 
-Permits are filtered for "Mechanical" type client-side after pulling from Accela:
+Permits are filtered at **API-level** using Accela's `type` parameter:
 
 ```python
-hvac_permits = [p for p in permits if "Mechanical" in p.get("type", {}).get("value", "")]
+# API request uses type filter
+params = {
+    "module": "Building",
+    "type": "Building/Residential/Trade/Mechanical",  # Hierarchical type path
+    "openedDateFrom": start_date,
+    "openedDateTo": end_date
+}
+# Only HVAC permits returned - no client-side filtering needed
 ```
+
+**Portal Display vs API Value:**
+- Portal shows: "Residential Mechanical Trade Permit"
+- API expects: `"Building/Residential/Trade/Mechanical"` (hierarchical path)
+
+This API-level filtering is more efficient than pulling all Building permits and filtering client-side.
 
 ### Data Storage
 

@@ -10,6 +10,18 @@ React frontend for the HVAC Lead Generation platform that pulls permit data from
 - **Summit.AI Integration**: Batch sync selected leads to Summit.AI CRM
 - **Real-time Status**: Track sync status with visual indicators
 
+## Current Status
+
+**Production Deployment:**
+- ✅ Deployed on Vercel at https://hvac-liard.vercel.app
+- ✅ Connected to Railway backend (https://hvac-backend-production-11e6.up.railway.app)
+- ✅ Supports rolling 30-year historical permits pulls
+- ✅ E2E tested with Playwright (all tests passing)
+
+**Current Data:**
+- 📊 **0 counties configured** (HCFL pilot deleted for statewide rebuild)
+- 🎯 Ready for immediate Florida Accela county onboarding (~25-30 counties)
+
 ## Tech Stack
 
 - React 19.2.0 with React DOM 19.2.0
