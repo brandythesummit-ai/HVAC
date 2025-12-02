@@ -253,37 +253,6 @@ Key tables:
 - **Commit style:** Conventional commits (feat:, fix:, enhance:, etc.)
 - Descriptive commit messages explaining the "why"
 
-## Testing Requirements (CRITICAL)
-
-### E2E Testing with Playwright
-- **ALWAYS test with Playwright when making changes to features**
-- **Test timeout: Maximum 15 seconds** - never longer
-- **Test URL: https://hvac-liard.vercel.app/counties**
-- Run tests after making changes and **fix any errors found before completing**
-- Sequential execution (workers: 1) to avoid data races
-- Screenshots/videos on failure only
-
-**⚠️ Known Issue (2025-12-01):**
-- E2E tests currently failing after Coverage Dashboard UI redesign
-- Tests use old selectors (`.card`, `button:has-text("Pull Permits")`)
-- Need to update for new hierarchical accordion UI structure
-- New selectors needed: state sections, compact rows, detail panel
-
-### Test Commands
-```bash
-npm run test                           # Run all E2E tests
-npm run test:ui                        # Interactive test runner
-npm run test:headed                    # Browser visible
-npm run test:debug                     # Debug mode
-npm run test:pull-permits              # Specific test
-npm run test:report                    # View HTML results
-```
-
-### Testing Philosophy
-- E2E testing is MANDATORY when applicable
-- Always verify changes work in production environment
-- Fix issues immediately when tests fail
-
 ## Common Commands
 
 ### Frontend Development
@@ -437,6 +406,34 @@ This is why we store the complete `raw_data` - to capture everything regardless 
 - **Encrypt sensitive credentials** using Fernet before storing in DB
 - **OAuth tokens auto-rotate** transparently
 - See `/SECURITY_TODO.md` for outstanding security tasks
+
+## Background Process Hygiene (Zombie Prevention)
+
+### The Problem
+When Python processes (uvicorn) are killed forcefully, child asyncio tasks can become orphaned:
+- Parent PID becomes 1 (init)
+- Tasks continue running indefinitely
+- Database writes continue even after server "stops"
+
+**Root Cause (discovered 2025-12-02):** An orphaned Python multiprocessing subprocess ran for 30+ minutes after its parent uvicorn died, creating 300+ phantom permits.
+
+### Prevention Checklist
+Before killing any local uvicorn/Python process:
+1. Use **Ctrl+C (SIGINT)** for graceful shutdown, not `kill -9`
+2. Check for orphaned processes: `ps aux | grep python | grep -v grep`
+3. Kill any multiprocessing spawn processes explicitly
+
+### If Orphaned Processes Occur
+1. Find them: `ps aux | grep "multiprocessing.spawn" | grep -v grep`
+2. Kill them: `kill -9 <PID>`
+3. Check database for stale running jobs and reset them
+
+### Signal Handlers (Implemented)
+The backend now has signal handlers in `backend/app/main.py` that:
+- Catch SIGTERM and SIGINT signals
+- Trigger graceful shutdown of all background tasks
+- Cancel tracked asyncio tasks with 5-second timeout
+- Log shutdown progress for debugging
 
 ## Data Flow & Enrichment Strategy
 
@@ -641,13 +638,8 @@ ACCELA_REQUEST_TIMEOUT=30.0                   # Request timeout (seconds)
 - **API-level filtering:** HVAC permits filtered using Accela type parameter `'Building/Residential/Trade/Mechanical'` (hierarchical type path from county portal)
 - **JSONB storage:** Full Accela API response stored in permits.raw_data for complete data preservation
 - **Multi-tenant:** System supports multiple agencies via agencies table
-- **Test target:** E2E tests run against production Vercel deployment at https://hvac-liard.vercel.app/counties
 
 ## Project-Specific Process Guidelines
-
-### Testing
-- **Playwright tests:** Always use foreground (2-3 minutes is acceptable)
-- **Exception:** Only use background if test suite >5 minutes AND you're doing other work
 
 ### Railway Logs
 - **Never** run multiple `railway logs` streams simultaneously
