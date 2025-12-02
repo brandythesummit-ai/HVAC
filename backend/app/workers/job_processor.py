@@ -306,10 +306,9 @@ class JobProcessor:
 
             logger.info(f"📆 Processing year {year}...")
 
-            # Update job with current year
+            # Update job with current year (progress updated in batch loop below)
             await self._update_job(job_id, {
                 'current_year': year,
-                'progress_percent': int((years_processed / total_years) * 100),
                 'updated_at': datetime.utcnow().isoformat()
             })
 
@@ -388,6 +387,12 @@ class JobProcessor:
                 # Track per-year permits progressively (inside loop so crash-safe)
                 per_year_permits[str(year)] = year_permits_pulled
 
+                # Calculate batch-level progress (more granular than year-level)
+                # Progress = completed years + partial progress on current year
+                # Estimate current year as 50% done after first batch for smoother updates
+                year_progress_fraction = min(0.9, batch_num * 0.2)  # Cap at 90% until year complete
+                progress_percent = int(((years_processed + year_progress_fraction) / total_years) * 100)
+
                 # Update job progress
                 await self._update_job(job_id, {
                     'permits_pulled': total_permits_pulled,
@@ -397,6 +402,7 @@ class JobProcessor:
                     'leads_created': total_leads_created,
                     'current_year': year,
                     'current_batch': batch_num,
+                    'progress_percent': progress_percent,
                     'elapsed_seconds': int(elapsed),
                     'permits_per_second': round(permits_per_second, 2),
                     'estimated_completion_at': estimated_completion.isoformat(),
@@ -411,7 +417,13 @@ class JobProcessor:
                     break
 
             years_processed += 1
-            # per_year_permits already updated progressively inside batch loop
+
+            # Update progress after year completion (ensures accurate % between years)
+            await self._update_job(job_id, {
+                'progress_percent': int((years_processed / total_years) * 100),
+                'updated_at': datetime.utcnow().isoformat()
+            })
+
             logger.info(f"✅ Year {year} complete: {year_permits_pulled} permits pulled")
 
         # Final update

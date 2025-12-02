@@ -107,7 +107,7 @@ class AccelaClient:
         logger.debug(f"   Client ID: {self.app_id}")
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     url,
                     data=data,
@@ -209,7 +209,7 @@ class AccelaClient:
         logger.debug(f"   Scope: {scope}")
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     url,
                     data=data,
@@ -281,7 +281,7 @@ class AccelaClient:
             "client_secret": self.app_secret
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 url,
                 data=data,
@@ -399,9 +399,12 @@ class AccelaClient:
             **kwargs.pop("headers", {})
         }
 
+        # Configure timeout (30s default, configurable via ACCELA_REQUEST_TIMEOUT)
+        timeout = httpx.Timeout(settings.accela_request_timeout, connect=10.0)
+
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.request(method, url, headers=headers, **kwargs)
 
                     # Update rate limiter state from response headers
@@ -422,6 +425,13 @@ class AccelaClient:
                     # Raise for other error status codes
                     response.raise_for_status()
                     return response.json()
+
+            except httpx.TimeoutException as e:
+                logger.error(f"[ACCELA API] Timeout on {endpoint} (attempt {attempt + 1}/{max_retries})")
+                if attempt == max_retries - 1:
+                    raise httpx.HTTPError(f"Request timeout after {settings.accela_request_timeout}s: {endpoint}")
+                # Brief pause before retry
+                await asyncio.sleep(1.0)
 
             except httpx.HTTPStatusError as e:
                 # Re-raise non-429 errors immediately

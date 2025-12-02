@@ -1,4 +1,4 @@
-import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Trash2, Key, ExternalLink, Loader2 } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Trash2, Key, ExternalLink, Loader2, Settings } from 'lucide-react';
 import { useCountyMetrics, useCountyPullStatus, useDeleteCounty, useSetupCountyWithPassword, useGetOAuthUrl, useUpdateCounty } from '../../hooks/useCounties';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useState } from 'react';
@@ -269,13 +269,28 @@ export default function CountyDetailPanel({ county, onClose }) {
 
               {/* Next Pull Schedule with Status */}
               {pullStatus.auto_pull_enabled && pullStatus.next_pull_at && (
-                <div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                    Next auto-pull: {formatRelativeTime(pullStatus.next_pull_at)}
-                  </div>
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  {/* Show active pull status when pull is in progress */}
+                  {pullStatus.initial_pull_progress !== null && !pullStatus.initial_pull_completed ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center text-sm text-blue-600 font-medium">
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Pull in progress
+                      </div>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Next scheduled: {formatRelativeTime(pullStatus.next_pull_at)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                      Next auto-pull: {formatRelativeTime(pullStatus.next_pull_at)}
+                    </div>
+                  )}
 
-                  {pullStatus.last_pull_status && (
+                  {/* Only show last pull status when NOT actively pulling */}
+                  {(pullStatus.initial_pull_completed || pullStatus.initial_pull_progress === null) && pullStatus.last_pull_status && (
                     <div className="flex items-center text-xs mt-1">
                       {pullStatus.last_pull_status === 'success' && (
                         <span className="flex items-center text-green-600">
@@ -320,11 +335,21 @@ export default function CountyDetailPanel({ county, onClose }) {
           {/* Authorization Section */}
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">🔌 Authorization</h3>
-            {county.oauth_authorized ? (
+            {county.oauth_authorized && !showCredentialForm ? (
+              // Authorized state with Edit button
               <div className="space-y-2">
-                <div className="flex items-center text-sm text-green-700">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Authorized with Accela
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-sm text-green-700">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Authorized with Accela
+                  </div>
+                  <button
+                    onClick={() => setShowCredentialForm(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    <Settings className="h-3 w-3 mr-1" />
+                    Update
+                  </button>
                 </div>
                 {county.last_pull_at && (
                   <p className="text-sm text-gray-600">
