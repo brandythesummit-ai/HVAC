@@ -617,13 +617,13 @@ class JobProcessor:
         try:
             # Check if permit already exists
             existing = self.db.table('permits') \
-                .select('id') \
+                .select('*') \
                 .eq('county_id', county_id) \
                 .eq('accela_record_id', permit_data['id']) \
                 .execute()
 
             if existing.data:
-                # Permit already exists
+                # Permit already exists - return full record for property aggregator
                 return existing.data[0]
 
             # Insert new permit
