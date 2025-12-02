@@ -1,13 +1,21 @@
-import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Trash2 } from 'lucide-react';
-import { useCountyMetrics, useCountyPullStatus, useDeleteCounty } from '../../hooks/useCounties';
+import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Trash2, Key, ExternalLink, Loader2 } from 'lucide-react';
+import { useCountyMetrics, useCountyPullStatus, useDeleteCounty, useSetupCountyWithPassword, useGetOAuthUrl, useUpdateCounty } from '../../hooks/useCounties';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useState } from 'react';
 
 export default function CountyDetailPanel({ county, onClose }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCredentialForm, setShowCredentialForm] = useState(false);
+  const [authMethod, setAuthMethod] = useState('password');
+  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [countyCode, setCountyCode] = useState(county.county_code || '');
+
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
   const { data: pullStatus } = useCountyPullStatus(county.id);
   const deleteCounty = useDeleteCounty();
+  const setupWithPassword = useSetupCountyWithPassword();
+  const getOAuthUrl = useGetOAuthUrl();
+  const updateCounty = useUpdateCounty();
 
   const getPlatformBadgeClass = () => {
     const platform = county.platform || 'Unknown';
@@ -32,6 +40,64 @@ export default function CountyDetailPanel({ county, onClose }) {
       // Deletion failed - error handled by mutation
     }
   };
+
+  const handleCredentialChange = (e) => {
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+  };
+
+  const handlePasswordSetup = async (e) => {
+    e.preventDefault();
+
+    try {
+      // Update county_code if provided and different
+      if (countyCode && countyCode !== county.county_code) {
+        await updateCounty.mutateAsync({
+          id: county.id,
+          data: { county_code: countyCode }
+        });
+      }
+
+      // Setup OAuth with password grant
+      await setupWithPassword.mutateAsync({
+        id: county.id,
+        credentials: {
+          username: credentials.username,
+          password: credentials.password,
+          scope: 'records'
+        }
+      });
+
+      // Reset form on success - panel will auto-update via React Query invalidation
+      setShowCredentialForm(false);
+      setCredentials({ username: '', password: '' });
+    } catch {
+      // Error handled by mutation
+    }
+  };
+
+  const handleOAuthPopup = async () => {
+    try {
+      // Update county_code first if needed
+      if (countyCode && countyCode !== county.county_code) {
+        await updateCounty.mutateAsync({
+          id: county.id,
+          data: { county_code: countyCode }
+        });
+      }
+
+      const result = await getOAuthUrl.mutateAsync(county.id);
+      const authUrl = result.authorization_url || result.data?.authorization_url;
+      if (authUrl) {
+        window.open(authUrl, '_blank', 'width=600,height=700');
+      }
+    } catch {
+      // Error handled by mutation
+    }
+  };
+
+  // Check if OAuth setup is in progress
+  const isSettingUp = setupWithPassword.isPending || getOAuthUrl.isPending || updateCounty.isPending;
+  const setupError = setupWithPassword.error || getOAuthUrl.error || updateCounty.error;
 
   return (
     <>
@@ -231,7 +297,215 @@ export default function CountyDetailPanel({ county, onClose }) {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-gray-600">Not yet authorized</p>
+              // Not authorized - show configuration form or button
+              <div className="space-y-4">
+                {/* Check if this platform supports Accela */}
+                {county.platform === 'Accela' || county.platform === 'Unknown' ? (
+                  <>
+                    {!showCredentialForm ? (
+                      // Initial state: Show "Connect to Accela" button
+                      <button
+                        onClick={() => setShowCredentialForm(true)}
+                        className="btn-primary w-full flex items-center justify-center"
+                      >
+                        <Key className="h-4 w-4 mr-2" />
+                        Connect to Accela
+                      </button>
+                    ) : (
+                      // Expanded state: Show credential configuration form
+                      <div className="space-y-4">
+                        {/* County Code field (if not already set) */}
+                        {!county.county_code && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                              Accela Agency Code
+                            </label>
+                            <input
+                              type="text"
+                              value={countyCode}
+                              onChange={(e) => setCountyCode(e.target.value.toUpperCase())}
+                              placeholder="e.g., HCFL"
+                              className="input-field"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                              The Accela agency code for this county (all caps)
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Auth method toggle */}
+                        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => setAuthMethod('password')}
+                            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              authMethod === 'password'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            <Key className="h-4 w-4 inline mr-1.5" />
+                            Password
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAuthMethod('oauth')}
+                            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              authMethod === 'oauth'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            <ExternalLink className="h-4 w-4 inline mr-1.5" />
+                            OAuth Popup
+                          </button>
+                        </div>
+
+                        {/* Password Method Form */}
+                        {authMethod === 'password' && (
+                          <form onSubmit={handlePasswordSetup} className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Accela Username/Email
+                              </label>
+                              <input
+                                type="email"
+                                name="username"
+                                value={credentials.username}
+                                onChange={handleCredentialChange}
+                                placeholder="user@example.com"
+                                className="input-field"
+                                required
+                                disabled={isSettingUp}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Accela Password
+                              </label>
+                              <input
+                                type="password"
+                                name="password"
+                                value={credentials.password}
+                                onChange={handleCredentialChange}
+                                placeholder="••••••••"
+                                className="input-field"
+                                required
+                                disabled={isSettingUp}
+                              />
+                              <p className="mt-1 text-xs text-gray-500">
+                                Your password is sent directly to Accela and never stored
+                              </p>
+                            </div>
+
+                            {/* Error Message */}
+                            {setupError && (
+                              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                <div className="flex items-start">
+                                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                                  <p className="text-sm text-red-800">
+                                    {setupError.response?.data?.error || setupError.message || 'Failed to connect'}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowCredentialForm(false);
+                                  setCredentials({ username: '', password: '' });
+                                }}
+                                className="btn-secondary flex-1"
+                                disabled={isSettingUp}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={isSettingUp || (!county.county_code && !countyCode)}
+                                className="btn-primary flex-1"
+                              >
+                                {isSettingUp ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Connecting...
+                                  </>
+                                ) : (
+                                  'Connect County'
+                                )}
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
+                        {/* OAuth Popup Method */}
+                        {authMethod === 'oauth' && (
+                          <div className="space-y-3">
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              <p className="text-sm text-blue-800">
+                                You'll be taken to Accela's login page in a new window.
+                              </p>
+                            </div>
+
+                            {/* Error Message */}
+                            {setupError && (
+                              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                <div className="flex items-start">
+                                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                                  <p className="text-sm text-red-800">
+                                    {setupError.response?.data?.error || setupError.message || 'Failed to get authorization URL'}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowCredentialForm(false);
+                                }}
+                                className="btn-secondary flex-1"
+                                disabled={isSettingUp}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleOAuthPopup}
+                                disabled={isSettingUp || (!county.county_code && !countyCode)}
+                                className="btn-primary flex-1"
+                              >
+                                {isSettingUp ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Loading...
+                                  </>
+                                ) : (
+                                  <>
+                                    Authorize with Accela
+                                    <ExternalLink className="h-4 w-4 ml-2" />
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Non-Accela platform - show different message
+                  <div className="text-sm text-gray-600 space-y-2">
+                    <p>This county uses <strong>{county.platform}</strong>.</p>
+                    <p className="text-gray-500">Accela integration is not available for this platform.</p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
