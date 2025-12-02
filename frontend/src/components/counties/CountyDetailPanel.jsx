@@ -1,7 +1,8 @@
 import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Trash2, Key, ExternalLink, Loader2, Settings } from 'lucide-react';
 import { useCountyMetrics, useCountyPullStatus, useDeleteCounty, useSetupCountyWithPassword, useGetOAuthUrl, useUpdateCounty } from '../../hooks/useCounties';
 import { formatRelativeTime } from '../../utils/formatters';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function CountyDetailPanel({ county, onClose }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -16,6 +17,23 @@ export default function CountyDetailPanel({ county, onClose }) {
   const setupWithPassword = useSetupCountyWithPassword();
   const getOAuthUrl = useGetOAuthUrl();
   const updateCounty = useUpdateCounty();
+  const queryClient = useQueryClient();
+
+  // Refetch metrics every 5 seconds during active pull jobs
+  // This ensures Total Permits, New Leads, etc. update in real-time
+  useEffect(() => {
+    const hasActiveJob = pullStatus && (
+      (pullStatus.initial_pull_progress !== null && !pullStatus.initial_pull_completed) ||
+      (pullStatus.years_status && Object.values(pullStatus.years_status).includes('in_progress'))
+    );
+
+    if (hasActiveJob) {
+      const interval = setInterval(() => {
+        queryClient.invalidateQueries({ queryKey: ['counties', county.id, 'metrics'] });
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [pullStatus, county.id, queryClient]);
 
   const getPlatformBadgeClass = () => {
     const platform = county.platform || 'Unknown';
