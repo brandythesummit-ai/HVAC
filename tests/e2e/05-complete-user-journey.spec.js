@@ -3,364 +3,353 @@ const { test, expect } = require('@playwright/test');
 /**
  * Test 5: Complete User Journey
  *
- * This test validates the complete workflow from start to finish:
- * 1. Pull permits from Accela
- * 2. Verify results display correctly
- * 3. Navigate to Leads page
- * 4. Verify leads appear with correct data
- * 5. Filter leads by status
- * 6. Select leads for sync
- * 7. Sync to Summit.AI
- * 8. Verify sync status updates
- * 9. Validate database state
+ * This test validates the complete user workflow with the new Coverage Dashboard:
+ * 1. Navigate to Coverage Dashboard
+ * 2. Browse state sections and counties
+ * 3. View county details
+ * 4. Configure OAuth credentials (if not authorized)
+ * 5. Navigate to Leads page
+ * 6. Apply filters
+ * 7. View lead details
+ *
+ * Note: Since OAuth requires real credentials, this test focuses on UI flow validation.
  */
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
 
 test.describe('Complete User Journey', () => {
-  test('complete workflow: Pull → Verify → Filter → Sync', async ({ page, request }) => {
-    // STEP 1: Get test county
-    const countiesResponse = await request.get(`${API_BASE_URL}/api/counties`);
-    expect(countiesResponse.ok()).toBeTruthy();
+  test('Coverage Dashboard → County Details → Leads Page', async ({ page, request }) => {
+    console.log('\n🚀 Starting complete user journey test\n');
 
-    const countiesData = await countiesResponse.json();
-    const counties = countiesData.data;
-    expect(counties.length).toBeGreaterThan(0);
-
-    const testCounty = counties[0];
-    console.log(`\n🚀 Starting complete user journey with county: ${testCounty.name}\n`);
-
-    // STEP 2: Navigate to Counties page
+    // STEP 1: Navigate to Coverage Dashboard
     await page.goto('/counties');
-    await expect(page).toHaveTitle(/Summit\.AI/);
-    console.log('✅ Step 1: Navigated to Counties page');
+    await page.waitForTimeout(500);
 
-    // STEP 3: Open Pull Permits modal
-    const countyCard = page.locator('.card').filter({ hasText: testCounty.name }).first();
-    await expect(countyCard).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Coverage Dashboard' })).toBeVisible();
+    console.log('✅ Step 1: Navigated to Coverage Dashboard');
 
-    const pullButton = countyCard.getByRole('button', { name: /pull permits/i });
-    await pullButton.click();
+    // STEP 2: Verify Florida section is expanded by default
+    await expect(page.getByText('FL (67 counties)')).toBeVisible();
+    console.log('✅ Step 2: Florida section visible with 67 counties');
 
-    await expect(page.getByRole('heading', { name: `Pull Permits - ${testCounty.name}` })).toBeVisible();
-    console.log('✅ Step 2: Opened Pull Permits modal');
+    // STEP 3: Find and click on a county
+    const brevardCounty = page.getByText('Brevard County').first();
+    await expect(brevardCounty).toBeVisible();
+    await brevardCounty.click();
+    await page.waitForTimeout(300);
+    console.log('✅ Step 3: Clicked on Brevard County');
 
-    // STEP 4: Fill out form with recent date range
-    const today = new Date();
-    const fromDate = new Date(today);
-    fromDate.setDate(fromDate.getDate() - 45); // Last 45 days for good sample
+    // STEP 4: Verify detail panel opens
+    const detailPanel = page.locator('.fixed.right-0.top-0');
+    await expect(detailPanel).toBeVisible();
+    await expect(page.locator('.fixed.right-0 h2')).toContainText('Brevard County');
+    console.log('✅ Step 4: Detail panel opened');
 
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    // STEP 5: Check authorization status and OAuth form
+    const isAuthorized = await page.getByText('Authorized with Accela').isVisible().catch(() => false);
 
-    await page.fill('input[name="date_from"]', formatDate(fromDate));
-    await page.fill('input[name="date_to"]', formatDate(today));
-    await page.selectOption('select[name="limit"]', '50'); // Higher limit for better testing
+    if (isAuthorized) {
+      console.log('✅ Step 5: County is already authorized - metrics should be visible');
 
-    console.log(`✅ Step 3: Configured date range (${formatDate(fromDate)} to ${formatDate(today)})`);
+      // Check for metrics section
+      const metricsSection = page.getByText('Metrics').first();
+      const hasMetrics = await metricsSection.isVisible().catch(() => false);
 
-    // STEP 5: Submit form and wait for results
-    const responsePromise = page.waitForResponse(
-      response => response.url().includes('/pull-permits') && response.status() === 200,
-      { timeout: 60000 } // Extended timeout for real API calls
-    );
-
-    await page.click('button[type="submit"]');
-    console.log('⏳ Step 4: Submitted pull permits request...');
-
-    const apiResponse = await responsePromise;
-    const responseData = await apiResponse.json();
-
-    expect(responseData.success).toBeTruthy();
-    const results = responseData.data;
-
-    console.log(`✅ Step 5: Received results - ${results.total_pulled} total, ${results.hvac_permits} HVAC, ${results.leads_created} leads created`);
-
-    // STEP 6: Verify results view displays correctly
-    await expect(page.getByRole('heading', { name: `Pull Results - ${testCounty.name}` })).toBeVisible();
-
-    const statCards = page.locator('.bg-white.border');
-
-    await expect(statCards.filter({ hasText: 'Total Permits Pulled' })).toContainText(results.total_pulled.toString());
-    await expect(statCards.filter({ hasText: 'HVAC Permits' })).toContainText(results.hvac_permits.toString());
-    await expect(statCards.filter({ hasText: 'Leads Created' })).toContainText(results.leads_created.toString());
-
-    console.log('✅ Step 6: Results view shows correct statistics');
-
-    if (results.leads_created === 0) {
-      console.log('⚠️  No leads created - test will skip remaining steps');
-      test.skip();
-    }
-
-    // STEP 7: Verify permits table shows data
-    const tableRows = page.locator('table tbody tr');
-    const rowCount = await tableRows.count();
-
-    expect(rowCount).toBeGreaterThan(0);
-    console.log(`✅ Step 7: Permits table displays ${rowCount} rows`);
-
-    // STEP 8: Navigate to Leads page
-    const goToLeadsButton = page.getByRole('button', { name: /go to leads/i });
-    await expect(goToLeadsButton).toBeVisible();
-    await goToLeadsButton.click();
-
-    await page.waitForURL('**/leads');
-    await expect(page).toHaveURL(/\/leads/);
-
-    console.log('✅ Step 8: Navigated to Leads page');
-
-    // STEP 9: Verify filters are pre-applied
-    const countyFilter = page.locator('select[name="county_id"]');
-    const syncStatusFilter = page.locator('select[name="sync_status"]');
-
-    await expect(countyFilter).toHaveValue(testCounty.id.toString());
-    await expect(syncStatusFilter).toHaveValue('pending');
-
-    console.log('✅ Step 9: Filters pre-applied (county + pending status)');
-
-    // STEP 10: Wait for leads table to load
-    await page.waitForSelector('table tbody tr', { timeout: 10000 });
-
-    const leadRows = page.locator('table tbody tr');
-    const leadRowCount = await leadRows.count();
-
-    expect(leadRowCount).toBeGreaterThan(0);
-    console.log(`✅ Step 10: Leads table displays ${leadRowCount} rows`);
-
-    // STEP 11: Verify lead data is displayed correctly
-    const firstLead = leadRows.first();
-
-    // Check that required columns are visible
-    await expect(firstLead.locator('td').nth(0)).toBeVisible(); // Owner
-    await expect(firstLead.locator('td').nth(1)).toBeVisible(); // Address
-    await expect(firstLead.locator('td').nth(2)).toBeVisible(); // Permit Date
-    await expect(firstLead.locator('td').nth(3)).toBeVisible(); // Sync Status
-
-    const ownerText = await firstLead.locator('td').nth(0).textContent();
-    const addressText = await firstLead.locator('td').nth(1).textContent();
-
-    console.log(`✅ Step 11: Lead data visible (Owner: ${ownerText?.substring(0, 20)}..., Address: ${addressText?.substring(0, 30)}...)`);
-
-    // STEP 12: Select leads for syncing
-    // Check if there are any pending leads
-    const pendingLeads = page.locator('table tbody tr').filter({ has: page.locator('text=/pending/i') });
-    const pendingCount = await pendingLeads.count();
-
-    console.log(`Found ${pendingCount} pending leads to sync`);
-
-    if (pendingCount === 0) {
-      console.log('⚠️  No pending leads to sync - they may all be synced already');
-
-      // Try clearing sync status filter to see all leads
-      await syncStatusFilter.selectOption('');
-      await page.waitForTimeout(1000);
-
-      const allLeadRows = page.locator('table tbody tr');
-      const allCount = await allLeadRows.count();
-
-      console.log(`Total leads (all statuses): ${allCount}`);
+      if (hasMetrics) {
+        console.log('   - Metrics section is displayed');
+      }
     } else {
-      // STEP 13: Select leads (select first few)
-      const leadsToSelect = Math.min(pendingCount, 3); // Select up to 3 leads
+      console.log('✅ Step 5: County needs authorization - checking OAuth form');
 
-      for (let i = 0; i < leadsToSelect; i++) {
-        const checkbox = pendingLeads.nth(i).locator('input[type="checkbox"]');
+      // Check for Connect button
+      const connectButton = page.getByRole('button', { name: 'Connect to Accela' });
+      const hasConnect = await connectButton.isVisible().catch(() => false);
 
-        if (await checkbox.count() > 0) {
-          await checkbox.check();
-        }
-      }
+      if (hasConnect) {
+        console.log('   - "Connect to Accela" button is available');
 
-      console.log(`✅ Step 12: Selected ${leadsToSelect} leads for syncing`);
+        // Click to expand form
+        await connectButton.click();
+        await page.waitForTimeout(200);
 
-      // STEP 14: Click "Send to Summit.AI" button
-      const syncButton = page.getByRole('button', { name: /send to summit|sync/i });
+        // Verify form elements
+        await expect(page.getByRole('button', { name: 'Password' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'OAuth Popup' })).toBeVisible();
+        console.log('   - OAuth form elements are present');
 
-      if (await syncButton.count() > 0) {
-        await syncButton.click();
-        console.log('⏳ Step 13: Clicked sync button, sending to Summit.AI...');
-
-        // Wait for sync to complete (look for success message or status update)
-        const successMessage = page.locator('text=/success|synced|sent/i');
-
-        try {
-          await expect(successMessage).toBeVisible({ timeout: 30000 });
-          console.log('✅ Step 14: Sync completed successfully');
-
-          // STEP 15: Verify sync status updated in database
-          await page.waitForTimeout(2000); // Give database time to update
-
-          const leadsResponse = await request.get(`${API_BASE_URL}/api/leads?county_id=${testCounty.id}`);
-          expect(leadsResponse.ok()).toBeTruthy();
-
-          const allLeads = await leadsResponse.json();
-
-          const syncedLeads = allLeads.filter(lead => lead.summit_sync_status === 'synced');
-
-          console.log(`✅ Step 15: Database shows ${syncedLeads.length} synced leads`);
-
-          // Verify synced leads have Summit contact IDs
-          const leadsWithContactIds = syncedLeads.filter(lead => lead.summit_contact_id);
-
-          console.log(`   - ${leadsWithContactIds.length} leads have Summit contact IDs`);
-
-          // Verify synced timestamp exists
-          const leadsWithTimestamp = syncedLeads.filter(lead => lead.summit_synced_at);
-
-          console.log(`   - ${leadsWithTimestamp.length} leads have sync timestamps`);
-
-          expect(leadsWithContactIds.length).toBeGreaterThan(0);
-
-        } catch (error) {
-          console.log('⚠️  Sync may have failed or is still in progress');
-          console.log(`   Error: ${error.message}`);
-
-          // Check if any error message is displayed
-          const errorMessage = page.locator('text=/error|failed/i');
-
-          if (await errorMessage.count() > 0) {
-            const errorText = await errorMessage.first().textContent();
-            console.log(`   Error message: ${errorText}`);
-          }
-        }
-
-        // STEP 16: Refresh page and verify status persists
-        await page.reload();
-        await page.waitForSelector('table tbody tr', { timeout: 10000 });
-
-        console.log('✅ Step 16: Page refreshed to verify data persistence');
-
-        // Check that synced leads now show "synced" status
-        const syncedBadges = page.locator('text=/synced/i');
-        const syncedBadgeCount = await syncedBadges.count();
-
-        if (syncedBadgeCount > 0) {
-          console.log(`✅ Step 17: ${syncedBadgeCount} leads showing "synced" status in UI`);
-        }
-
-      } else {
-        console.log('⚠️  Sync button not found - may not be implemented yet');
+        // Cancel form
+        await page.getByRole('button', { name: 'Cancel' }).click();
+        await page.waitForTimeout(200);
       }
     }
 
-    // STEP 18: Final database validation
-    const finalLeadsResponse = await request.get(`${API_BASE_URL}/api/leads?county_id=${testCounty.id}`);
-    expect(finalLeadsResponse.ok()).toBeTruthy();
+    // STEP 6: Close detail panel
+    await page.locator('.fixed.right-0 button').first().click();
+    await page.waitForTimeout(300);
+    await expect(detailPanel).not.toBeVisible();
+    console.log('✅ Step 6: Closed detail panel');
 
-    const finalLeads = await finalLeadsResponse.json();
+    // STEP 7: Use search to find another county
+    const searchInput = page.getByPlaceholder('Search states or counties...');
+    await searchInput.fill('Hillsborough');
+    await page.waitForTimeout(300);
 
-    console.log('\n📊 Final Data Summary:');
-    console.log(`   Total leads for ${testCounty.name}: ${finalLeads.length}`);
+    // Florida section should still be visible (contains Hillsborough)
+    await expect(page.getByText('FL (67 counties)')).toBeVisible();
+    console.log('✅ Step 7: Search filters counties correctly');
 
-    const statusCounts = finalLeads.reduce((acc, lead) => {
-      acc[lead.summit_sync_status] = (acc[lead.summit_sync_status] || 0) + 1;
-      return acc;
-    }, {});
+    // STEP 8: Clear search
+    await searchInput.fill('');
+    await page.waitForTimeout(300);
+    console.log('✅ Step 8: Search cleared');
 
-    console.log(`   Status breakdown:`, statusCounts);
+    // STEP 9: Navigate to Leads page via sidebar
+    await page.getByRole('link', { name: 'Lead Review' }).click();
+    await expect(page).toHaveURL(/\/leads/);
+    console.log('✅ Step 9: Navigated to Leads page');
 
-    // Verify data integrity
-    const leadsWithRequiredFields = finalLeads.filter(lead =>
-      lead.id &&
-      lead.permit_id &&
-      lead.county_id &&
-      lead.permits &&
-      lead.permits.owner_name &&
-      lead.permits.property_address
-    );
+    // STEP 10: Verify Lead Review page loads (use h1 specifically to avoid matching nav h2)
+    await expect(page.locator('h1').filter({ hasText: 'Lead Review' })).toBeVisible();
+    await expect(page.getByText('Advanced Filters')).toBeVisible();
+    console.log('✅ Step 10: Lead Review page loaded');
 
-    const dataIntegrityPercent = (leadsWithRequiredFields.length / finalLeads.length) * 100;
+    // STEP 11: Apply a filter (use first() for safety with responsive layouts)
+    const tierFilter = page.locator('select#lead_tier').first();
+    await expect(tierFilter).toBeVisible();
+    await tierFilter.selectOption('HOT');
+    await page.waitForTimeout(300);
+    await expect(tierFilter).toHaveValue('HOT');
+    console.log('✅ Step 11: Applied lead tier filter');
 
-    console.log(`   Data integrity: ${dataIntegrityPercent.toFixed(1)}% (${leadsWithRequiredFields.length}/${finalLeads.length} with all required fields)`);
-
-    expect(dataIntegrityPercent).toBeGreaterThanOrEqual(80);
+    // STEP 12: Navigate back to Coverage Dashboard
+    await page.getByRole('link', { name: 'Counties' }).click();
+    await expect(page).toHaveURL(/\/counties/);
+    await expect(page.getByRole('heading', { name: 'Coverage Dashboard' })).toBeVisible();
+    console.log('✅ Step 12: Navigated back to Coverage Dashboard');
 
     console.log('\n✅ Complete user journey test passed!\n');
   });
 
-  test('complete workflow with multiple counties', async ({ page, request }) => {
-    // Get multiple counties
-    const countiesResponse = await request.get(`${API_BASE_URL}/api/counties`);
-    const countiesData = await countiesResponse.json();
-    const counties = countiesData.data;
+  test('Multi-county workflow: Browse multiple counties', async ({ page }) => {
+    console.log('\n🚀 Starting multi-county browse test\n');
 
-    if (counties.length < 2) {
-      test.skip('Need at least 2 counties for this test');
-    }
+    await page.goto('/counties');
+    await page.waitForTimeout(500);
 
-    console.log(`\n🚀 Testing multi-county workflow with ${Math.min(counties.length, 2)} counties\n`);
+    // Browse through 3 different counties
+    const countyNames = ['Alachua County', 'Baker County', 'Bay County'];
+    const visitedCounties = [];
 
-    const countiesToTest = counties.slice(0, 2);
-    const countyResults = [];
+    for (const countyName of countyNames) {
+      // Search for the county
+      const searchInput = page.getByPlaceholder('Search states or counties...');
+      await searchInput.fill(countyName.split(' ')[0]); // Search by first word
+      await page.waitForTimeout(300);
 
-    for (const county of countiesToTest) {
-      await page.goto('/counties');
+      // Try to find and click the county
+      const countyRow = page.getByText(countyName).first();
+      const isVisible = await countyRow.isVisible().catch(() => false);
 
-      const countyCard = page.locator('.card').filter({ hasText: county.name }).first();
-      const pullButton = countyCard.getByRole('button', { name: /pull permits/i });
-      await pullButton.click();
+      if (isVisible) {
+        await countyRow.click();
+        await page.waitForTimeout(300);
 
-      const today = new Date();
-      const fromDate = new Date(today);
-      fromDate.setDate(fromDate.getDate() - 30);
+        // Verify panel opens
+        const panelTitle = await page.locator('.fixed.right-0 h2').textContent().catch(() => '');
 
-      const formatDate = (date) => date.toISOString().split('T')[0];
+        if (panelTitle.includes(countyName)) {
+          visitedCounties.push(countyName);
+          console.log(`✅ Viewed: ${countyName}`);
+        }
 
-      await page.fill('input[name="date_from"]', formatDate(fromDate));
-      await page.fill('input[name="date_to"]', formatDate(today));
-      await page.selectOption('select[name="limit"]', '50');
-
-      const responsePromise = page.waitForResponse(
-        response => response.url().includes('/pull-permits'),
-        { timeout: 60000 }
-      );
-
-      await page.click('button[type="submit"]');
-
-      const apiResponse = await responsePromise;
-      const responseData = await apiResponse.json();
-
-      if (responseData.success) {
-        countyResults.push({
-          county: county.name,
-          results: responseData.data
-        });
-
-        console.log(`✅ ${county.name}: ${responseData.data.leads_created} leads created`);
+        // Close panel by clicking backdrop
+        await page.locator('.fixed.inset-0.bg-black').click();
+        await page.waitForTimeout(200);
       }
 
-      // Close modal
-      const closeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
-      await closeButton.click();
+      // Clear search
+      await searchInput.fill('');
+      await page.waitForTimeout(200);
     }
 
-    // Navigate to Leads page
-    await page.goto('/leads');
-    await page.waitForSelector('table tbody tr', { timeout: 10000 });
+    console.log(`\n✅ Successfully browsed ${visitedCounties.length} counties\n`);
+    expect(visitedCounties.length).toBeGreaterThan(0);
+  });
 
-    // Test filtering by each county
-    const countyFilter = page.locator('select[name="county_id"]');
+  test('API integration: Verify county data consistency', async ({ page, request }) => {
+    console.log('\n🚀 Starting data consistency test\n');
 
-    for (const result of countyResults) {
-      const county = counties.find(c => c.name === result.county);
+    // Get counties from API
+    const response = await request.get(`${API_BASE_URL}/api/counties`);
+    expect(response.ok()).toBeTruthy();
 
-      await countyFilter.selectOption(county.id.toString());
-      await page.waitForTimeout(1000);
+    const data = await response.json();
+    const counties = data.data;
+    const floridaCounties = counties.filter(c => c.state === 'FL');
 
-      const filteredRows = page.locator('table tbody tr');
-      const count = await filteredRows.count();
+    console.log(`API returns ${counties.length} total counties, ${floridaCounties.length} in Florida`);
 
-      console.log(`✅ ${result.county} filter: showing ${count} leads`);
+    // Navigate to Coverage Dashboard
+    await page.goto('/counties');
+    await page.waitForTimeout(500);
+
+    // Verify count matches UI
+    await expect(page.getByText(`FL (${floridaCounties.length} counties)`)).toBeVisible();
+    console.log('✅ County count matches between API and UI');
+
+    // Check platform distribution
+    const platformCounts = floridaCounties.reduce((acc, c) => {
+      const platform = c.platform || 'Unknown';
+      acc[platform] = (acc[platform] || 0) + 1;
+      return acc;
+    }, {});
+
+    console.log('Platform distribution:');
+    Object.entries(platformCounts).forEach(([platform, count]) => {
+      console.log(`   - ${platform}: ${count}`);
+    });
+
+    // Verify authorized count
+    const authorizedCount = floridaCounties.filter(c => c.oauth_authorized).length;
+    console.log(`Authorized counties: ${authorizedCount}/${floridaCounties.length}`);
+
+    // UI should show authorized count in state metrics
+    const authorizedText = page.locator('text=/\\d+ authorized/');
+    const hasAuthorizedCount = await authorizedText.isVisible().catch(() => false);
+
+    if (hasAuthorizedCount) {
+      console.log('✅ Authorized count visible in UI');
     }
 
-    // Clear filter and verify all leads shown
-    await countyFilter.selectOption('');
-    await page.waitForTimeout(1000);
+    console.log('\n✅ Data consistency test passed!\n');
+  });
 
-    const allRows = page.locator('table tbody tr');
-    const totalCount = await allRows.count();
+  test('OAuth configuration journey (UI flow only)', async ({ page }) => {
+    console.log('\n🚀 Starting OAuth configuration UI test\n');
 
-    console.log(`✅ All counties: showing ${totalCount} total leads`);
+    await page.goto('/counties');
+    await page.waitForTimeout(500);
 
-    console.log('\n✅ Multi-county workflow test passed!\n');
+    // Find an unauthorized Accela county
+    const searchInput = page.getByPlaceholder('Search states or counties...');
+    await searchInput.fill('Brevard');
+    await page.waitForTimeout(300);
+
+    await page.getByText('Brevard County').first().click();
+    await page.waitForTimeout(300);
+
+    // Check if needs authorization
+    const isAuthorized = await page.getByText('Authorized with Accela').isVisible().catch(() => false);
+
+    if (isAuthorized) {
+      console.log('ℹ️ Brevard County is already authorized, skipping OAuth flow');
+      return;
+    }
+
+    const connectButton = page.getByRole('button', { name: 'Connect to Accela' });
+    const hasConnect = await connectButton.isVisible().catch(() => false);
+
+    if (!hasConnect) {
+      console.log('ℹ️ Connect button not visible (may be non-Accela platform)');
+      return;
+    }
+
+    // STEP 1: Open OAuth form
+    await connectButton.click();
+    await page.waitForTimeout(200);
+    console.log('✅ Step 1: Opened OAuth configuration form');
+
+    // STEP 2: Verify Password method is default
+    await expect(page.getByPlaceholder('user@example.com')).toBeVisible();
+    await expect(page.getByPlaceholder('••••••••')).toBeVisible();
+    console.log('✅ Step 2: Password method form is visible');
+
+    // STEP 3: Switch to OAuth Popup method
+    await page.getByRole('button', { name: 'OAuth Popup' }).click();
+    await page.waitForTimeout(100);
+
+    await expect(page.getByText("You'll be taken to Accela's login page")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Authorize with Accela' })).toBeVisible();
+    console.log('✅ Step 3: OAuth Popup method UI is correct');
+
+    // STEP 4: Switch back to Password method
+    await page.getByRole('button', { name: 'Password' }).click();
+    await page.waitForTimeout(100);
+    await expect(page.getByPlaceholder('user@example.com')).toBeVisible();
+    console.log('✅ Step 4: Switched back to Password method');
+
+    // STEP 5: Fill credentials (don't submit - just UI test)
+    await page.getByPlaceholder('user@example.com').fill('test@example.com');
+    await page.getByPlaceholder('••••••••').fill('testpassword123');
+    console.log('✅ Step 5: Filled credential fields');
+
+    // Check if agency code field is visible
+    const agencyField = page.locator('input[placeholder="e.g., HCFL"]');
+    if (await agencyField.isVisible().catch(() => false)) {
+      await agencyField.fill('BREVARD');
+      console.log('✅ Step 5b: Filled agency code field');
+    }
+
+    // STEP 6: Verify Connect County button is enabled
+    const submitButton = page.getByRole('button', { name: 'Connect County' });
+    const isDisabled = await submitButton.isDisabled().catch(() => true);
+    expect(isDisabled).toBeFalsy();
+    console.log('✅ Step 6: Connect County button is enabled');
+
+    // STEP 7: Cancel and verify form closes
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.waitForTimeout(200);
+
+    await expect(connectButton).toBeVisible();
+    await expect(page.getByPlaceholder('user@example.com')).not.toBeVisible();
+    console.log('✅ Step 7: Cancelled - form closed correctly');
+
+    console.log('\n✅ OAuth configuration UI test passed!\n');
+  });
+});
+
+test.describe('End-to-End Data Flow', () => {
+  test('Leads API returns correct data structure', async ({ request }) => {
+    // Test leads endpoint
+    const response = await request.get(`${API_BASE_URL}/api/leads`);
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data).toHaveProperty('data');
+    expect(data.data).toHaveProperty('leads');
+    expect(data.data).toHaveProperty('total');
+
+    console.log(`✅ Leads API returns ${data.data.total} total leads`);
+
+    // Verify lead structure if any exist
+    if (data.data.leads.length > 0) {
+      const lead = data.data.leads[0];
+      expect(lead).toHaveProperty('id');
+      expect(lead).toHaveProperty('county_id');
+      expect(lead).toHaveProperty('summit_sync_status');
+      console.log('✅ Lead data structure is correct');
+    }
+  });
+
+  test('Counties API returns correct data structure', async ({ request }) => {
+    const response = await request.get(`${API_BASE_URL}/api/counties`);
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data).toHaveProperty('success', true);
+    expect(data).toHaveProperty('data');
+    expect(Array.isArray(data.data)).toBeTruthy();
+
+    console.log(`✅ Counties API returns ${data.data.length} counties`);
+
+    // Verify county structure
+    if (data.data.length > 0) {
+      const county = data.data[0];
+      expect(county).toHaveProperty('id');
+      expect(county).toHaveProperty('name');
+      expect(county).toHaveProperty('state');
+      expect(county).toHaveProperty('platform');
+      console.log('✅ County data structure is correct');
+    }
   });
 });

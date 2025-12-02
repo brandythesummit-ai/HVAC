@@ -690,7 +690,12 @@ class JobProcessor:
                 'raw_data': permit_data.get('raw_data')
             }
 
-            result = self.db.table('permits').insert(insert_data).execute()
+            # Use upsert to handle re-runs gracefully (avoids duplicate key errors)
+            # If permit with this county_id + accela_record_id exists, update it
+            result = self.db.table('permits').upsert(
+                insert_data,
+                on_conflict='county_id,accela_record_id'
+            ).execute()
 
             if result.data:
                 return result.data[0]
