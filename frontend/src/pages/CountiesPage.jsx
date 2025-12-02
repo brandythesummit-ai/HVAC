@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Loader2, AlertCircle, MapPin } from 'lucide-react';
 import { useCounties } from '../hooks/useCounties';
 import StateSection from '../components/counties/StateSection';
@@ -51,6 +51,21 @@ export default function CountiesPage() {
       );
     }).sort();
   }, [countiesByState, searchQuery]);
+
+  // Sync selectedCounty with updated allCounties data
+  // This ensures the panel shows fresh data after mutations invalidate queries
+  useEffect(() => {
+    if (selectedCounty && allCounties) {
+      const updatedCounty = allCounties.find(c => c.id === selectedCounty.id);
+      if (updatedCounty) {
+        // Only update if data actually changed (prevents infinite loops)
+        const hasChanged = JSON.stringify(updatedCounty) !== JSON.stringify(selectedCounty);
+        if (hasChanged) {
+          setSelectedCounty(updatedCounty);
+        }
+      }
+    }
+  }, [allCounties, selectedCounty]);
 
   const toggleState = (state) => {
     setExpandedStates(prev => {
