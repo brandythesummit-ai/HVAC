@@ -275,8 +275,12 @@ class JobProcessor:
 
         print(f"✅ Token validated for {county['name']}", flush=True)
 
+        # DIAGNOSTIC: Print after each step to find hang location
+        print(f"🔍 [DEBUG] Step 1: Initializing aggregator...", flush=True)
+
         # Initialize property aggregator
         aggregator = PropertyAggregator(self.db)
+        print(f"🔍 [DEBUG] Step 2: Aggregator initialized", flush=True)
 
         # Calculate year range (pull oldest first)
         current_year = datetime.now().year
@@ -297,22 +301,28 @@ class JobProcessor:
 
         # Track year-level status for accurate progress display
         # Status values: 'not_started', 'in_progress', 'completed'
+        print(f"🔍 [DEBUG] Step 3: Creating years_status dict for {start_year}-{end_year}...", flush=True)
         years_status = {str(year): 'not_started' for year in range(start_year, end_year + 1)}
+        print(f"🔍 [DEBUG] Step 4: years_status created with {len(years_status)} years", flush=True)
 
         start_time = datetime.utcnow()
 
+        print(f"📅 Pulling {years} years: {start_year} → {end_year}", flush=True)
         logger.info(f"📅 Pulling {years} years: {start_year} → {end_year}")
 
         # Initialize job with years_status so UI can show all years immediately
+        print(f"🔍 [DEBUG] Step 5: About to update job with years_status...", flush=True)
         await self._update_job(job_id, {
             'years_status': years_status,
             'start_year': start_year,
             'end_year': end_year,
             'updated_at': datetime.utcnow().isoformat()
         })
+        print(f"🔍 [DEBUG] Step 6: Job updated, starting year loop...", flush=True)
 
         # Process year by year (oldest first)
         for year in range(start_year, end_year + 1):
+            print(f"📆 Processing year {year}...", flush=True)
             year_start = f"{year}-01-01"
             year_end = f"{year}-12-31"
 
