@@ -98,8 +98,16 @@ export const useCountyPullStatus = (id) => {
     queryFn: () => countiesApi.getPullStatus(id),
     enabled: !!id,
     refetchInterval: (data) => {
-      // Auto-refresh every 10 seconds if initial pull is in progress
-      return data?.initial_pull_progress !== null && !data?.initial_pull_completed ? 10000 : false;
+      // Poll every 5 seconds if:
+      // 1. Has active job with progress, OR
+      // 2. Has years_status with any "in_progress" year, OR
+      // 3. Has start_year set but pull not completed (job just started)
+      const hasActiveProgress = data?.initial_pull_progress !== null;
+      const hasYearsInProgress = data?.years_status &&
+        Object.values(data.years_status || {}).includes('in_progress');
+      const hasJobButNotCompleted = data?.start_year && !data?.initial_pull_completed;
+
+      return (hasActiveProgress || hasYearsInProgress || hasJobButNotCompleted) ? 5000 : false;
     },
   });
 };
