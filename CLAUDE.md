@@ -560,6 +560,35 @@ FastAPI auto-generates API docs:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
+## Railway Deployment Rules ⚠️ CRITICAL
+
+**NEVER create new Railway projects for this codebase.** The production project already exists.
+
+### Before ANY Railway Operation:
+1. **ALWAYS run `railway status`** first to verify you're linked to `hvac-backend`
+2. **ALWAYS run `mcp__Railway__list-projects`** to see existing projects
+3. **NEVER use `mcp__Railway__create-project-and-link`** - the project already exists
+4. **Use `mcp__Railway__deploy`** only for the existing linked project
+
+### The ONE Production Project:
+- **Project Name:** `hvac-backend`
+- **Project ID:** `a2859506-2ccd-4335-8f79-7ba50f6294a8`
+- **Service:** `hvac-backend`
+- **URL:** `https://hvac-backend-production-11e6.up.railway.app`
+
+### If Railway Shows "Not Linked":
+```bash
+cd /Users/Brandy/projects/HVAC/backend
+railway link  # Select "hvac-backend" from the list
+```
+
+### Why This Matters:
+Creating duplicate Railway projects that connect to the same Supabase database causes:
+- Multiple job processors fighting over the same jobs
+- Race conditions and duplicate key errors
+- Jobs appearing stuck when a different instance crashes
+- Wasted Railway compute costs
+
 ## Environment Variables
 
 ### Frontend (.env)
