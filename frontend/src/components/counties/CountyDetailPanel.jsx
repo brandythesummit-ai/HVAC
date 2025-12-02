@@ -220,6 +220,36 @@ export default function CountyDetailPanel({ county, onClose }) {
                       {pullStatus.years_info.start_year}–{pullStatus.years_info.end_year}
                     </div>
                   )}
+
+                  {/* Per-Year Breakdown Table */}
+                  {pullStatus.per_year_permits && Object.keys(pullStatus.per_year_permits).length > 0 && (
+                    <div className="mt-3">
+                      <h4 className="text-xs font-medium text-gray-600 mb-1.5">Permits by Year</h4>
+                      <div className="max-h-36 overflow-y-auto border border-gray-200 rounded bg-white">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-600">Year</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-600">Permits</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {Object.entries(pullStatus.per_year_permits)
+                              .sort(([a], [b]) => Number(b) - Number(a))
+                              .map(([year, count]) => (
+                                <tr
+                                  key={year}
+                                  className={year === String(pullStatus.years_info?.current_year) ? 'bg-blue-50' : ''}
+                                >
+                                  <td className="px-2 py-1">{year}</td>
+                                  <td className="px-2 py-1 text-right font-mono">{count.toLocaleString()}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -286,6 +286,9 @@ class JobProcessor:
         total_properties_updated = 0
         total_leads_created = 0
 
+        # Track permits per year for live UI updates
+        per_year_permits = {}
+
         start_time = datetime.utcnow()
 
         logger.info(f"📅 Pulling {years} years: {start_year} → {end_year}")
@@ -388,6 +391,7 @@ class JobProcessor:
                     'elapsed_seconds': int(elapsed),
                     'permits_per_second': round(permits_per_second, 2),
                     'estimated_completion_at': estimated_completion.isoformat(),
+                    'per_year_permits': per_year_permits,
                     'updated_at': datetime.utcnow().isoformat()
                 })
 
@@ -398,6 +402,7 @@ class JobProcessor:
                     break
 
             years_processed += 1
+            per_year_permits[str(year)] = year_permits_pulled
             logger.info(f"✅ Year {year} complete: {year_permits_pulled} permits pulled")
 
         # Final update
@@ -413,6 +418,7 @@ class JobProcessor:
             'elapsed_seconds': int(elapsed),
             'permits_per_second': round(permits_per_second, 2),
             'progress_percent': 100,
+            'per_year_permits': per_year_permits,
             'updated_at': datetime.utcnow().isoformat()
         })
 

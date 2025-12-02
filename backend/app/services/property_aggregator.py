@@ -287,13 +287,18 @@ class PropertyAggregator:
         try:
             # Extract and normalize address
             raw_address = permit_data.get('property_address')
-            if not raw_address:
-                logger.warning(f"Permit {permit_data.get('id')} has no address, skipping")
-                return None, None, False
 
-            # Parse address components
-            parsed_address = AddressNormalizer.parse_address(raw_address)
-            normalized_address = parsed_address.normalized_address
+            # Parse address components (use permit ID as fallback for no-address permits)
+            if raw_address:
+                parsed_address = AddressNormalizer.parse_address(raw_address)
+                normalized_address = parsed_address.normalized_address
+            else:
+                # No address available - use permit ID as unique identifier
+                # This allows historical permits (which often lack address data) to still become leads
+                permit_id = permit_data.get('id', 'unknown')
+                logger.info(f"Permit {permit_id} has no address - using permit ID as identifier")
+                parsed_address = AddressNormalizer.parse_address(f"PERMIT-{permit_id}")
+                normalized_address = f"PERMIT-{permit_id}"
 
             # Extract HVAC permit date
             opened_date = permit_data.get('opened_date')
@@ -501,10 +506,9 @@ class PropertyAggregator:
 
         property_record = property_result.data[0]
 
-        # Only create lead if qualified
-        if not property_record.get('is_qualified'):
-            logger.info(f"Property {property_id} not qualified (HVAC < 5 years), skipping lead creation")
-            return None
+        # Create lead for ALL properties regardless of qualification
+        # This allows users to see all permit data in the Leads tab
+        # The is_qualified and lead_tier fields still indicate actual qualification status
 
         # Get the associated permit for additional details
         permit_id = property_record.get('most_recent_hvac_permit_id')

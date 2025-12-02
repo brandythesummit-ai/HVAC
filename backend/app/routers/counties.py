@@ -338,9 +338,10 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
         # Get active job progress (if any)
         job_progress = None
         years_info = None
+        per_year_permits = {}
         if county.data.get("initial_pull_job_id"):
             job_result = db.table("background_jobs")\
-                .select("status, progress_percent, permits_pulled, current_year, parameters")\
+                .select("status, progress_percent, permits_pulled, current_year, parameters, per_year_permits")\
                 .eq("id", county.data["initial_pull_job_id"])\
                 .execute()
 
@@ -374,6 +375,9 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
                     "total_years": total_years
                 }
 
+                # Extract per-year permit counts for live UI display
+                per_year_permits = job_data.get("per_year_permits", {}) or {}
+
         # Get last incremental pull stats
         last_pull_result = db.table("pull_history")\
             .select("permits_pulled, created_at")\
@@ -391,6 +395,7 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
                 "initial_pull_completed": county.data.get("initial_pull_completed", False),
                 "initial_pull_progress": job_progress,
                 "years_info": years_info,
+                "per_year_permits": per_year_permits,
                 "next_pull_at": schedule["next_pull_at"] if schedule else None,
                 "last_pull_at": last_pull["created_at"] if last_pull else None,
                 "last_pull_permits": last_pull["permits_pulled"] if last_pull else 0,
