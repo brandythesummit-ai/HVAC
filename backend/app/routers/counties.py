@@ -335,48 +335,71 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
 
         schedule = schedule_result.data[0] if schedule_result.data else None
 
+        # Compute per_year_permits from actual permits in database
+        # This ensures data shows regardless of job state (manual pulls, completed jobs, etc.)
+        from collections import defaultdict
+        db_per_year_permits = defaultdict(int)
+
+        permits_result = db.table("permits")\
+            .select("opened_date")\
+            .eq("county_id", county_id)\
+            .execute()
+
+        if permits_result.data:
+            for permit in permits_result.data:
+                if permit.get("opened_date"):
+                    # Extract year from date string (format: YYYY-MM-DD)
+                    year = permit["opened_date"][:4]
+                    db_per_year_permits[year] += 1
+
+        # Convert to regular dict with string keys
+        per_year_permits = dict(db_per_year_permits)
+
         # Get active job progress (if any)
         job_progress = None
         years_info = None
-        per_year_permits = {}
+        job_per_year_permits = {}
         if county.data.get("initial_pull_job_id"):
             job_result = db.table("background_jobs")\
                 .select("status, progress_percent, permits_pulled, current_year, parameters, per_year_permits")\
                 .eq("id", county.data["initial_pull_job_id"])\
                 .execute()
 
-            if job_result.data and job_result.data[0]["status"] in ["pending", "running"]:
+            if job_result.data:
                 job_data = job_result.data[0]
-                job_progress = job_data.get("progress_percent", 0)
 
-                # Extract year information
-                parameters = job_data.get("parameters", {})
-                if isinstance(parameters, str):
-                    import json
-                    parameters = json.loads(parameters)
+                # per_year_permits now computed from actual DB permits above
+                # Job data no longer needed for this (DB is source of truth)
 
-                years = parameters.get("years", 30)
-                current_year = job_data.get("current_year")
+                # Only show progress info for active jobs (pending/running)
+                if job_data["status"] in ["pending", "running"]:
+                    job_progress = job_data.get("progress_percent", 0)
 
-                # Calculate derived values
-                from datetime import datetime
-                end_year = datetime.now().year
-                start_year = end_year - years
+                    # Extract year information
+                    parameters = job_data.get("parameters", {})
+                    if isinstance(parameters, str):
+                        import json
+                        parameters = json.loads(parameters)
 
-                # Calculate years completed based on progress
-                total_years = years
-                years_completed = int((job_progress / 100) * total_years)
+                    years = parameters.get("years", 30)
+                    current_year = job_data.get("current_year")
 
-                years_info = {
-                    "current_year": current_year,
-                    "start_year": start_year,
-                    "end_year": end_year,
-                    "years_completed": years_completed,
-                    "total_years": total_years
-                }
+                    # Calculate derived values
+                    from datetime import datetime
+                    end_year = datetime.now().year
+                    start_year = end_year - years
 
-                # Extract per-year permit counts for live UI display
-                per_year_permits = job_data.get("per_year_permits", {}) or {}
+                    # Calculate years completed based on progress
+                    total_years = years
+                    years_completed = int((job_progress / 100) * total_years)
+
+                    years_info = {
+                        "current_year": current_year,
+                        "start_year": start_year,
+                        "end_year": end_year,
+                        "years_completed": years_completed,
+                        "total_years": total_years
+                    }
 
         # Get last incremental pull stats
         last_pull_result = db.table("pull_history")\

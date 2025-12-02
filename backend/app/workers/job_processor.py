@@ -175,11 +175,17 @@ class JobProcessor:
 
             if retry_count < max_retries:
                 # Retry - set back to pending
+                # CRITICAL: Reset counters to avoid accumulation across retries
                 await self._update_job(
                     job_id,
                     {
                         'status': 'pending',
                         'retry_count': retry_count + 1,
+                        'permits_pulled': 0,       # Reset counter
+                        'permits_saved': 0,        # Reset counter
+                        'per_year_permits': {},    # Reset year tracking
+                        'current_year': None,      # Reset current year
+                        'progress_percent': 0,     # Reset progress
                         'error_message': error_message,
                         'error_details': error_details,
                         'updated_at': datetime.utcnow().isoformat()
@@ -379,6 +385,9 @@ class JobProcessor:
                 estimated_remaining = ((total_years - years_processed) * 1000) / permits_per_second if permits_per_second > 0 else 0
                 estimated_completion = datetime.utcnow() + timedelta(seconds=estimated_remaining)
 
+                # Track per-year permits progressively (inside loop so crash-safe)
+                per_year_permits[str(year)] = year_permits_pulled
+
                 # Update job progress
                 await self._update_job(job_id, {
                     'permits_pulled': total_permits_pulled,
@@ -402,7 +411,7 @@ class JobProcessor:
                     break
 
             years_processed += 1
-            per_year_permits[str(year)] = year_permits_pulled
+            # per_year_permits already updated progressively inside batch loop
             logger.info(f"✅ Year {year} complete: {year_permits_pulled} permits pulled")
 
         # Final update

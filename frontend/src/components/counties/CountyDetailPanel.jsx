@@ -231,20 +231,20 @@ export default function CountyDetailPanel({ county, onClose }) {
                 </div>
               )}
 
-              {/* Per-Year Breakdown Table - ALWAYS VISIBLE when data exists */}
-              {pullStatus.per_year_permits && Object.keys(pullStatus.per_year_permits).length > 0 && (
-                <div className="mt-3">
-                  <h4 className="text-xs font-medium text-gray-600 mb-1.5">Permits by Year</h4>
-                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded bg-white">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-100 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600">Year</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600">Permits</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {Object.entries(pullStatus.per_year_permits)
+              {/* Per-Year Breakdown Table - ALWAYS VISIBLE */}
+              <div className="mt-3">
+                <h4 className="text-xs font-medium text-gray-600 mb-1.5">Permits by Year</h4>
+                <div className="max-h-36 overflow-y-auto border border-gray-200 rounded bg-white">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left font-medium text-gray-600">Year</th>
+                        <th className="px-2 py-1.5 text-right font-medium text-gray-600">Permits</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pullStatus.per_year_permits && Object.keys(pullStatus.per_year_permits).length > 0 ? (
+                        Object.entries(pullStatus.per_year_permits)
                           .sort(([a], [b]) => Number(b) - Number(a))
                           .map(([year, count]) => (
                             <tr
@@ -254,12 +254,18 @@ export default function CountyDetailPanel({ county, onClose }) {
                               <td className="px-2 py-1">{year}</td>
                               <td className="px-2 py-1 text-right font-mono">{count.toLocaleString()}</td>
                             </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
+                          ))
+                      ) : (
+                        <tr>
+                          <td colSpan="2" className="px-2 py-3 text-center text-gray-400 italic">
+                            No permits pulled yet
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
 
               {/* Next Pull Schedule with Status */}
               {pullStatus.auto_pull_enabled && pullStatus.next_pull_at && (
