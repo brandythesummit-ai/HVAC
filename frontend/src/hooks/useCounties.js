@@ -103,3 +103,17 @@ export const useCountyPullStatus = (id) => {
     },
   });
 };
+
+export const useUpdateCountyPlatform = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ countyId, ...platformData }) => countiesApi.updatePlatform(countyId, platformData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['counties'],
+        refetchType: 'all'
+      });
+    },
+  });
+};

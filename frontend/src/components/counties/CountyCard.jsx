@@ -1,14 +1,26 @@
 import { useState } from 'react';
-import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2, Database, RefreshCw, Calendar } from 'lucide-react';
+import { MapPin, Download, AlertCircle, CheckCircle, Clock, ExternalLink, BarChart3, Send, Trash2, Database, RefreshCw, Calendar, HelpCircle, Shield } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/formatters';
-import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty, useCountyPullStatus } from '../../hooks/useCounties';
+import { useCountyMetrics, useGetOAuthUrl, useDeleteCounty, useCountyPullStatus, useUpdateCountyPlatform } from '../../hooks/useCounties';
 
 const CountyCard = ({ county }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPlatformSelect, setShowPlatformSelect] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState('');
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
   const { data: pullStatus } = useCountyPullStatus(county.id);
   const getOAuthUrl = useGetOAuthUrl();
   const deleteCounty = useDeleteCounty();
+  const updatePlatform = useUpdateCountyPlatform();
+
+  const platformOptions = [
+    { value: 'Accela', label: 'Accela', color: 'text-blue-700 bg-blue-100' },
+    { value: 'EnerGov', label: 'EnerGov (Tyler)', color: 'text-purple-700 bg-purple-100' },
+    { value: 'eTRAKiT', label: 'eTRAKiT (Central Square)', color: 'text-orange-700 bg-orange-100' },
+    { value: 'Tyler', label: 'Tyler Technologies', color: 'text-indigo-700 bg-indigo-100' },
+    { value: 'OpenGov', label: 'OpenGov', color: 'text-green-700 bg-green-100' },
+    { value: 'Custom', label: 'Custom System', color: 'text-gray-700 bg-gray-100' },
+  ];
 
   const handleAuthorize = async () => {
     try {
@@ -26,6 +38,37 @@ const CountyCard = ({ county }) => {
     } catch {
       // County deletion failed - error handled by mutation
     }
+  };
+
+  const handlePlatformUpdate = async () => {
+    if (!selectedPlatform) return;
+
+    try {
+      await updatePlatform.mutateAsync({
+        countyId: county.id,
+        platform: selectedPlatform,
+        platform_confidence: 'Confirmed',
+        platform_detection_notes: 'Manually set by user'
+      });
+      setShowPlatformSelect(false);
+      setSelectedPlatform('');
+    } catch {
+      // Platform update failed - error handled by mutation
+    }
+  };
+
+  const getPlatformBadgeClass = () => {
+    const platform = county.platform || 'Unknown';
+    const colors = {
+      'Accela': 'badge-success',
+      'EnerGov': 'text-purple-700 bg-purple-100',
+      'eTRAKiT': 'text-orange-700 bg-orange-100',
+      'Tyler': 'text-indigo-700 bg-indigo-100',
+      'OpenGov': 'text-green-700 bg-green-100',
+      'Custom': 'text-gray-700 bg-gray-100',
+      'Unknown': 'badge-secondary'
+    };
+    return `badge ${colors[platform] || 'badge-secondary'}`;
   };
 
   const getStatusBadgeClass = () => {
@@ -59,9 +102,21 @@ const CountyCard = ({ county }) => {
                 <MapPin className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{county.name}</h3>
-                <p className="text-sm text-gray-500 mt-0.5 font-mono">
-                  {county.county_code}
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-lg font-semibold text-gray-900">{county.name}</h3>
+                  {/* Platform Badge */}
+                  <div className={getPlatformBadgeClass()}>
+                    {county.platform_confidence === 'Confirmed' && county.platform !== 'Unknown' && (
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                    )}
+                    {county.platform === 'Unknown' && (
+                      <HelpCircle className="h-3 w-3 mr-1" />
+                    )}
+                    <span className="text-xs">{county.platform || 'Unknown'}</span>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 font-mono">
+                  {county.county_code || 'No code set'}
                 </p>
               </div>
             </div>
@@ -73,6 +128,73 @@ const CountyCard = ({ county }) => {
         </div>
 
         <div className="card-body">
+          {/* Platform Selection for Unknown Platforms */}
+          {county.platform === 'Unknown' && !showPlatformSelect && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start">
+                <HelpCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="ml-3 flex-1">
+                  <h4 className="text-sm font-semibold text-yellow-800">Platform Unknown</h4>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    We couldn't automatically detect which permit platform this county uses.
+                  </p>
+                  <button
+                    onClick={() => setShowPlatformSelect(true)}
+                    className="mt-2 text-xs font-medium text-yellow-800 hover:text-yellow-900 underline"
+                  >
+                    Set platform manually
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Manual Platform Selection UI */}
+          {showPlatformSelect && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">Select Permit Platform</h4>
+              <div className="space-y-2 mb-3">
+                {platformOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center p-2 rounded-lg border border-gray-200 hover:bg-white cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name="platform"
+                      value={option.value}
+                      checked={selectedPlatform === option.value}
+                      onChange={(e) => setSelectedPlatform(e.target.value)}
+                      className="mr-3"
+                    />
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${option.color}`}>
+                      {option.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handlePlatformUpdate}
+                  disabled={!selectedPlatform || updatePlatform.isPending}
+                  className="btn-primary text-sm flex-1"
+                >
+                  {updatePlatform.isPending ? 'Saving...' : 'Save Platform'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPlatformSelect(false);
+                    setSelectedPlatform('');
+                  }}
+                  disabled={updatePlatform.isPending}
+                  className="btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Metrics Section */}
           {county.oauth_authorized && metrics && (
             <div className="grid grid-cols-3 gap-4 mb-4">

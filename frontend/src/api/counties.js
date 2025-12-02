@@ -62,4 +62,10 @@ export const countiesApi = {
     const response = await apiClient.get(`/api/counties/${id}/pull-status`);
     return response.data?.data || {};
   },
+
+  // Update county platform information
+  updatePlatform: async (id, platformData) => {
+    const response = await apiClient.patch(`/api/counties/${id}/platform`, platformData);
+    return response.data?.data || response.data;
+  },
 };

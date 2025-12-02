@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from app.database import get_db
-from app.models.county import CountyCreate, CountyUpdate, CountyResponse
+from app.models.county import CountyCreate, CountyUpdate, CountyResponse, PlatformUpdate
 from app.services.accela_client import AccelaClient
 from app.services.encryption import encryption_service
 from app.config import settings
@@ -710,6 +710,152 @@ async def get_rate_limit_stats(county_id: str, db=Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error getting rate limit stats: {str(e)}")
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }
+
+
+# Platform detection endpoints
+
+@router.patch("/{county_id}/platform", response_model=dict)
+async def update_county_platform(
+    county_id: str,
+    platform_update: PlatformUpdate,
+    db=Depends(get_db)
+):
+    """
+    Manually update a county's platform information.
+
+    This endpoint allows manual override of platform detection when:
+    - Automated detection fails (platform='Unknown')
+    - Detection is incorrect
+    - Platform changes over time
+
+    Request body:
+    {
+        "platform": "Accela",
+        "platform_confidence": "Confirmed",
+        "county_code": "HCFL",
+        "permit_portal_url": "https://aca-prod.accela.com/HCFL/Default.aspx",
+        "building_dept_website": "https://www.hillsboroughcounty.org/en/residents/building-and-development",
+        "platform_detection_notes": "Manually verified via county website"
+    }
+    """
+    try:
+        # Verify county exists
+        county_result = db.table("counties").select("*").eq("id", county_id).execute()
+        if not county_result.data:
+            raise HTTPException(status_code=404, detail=f"County {county_id} not found")
+
+        # Build update data from provided fields
+        update_data = {
+            "platform": platform_update.platform,
+        }
+
+        if platform_update.platform_confidence is not None:
+            update_data["platform_confidence"] = platform_update.platform_confidence
+
+        if platform_update.county_code is not None:
+            update_data["county_code"] = platform_update.county_code
+
+        if platform_update.permit_portal_url is not None:
+            update_data["permit_portal_url"] = platform_update.permit_portal_url
+
+        if platform_update.building_dept_website is not None:
+            update_data["building_dept_website"] = platform_update.building_dept_website
+
+        if platform_update.platform_detection_notes is not None:
+            update_data["platform_detection_notes"] = platform_update.platform_detection_notes
+
+        # Update county
+        result = db.table("counties").update(update_data).eq("id", county_id).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="County not found after update")
+
+        return {
+            "success": True,
+            "data": result.data[0],
+            "error": None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating county platform: {str(e)}")
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }
+
+
+@router.get("/platforms/summary", response_model=dict)
+async def get_platforms_summary(db=Depends(get_db)):
+    """
+    Get platform distribution statistics across all counties.
+
+    Returns counts and percentages for each platform type.
+    Useful for dashboard metrics and monitoring detection coverage.
+
+    Response:
+    {
+        "success": true,
+        "data": {
+            "total_counties": 67,
+            "platforms": {
+                "Accela": {"count": 13, "percentage": 19.4},
+                "Unknown": {"count": 53, "percentage": 79.1},
+                "Custom": {"count": 1, "percentage": 1.5}
+            },
+            "by_confidence": {
+                "Confirmed": 13,
+                "Likely": 1,
+                "Unknown": 53
+            }
+        }
+    }
+    """
+    try:
+        # Get all counties
+        counties_result = db.table("counties").select("platform, platform_confidence").execute()
+
+        total_counties = len(counties_result.data)
+
+        # Count by platform
+        platform_counts = {}
+        confidence_counts = {}
+
+        for county in counties_result.data:
+            platform = county.get("platform", "Unknown")
+            confidence = county.get("platform_confidence", "Unknown")
+
+            platform_counts[platform] = platform_counts.get(platform, 0) + 1
+            confidence_counts[confidence] = confidence_counts.get(confidence, 0) + 1
+
+        # Calculate percentages
+        platforms_with_percentages = {}
+        for platform, count in platform_counts.items():
+            percentage = (count / total_counties * 100) if total_counties > 0 else 0
+            platforms_with_percentages[platform] = {
+                "count": count,
+                "percentage": round(percentage, 1)
+            }
+
+        return {
+            "success": True,
+            "data": {
+                "total_counties": total_counties,
+                "platforms": platforms_with_percentages,
+                "by_confidence": confidence_counts
+            },
+            "error": None
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting platforms summary: {str(e)}")
         return {
             "success": False,
             "data": None,
