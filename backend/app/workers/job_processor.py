@@ -54,7 +54,13 @@ class JobProcessor:
     async def start(self):
         """Start the job processor polling loop."""
         self.is_running = True
+
+        # Force stdout for Railway visibility
+        print("🚀 JOB PROCESSOR STARTED", flush=True)
         logger.info("🚀 Job processor started - polling every %d seconds", self.POLL_INTERVAL)
+
+        # Recover any stale jobs from previous crash/restart
+        await self._recover_stale_jobs()
 
         while self.is_running:
             try:
@@ -71,6 +77,44 @@ class JobProcessor:
     async def stop(self):
         """Stop the job processor."""
         self.is_running = False
+
+    async def _recover_stale_jobs(self):
+        """
+        Reset jobs stuck in 'running' state from server crash/restart.
+
+        Jobs that have been 'running' for > 10 minutes without progress
+        are assumed to be orphaned and reset to 'pending' for retry.
+        """
+        stale_threshold = datetime.utcnow() - timedelta(minutes=10)
+
+        try:
+            # Find and reset stale jobs
+            result = self.db.table('background_jobs') \
+                .select('id, county_id, job_type, updated_at') \
+                .eq('status', 'running') \
+                .lt('updated_at', stale_threshold.isoformat()) \
+                .execute()
+
+            if not result.data:
+                print("♻️ No stale jobs to recover", flush=True)
+                return
+
+            for job in result.data:
+                job_id = job['id']
+                self.db.table('background_jobs').update({
+                    'status': 'pending',
+                    'error_message': 'Recovered: Job was interrupted by server restart',
+                    'updated_at': datetime.utcnow().isoformat()
+                }).eq('id', job_id).execute()
+
+                print(f"♻️ Recovered stale job {job_id} ({job['job_type']})", flush=True)
+                logger.warning(f"♻️ Recovered stale job {job_id}")
+
+            logger.warning(f"♻️ Recovered {len(result.data)} stale jobs")
+
+        except Exception as e:
+            logger.error(f"❌ Error recovering stale jobs: {str(e)}")
+            print(f"❌ Error recovering stale jobs: {str(e)}", flush=True)
 
     async def _poll_and_process(self):
         """Poll for pending jobs and process the oldest one."""
@@ -89,6 +133,7 @@ class JobProcessor:
         job = result.data[0]
         job_id = job['id']
 
+        print(f"📋 PICKED UP JOB {job_id} ({job['job_type']})", flush=True)
         logger.info(f"📋 Picked up job {job_id} ({job['job_type']})")
 
         # Mark job as running
@@ -114,6 +159,7 @@ class JobProcessor:
                 progress_percent=100
             )
 
+            print(f"✅ JOB {job_id} COMPLETED SUCCESSFULLY", flush=True)
             logger.info(f"✅ Job {job_id} completed successfully")
 
         except Exception as e:
@@ -139,6 +185,7 @@ class JobProcessor:
                         'updated_at': datetime.utcnow().isoformat()
                     }
                 )
+                print(f"⚠️ JOB {job_id} FAILED, RETRY {retry_count + 1}/{max_retries}: {error_message}", flush=True)
                 logger.warning(f"⚠️  Job {job_id} failed, retry {retry_count + 1}/{max_retries}")
             else:
                 # Max retries exceeded - mark as failed
@@ -152,6 +199,7 @@ class JobProcessor:
                         'updated_at': datetime.utcnow().isoformat()
                     }
                 )
+                print(f"❌ JOB {job_id} FAILED PERMANENTLY after {max_retries} retries: {error_message}", flush=True)
                 logger.error(f"❌ Job {job_id} failed permanently after {max_retries} retries")
 
         finally:
@@ -200,6 +248,26 @@ class JobProcessor:
             access_token=county.get('access_token', ''),
             token_expires_at=county.get('token_expires_at', '')
         )
+
+        # CRITICAL: Validate token before processing to fail fast
+        print(f"🔐 Validating OAuth token for {county['name']}...", flush=True)
+        token_result = await accela_client.ensure_valid_token()
+
+        if not token_result['success']:
+            print(f"❌ Token validation failed: {token_result['error']}", flush=True)
+            logger.error(f"❌ Token validation failed for {county['name']}: {token_result['error']}")
+
+            if token_result.get('needs_reauth'):
+                # Mark county as needing re-authorization
+                self.db.table('counties').update({
+                    'status': 'disconnected',
+                    'updated_at': datetime.utcnow().isoformat()
+                }).eq('id', county_id).execute()
+                print(f"⚠️ County {county['name']} marked as disconnected - needs re-authorization", flush=True)
+
+            raise ValueError(f"OAuth token invalid for {county['name']}: {token_result['error']}")
+
+        print(f"✅ Token validated for {county['name']}", flush=True)
 
         # Initialize property aggregator
         aggregator = PropertyAggregator(self.db)
@@ -395,6 +463,26 @@ class JobProcessor:
             access_token=county.get('access_token', ''),
             token_expires_at=county.get('token_expires_at', '')
         )
+
+        # CRITICAL: Validate token before processing to fail fast
+        print(f"🔐 Validating OAuth token for {county['name']}...", flush=True)
+        token_result = await accela_client.ensure_valid_token()
+
+        if not token_result['success']:
+            print(f"❌ Token validation failed: {token_result['error']}", flush=True)
+            logger.error(f"❌ Token validation failed for {county['name']}: {token_result['error']}")
+
+            if token_result.get('needs_reauth'):
+                # Mark county as needing re-authorization
+                self.db.table('counties').update({
+                    'status': 'disconnected',
+                    'updated_at': datetime.utcnow().isoformat()
+                }).eq('id', county_id).execute()
+                print(f"⚠️ County {county['name']} marked as disconnected - needs re-authorization", flush=True)
+
+            raise ValueError(f"OAuth token invalid for {county['name']}: {token_result['error']}")
+
+        print(f"✅ Token validated for {county['name']}", flush=True)
 
         aggregator = PropertyAggregator(self.db)
 

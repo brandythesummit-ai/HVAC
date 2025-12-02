@@ -312,6 +312,50 @@ class AccelaClient:
         if self._is_token_expired():
             await self.refresh_access_token()
 
+    async def ensure_valid_token(self) -> Dict[str, Any]:
+        """
+        Public method to verify OAuth token is valid before processing.
+
+        Call this at the start of a job to fail fast if re-authorization is needed.
+
+        Returns:
+            Dict with 'success', 'error', 'needs_reauth'
+        """
+        try:
+            if self._is_token_expired():
+                logger.info(f"[TOKEN] Token expired, attempting refresh...")
+                await self.refresh_access_token()
+
+            return {
+                "success": True,
+                "error": None,
+                "needs_reauth": False,
+                "expires_at": self._token_expires_at
+            }
+        except httpx.HTTPStatusError as e:
+            error_body = e.response.text
+            error_status = e.response.status_code
+
+            # 400/401 errors typically mean refresh token is invalid
+            needs_reauth = error_status in (400, 401)
+
+            logger.error(f"[TOKEN] Refresh failed: {error_status} - {error_body}")
+
+            return {
+                "success": False,
+                "error": f"Token refresh failed ({error_status}): {error_body}",
+                "needs_reauth": needs_reauth,
+                "expires_at": self._token_expires_at
+            }
+        except Exception as e:
+            logger.error(f"[TOKEN] Unexpected error during token refresh: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "needs_reauth": True,  # Assume re-auth needed on unknown errors
+                "expires_at": self._token_expires_at
+            }
+
     async def _make_request(
         self,
         method: str,
