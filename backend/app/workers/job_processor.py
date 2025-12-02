@@ -373,7 +373,23 @@ class JobProcessor:
                 batch_leads_created = 0
                 batch_permits_saved = 0
 
+                permit_count = 0
+                last_progress_update = datetime.utcnow()
+
                 for permit in permits:
+                    permit_count += 1
+
+                    # Update progress every 50 permits or every 30 seconds
+                    now = datetime.utcnow()
+                    should_update = (permit_count % 50 == 0) or ((now - last_progress_update).total_seconds() >= 30)
+
+                    if should_update:
+                        print(f"      ⏳ Processed {permit_count}/{len(permits)} permits in batch {batch_num}", flush=True)
+                        await self._update_job(job_id, {
+                            'updated_at': now.isoformat()
+                        })
+                        last_progress_update = now
+
                     try:
                         # Get additional permit details
                         permit_details = await self._enrich_permit_data(accela_client, permit)
