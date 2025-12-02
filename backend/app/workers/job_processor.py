@@ -345,6 +345,7 @@ class JobProcessor:
 
             while True:
                 batch_num += 1
+                print(f"   📦 Batch {batch_num} for {year} - fetching up to {batch_size} permits...", flush=True)
                 logger.info(f"   📦 Batch {batch_num} (up to {batch_size} permits)")
 
                 # Fetch permits
@@ -354,8 +355,10 @@ class JobProcessor:
                     limit=batch_size,
                     permit_type=permit_type
                 )
+                print(f"   ✅ Batch {batch_num} returned from Accela", flush=True)
 
                 permits = permit_data.get('permits', [])
+                print(f"   📊 Got {len(permits)} permits for {year}", flush=True)
 
                 if not permits:
                     logger.info(f"   ✅ No more permits for {year}")
