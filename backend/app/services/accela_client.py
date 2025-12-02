@@ -402,6 +402,13 @@ class AccelaClient:
         # Configure timeout (30s default, configurable via ACCELA_REQUEST_TIMEOUT)
         timeout = httpx.Timeout(settings.accela_request_timeout, connect=10.0)
 
+        # VERBOSE LOGGING: Show every API call
+        params_str = ""
+        if "params" in kwargs:
+            params_str = "&".join([f"{k}={v}" for k, v in kwargs["params"].items() if v is not None])
+        full_url = f"{url}?{params_str}" if params_str else url
+        print(f"🌐 [ACCELA API] {method} {full_url}", flush=True)
+
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
@@ -409,6 +416,11 @@ class AccelaClient:
 
                     # Update rate limiter state from response headers
                     self.rate_limiter.update_from_headers(dict(response.headers))
+
+                    # VERBOSE LOGGING: Show response status and rate limit info
+                    rate_remaining = response.headers.get('x-ratelimit-remaining', '?')
+                    rate_limit = response.headers.get('x-ratelimit-limit', '?')
+                    print(f"   ✅ {response.status_code} OK | Rate: {rate_remaining}/{rate_limit} remaining", flush=True)
 
                     # Handle 429 Too Many Requests
                     if response.status_code == 429:
