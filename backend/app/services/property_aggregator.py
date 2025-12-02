@@ -417,13 +417,18 @@ class PropertyAggregator:
             'pipeline_confidence': pipeline_confidence,
         }
 
-        result = self.db.table('properties').insert(property_data).execute()
+        # Use upsert to handle re-pulls gracefully (avoids duplicate key errors)
+        # If a property with this county_id + normalized_address already exists, update it
+        result = self.db.table('properties').upsert(
+            property_data,
+            on_conflict='county_id,normalized_address'
+        ).execute()
 
         if result.data:
-            logger.info(f"Created property {result.data[0]['id']} at {parsed_address.normalized_address} (Pipeline: {recommended_pipeline})")
+            logger.info(f"Upserted property {result.data[0]['id']} at {parsed_address.normalized_address} (Pipeline: {recommended_pipeline})")
             return result.data[0]['id']
         else:
-            raise Exception("Failed to create property record")
+            raise Exception("Failed to upsert property record")
 
     async def _update_property(
         self,
