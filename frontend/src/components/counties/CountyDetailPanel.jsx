@@ -234,9 +234,9 @@ export default function CountyDetailPanel({ county, onClose }) {
               {/* Per-Year Breakdown Table - ALWAYS VISIBLE */}
               <div className="mt-3">
                 <h4 className="text-xs font-medium text-gray-600 mb-1.5">Permits by Year</h4>
-                <div className="max-h-36 overflow-y-auto border border-gray-200 rounded bg-white">
+                <div className="border border-gray-200 rounded bg-white">
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-100 sticky top-0">
+                    <thead className="bg-gray-100">
                       <tr>
                         <th className="px-2 py-1.5 text-left font-medium text-gray-600">Year</th>
                         <th className="px-2 py-1.5 text-right font-medium text-gray-600">Permits</th>
