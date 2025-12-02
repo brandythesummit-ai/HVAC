@@ -535,7 +535,7 @@ export default function CountyDetailPanel({ county, onClose }) {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Actions - Delete only (pulls are automatic after authorization) */}
           {county.oauth_authorized && (
             <div className="pt-4 border-t border-gray-200">
               <button

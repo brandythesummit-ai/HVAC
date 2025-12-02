@@ -6,10 +6,13 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
 
     const hasLeads = (county.lead_count || 0) > 0;
     const lastPullFailed = county.last_pull_status === 'failed';
+    const hasEverPulled = county.last_pull_at !== null || county.initial_pull_completed;
 
     if (lastPullFailed) return { color: 'red', text: 'Error', icon: AlertCircle };
     if (hasLeads) return { color: 'green', text: 'Healthy', icon: CheckCircle };
-    return { color: 'yellow', text: 'Setup', icon: AlertCircle };
+    if (hasEverPulled) return { color: 'green', text: 'Active', icon: CheckCircle };
+    // Authorized but never pulled yet - ready to pull
+    return { color: 'green', text: 'Ready', icon: CheckCircle };
   };
 
   const health = getHealthStatus();

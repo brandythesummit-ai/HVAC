@@ -492,12 +492,48 @@ async def setup_county_with_password(
 
         db.table("counties").update(update_data).eq("id", county_id).execute()
 
+        # ===============================================
+        # AUTO-TRIGGER 30-YEAR INITIAL PULL
+        # ===============================================
+        # Only trigger if county hasn't completed initial pull yet
+        county_check = db.table("counties")\
+            .select("initial_pull_completed, initial_pull_job_id")\
+            .eq("id", county_id)\
+            .single()\
+            .execute()
+
+        job_id = None
+        if county_check.data and not county_check.data.get("initial_pull_completed"):
+            # Create initial_pull job (same as POST /api/counties)
+            job_data = {
+                "county_id": county_id,
+                "job_type": "initial_pull",
+                "status": "pending",
+                "parameters": {"years": 30},
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            job_result = db.table("background_jobs").insert(job_data).execute()
+            job_id = job_result.data[0]["id"] if job_result.data else None
+
+            # Update county with job reference
+            if job_id:
+                db.table("counties").update({
+                    "initial_pull_job_id": job_id
+                }).eq("id", county_id).execute()
+
+            # Assign weekly pull schedule (staggered across week)
+            assign_pull_schedule(db, county_id)
+
+            logger.info(f"Auto-triggered initial_pull job {job_id} for county {county_id}")
+
         return {
             "success": True,
             "data": {
-                "message": "County connected successfully using password grant",
+                "message": "County connected successfully using password grant" +
+                          (". 30-year historical pull started." if job_id else ""),
                 "county_id": county_id,
-                "county_name": county["name"]
+                "county_name": county["name"],
+                "initial_pull_job_id": job_id
             },
             "error": None
         }
