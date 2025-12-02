@@ -295,9 +295,21 @@ class JobProcessor:
         # Track permits per year for live UI updates
         per_year_permits = {}
 
+        # Track year-level status for accurate progress display
+        # Status values: 'not_started', 'in_progress', 'completed'
+        years_status = {str(year): 'not_started' for year in range(start_year, end_year + 1)}
+
         start_time = datetime.utcnow()
 
         logger.info(f"📅 Pulling {years} years: {start_year} → {end_year}")
+
+        # Initialize job with years_status so UI can show all years immediately
+        await self._update_job(job_id, {
+            'years_status': years_status,
+            'start_year': start_year,
+            'end_year': end_year,
+            'updated_at': datetime.utcnow().isoformat()
+        })
 
         # Process year by year (oldest first)
         for year in range(start_year, end_year + 1):
@@ -306,9 +318,13 @@ class JobProcessor:
 
             logger.info(f"📆 Processing year {year}...")
 
-            # Update job with current year (progress updated in batch loop below)
+            # Mark this year as in_progress
+            years_status[str(year)] = 'in_progress'
+
+            # Update job with current year and status
             await self._update_job(job_id, {
                 'current_year': year,
+                'years_status': years_status,
                 'updated_at': datetime.utcnow().isoformat()
             })
 
@@ -418,9 +434,13 @@ class JobProcessor:
 
             years_processed += 1
 
+            # Mark this year as completed
+            years_status[str(year)] = 'completed'
+
             # Update progress after year completion (ensures accurate % between years)
             await self._update_job(job_id, {
                 'progress_percent': int((years_processed / total_years) * 100),
+                'years_status': years_status,
                 'updated_at': datetime.utcnow().isoformat()
             })
 
@@ -440,6 +460,9 @@ class JobProcessor:
             'permits_per_second': round(permits_per_second, 2),
             'progress_percent': 100,
             'per_year_permits': per_year_permits,
+            'years_status': years_status,
+            'start_year': start_year,
+            'end_year': end_year,
             'updated_at': datetime.utcnow().isoformat()
         })
 

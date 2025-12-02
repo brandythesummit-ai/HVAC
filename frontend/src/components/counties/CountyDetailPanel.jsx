@@ -234,16 +234,53 @@ export default function CountyDetailPanel({ county, onClose }) {
               {/* Per-Year Breakdown Table - ALWAYS VISIBLE */}
               <div className="mt-3">
                 <h4 className="text-xs font-medium text-gray-600 mb-1.5">Permits by Year</h4>
-                <div className="border border-gray-200 rounded bg-white">
+                <div className="border border-gray-200 rounded bg-white max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-gray-100 sticky top-0">
                       <tr>
                         <th className="px-2 py-1.5 text-left font-medium text-gray-600">Year</th>
+                        <th className="px-2 py-1.5 text-center font-medium text-gray-600">Status</th>
                         <th className="px-2 py-1.5 text-right font-medium text-gray-600">Permits</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {pullStatus.per_year_permits && Object.keys(pullStatus.per_year_permits).length > 0 ? (
+                      {/* New: Year-level status tracking when available */}
+                      {pullStatus.start_year && pullStatus.end_year ? (
+                        Array.from(
+                          { length: pullStatus.end_year - pullStatus.start_year + 1 },
+                          (_, i) => pullStatus.end_year - i  // Newest first
+                        ).map(year => {
+                          const status = pullStatus.years_status?.[year] || 'not_started';
+                          const permits = pullStatus.per_year_permits?.[year] || 0;
+
+                          return (
+                            <tr key={year} className={status === 'in_progress' ? 'bg-blue-50' : ''}>
+                              <td className="px-2 py-1">{year}</td>
+                              <td className="px-2 py-1 text-center">
+                                {status === 'completed' && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">
+                                    <CheckCircle className="h-3 w-3 mr-0.5" />
+                                    Done
+                                  </span>
+                                )}
+                                {status === 'in_progress' && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                                    <RefreshCw className="h-3 w-3 mr-0.5 animate-spin" />
+                                    Pulling
+                                  </span>
+                                )}
+                                {status === 'not_started' && (
+                                  <span className="text-xs text-gray-400">—</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1 text-right font-mono">
+                                {status === 'completed' ? permits.toLocaleString() : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : pullStatus.per_year_permits && Object.keys(pullStatus.per_year_permits).length > 0 ? (
+                        /* Fallback: Old behavior for existing jobs without years_status */
                         Object.entries(pullStatus.per_year_permits)
                           .sort(([a], [b]) => Number(b) - Number(a))
                           .map(([year, count]) => (
@@ -252,12 +289,18 @@ export default function CountyDetailPanel({ county, onClose }) {
                               className={year === String(pullStatus.years_info?.current_year) ? 'bg-blue-50' : ''}
                             >
                               <td className="px-2 py-1">{year}</td>
+                              <td className="px-2 py-1 text-center">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">
+                                  <CheckCircle className="h-3 w-3 mr-0.5" />
+                                  Done
+                                </span>
+                              </td>
                               <td className="px-2 py-1 text-right font-mono">{count.toLocaleString()}</td>
                             </tr>
                           ))
                       ) : (
                         <tr>
-                          <td colSpan="2" className="px-2 py-3 text-center text-gray-400 italic">
+                          <td colSpan="3" className="px-2 py-3 text-center text-gray-400 italic">
                             No permits pulled yet
                           </td>
                         </tr>

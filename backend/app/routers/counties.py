@@ -380,7 +380,7 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
         job_per_year_permits = {}
         if county.data.get("initial_pull_job_id"):
             job_result = db.table("background_jobs")\
-                .select("status, progress_percent, permits_pulled, current_year, parameters, per_year_permits")\
+                .select("status, progress_percent, permits_pulled, current_year, parameters, per_year_permits, years_status, start_year, end_year")\
                 .eq("id", county.data["initial_pull_job_id"])\
                 .execute()
 
@@ -431,6 +431,20 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
 
         last_pull = last_pull_result.data[0] if last_pull_result.data else None
 
+        # Extract years_status from job if available
+        years_status = None
+        job_start_year = None
+        job_end_year = None
+        if county.data.get("initial_pull_job_id"):
+            try:
+                if job_result.data:
+                    job_data = job_result.data[0]
+                    years_status = job_data.get("years_status", {})
+                    job_start_year = job_data.get("start_year")
+                    job_end_year = job_data.get("end_year")
+            except NameError:
+                pass  # job_result wasn't defined (no job_id)
+
         return {
             "success": True,
             "data": {
@@ -438,6 +452,9 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
                 "initial_pull_progress": job_progress,
                 "years_info": years_info,
                 "per_year_permits": per_year_permits,
+                "years_status": years_status,
+                "start_year": job_start_year,
+                "end_year": job_end_year,
                 "next_pull_at": schedule["next_pull_at"] if schedule else None,
                 "last_pull_at": last_pull["created_at"] if last_pull else None,
                 "last_pull_permits": last_pull["permits_pulled"] if last_pull else 0,
