@@ -384,6 +384,10 @@ class JobProcessor:
                     should_update = (permit_count % 50 == 0) or ((now - last_progress_update).total_seconds() >= 30)
 
                     if should_update:
+                        # Check if job was cancelled or deleted
+                        if await self._is_job_cancelled_or_deleted(job_id):
+                            raise Exception("Job was cancelled or deleted by user")
+
                         print(f"      ⏳ Processed {permit_count}/{len(permits)} permits in batch {batch_num}", flush=True)
                         await self._update_job(job_id, {
                             'updated_at': now.isoformat()
@@ -757,6 +761,40 @@ class JobProcessor:
     async def _update_job(self, job_id: str, updates: Dict):
         """Update job with arbitrary fields."""
         self.db.table('background_jobs').update(updates).eq('id', job_id).execute()
+
+    async def _is_job_cancelled_or_deleted(self, job_id: str) -> bool:
+        """
+        Check if the job has been cancelled or deleted from the database.
+
+        This is called periodically during permit processing to allow
+        users to stop a running job by either:
+        1. Setting status = 'cancelled' in the database
+        2. Deleting the job row entirely
+
+        Returns True if the job should stop processing.
+        """
+        try:
+            result = self.db.table('background_jobs') \
+                .select('status') \
+                .eq('id', job_id) \
+                .execute()
+
+            # Job was deleted
+            if not result.data:
+                print(f"🛑 Job {job_id} was deleted - stopping processing", flush=True)
+                return True
+
+            # Job was cancelled
+            status = result.data[0].get('status')
+            if status in ('cancelled', 'failed', 'completed'):
+                print(f"🛑 Job {job_id} status is '{status}' - stopping processing", flush=True)
+                return True
+
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking job status: {e}")
+            # On error, continue processing (fail-safe)
+            return False
 
 
 # Singleton instance
