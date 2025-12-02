@@ -343,21 +343,36 @@ async def get_county_pull_status(county_id: str, db=Depends(get_db)):
         current_year = datetime.now().year
         per_year_permits = {str(year): 0 for year in range(current_year - 29, current_year + 1)}
 
-        permits_result = db.table("permits")\
-            .select("opened_date")\
-            .eq("county_id", county_id)\
-            .execute()
+        # Use RPC for efficient SQL aggregation (no row limit issues)
+        # Falls back to client-side counting if RPC not available
+        try:
+            rpc_result = db.rpc(
+                "count_permits_by_year",
+                {"p_county_id": county_id}
+            ).execute()
 
-        if permits_result.data:
-            for permit in permits_result.data:
-                if permit.get("opened_date"):
-                    # Extract year from date string (format: YYYY-MM-DD)
-                    year = permit["opened_date"][:4]
-                    if year in per_year_permits:
-                        per_year_permits[year] += 1
-                    else:
-                        # Include years outside 30-year range if they exist
-                        per_year_permits[year] = 1
+            if rpc_result.data:
+                for row in rpc_result.data:
+                    year = str(row["year"])
+                    per_year_permits[year] = row["count"]
+        except Exception:
+            # Fallback: fetch all permits with high limit (default is 1000)
+            permits_result = db.table("permits")\
+                .select("opened_date")\
+                .eq("county_id", county_id)\
+                .limit(100000)\
+                .execute()
+
+            if permits_result.data:
+                for permit in permits_result.data:
+                    if permit.get("opened_date"):
+                        # Extract year from date string (format: YYYY-MM-DD)
+                        year = permit["opened_date"][:4]
+                        if year in per_year_permits:
+                            per_year_permits[year] += 1
+                        else:
+                            # Include years outside 30-year range if they exist
+                            per_year_permits[year] = 1
 
         # Get active job progress (if any)
         job_progress = None
