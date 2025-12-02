@@ -26,6 +26,7 @@ Florida's climate and aging HVAC systems create high replacement demand. Statewi
 - **Framework:** React 19.2.0 with React Router 7.9.6
 - **Build Tool:** Vite 7.2.4
 - **State Management:** TanStack React Query 5.90.11
+- **Virtual Scrolling:** TanStack React Virtual 3.13.12
 - **HTTP Client:** Axios 1.13.2
 - **Styling:** TailwindCSS 4.1.17 with PostCSS
 - **Icons:** Lucide React
@@ -201,12 +202,25 @@ The rate limiter categorizes requests for different fallback delays:
 /frontend/src
 ├── /api                 # API client layer (Axios)
 ├── /components          # Reusable React components
+│   └── /counties        # Coverage Dashboard components (hierarchical UI)
+│       ├── StateSection.jsx          # State accordion header with metrics
+│       ├── CountiesVirtualList.jsx   # Virtual scrolling container
+│       ├── CountyCompactRow.jsx      # Lightweight 60px county row
+│       └── CountyDetailPanel.jsx     # Slide-out detail panel
 ├── /pages               # Top-level page components
+│   └── CountiesPage.jsx # Coverage Dashboard (hierarchical state-grouped UI)
 ├── /hooks               # Custom React Query hooks
 └── /utils               # Formatters and utilities
 ```
 
 **Pattern:** Functional components with hooks, React Query for server state
+
+**Coverage Dashboard Architecture:**
+- **Hierarchical Accordion Pattern**: State-grouped counties with progressive disclosure
+- **Virtual Scrolling**: Only renders ~20 visible rows for 3,000+ county performance
+- **Performance Optimizations**: React.memo, useMemo, debounced search (300ms)
+- **Fixed Row Heights**: 60px for predictable virtual scrolling
+- **Fetch Strategy**: Load all counties once (~300KB gzipped), client-side filtering
 
 ### Database Schema
 Key tables:
@@ -248,6 +262,12 @@ Key tables:
 - Run tests after making changes and **fix any errors found before completing**
 - Sequential execution (workers: 1) to avoid data races
 - Screenshots/videos on failure only
+
+**⚠️ Known Issue (2025-12-01):**
+- E2E tests currently failing after Coverage Dashboard UI redesign
+- Tests use old selectors (`.card`, `button:has-text("Pull Permits")`)
+- Need to update for new hierarchical accordion UI structure
+- New selectors needed: state sections, compact rows, detail panel
 
 ### Test Commands
 ```bash

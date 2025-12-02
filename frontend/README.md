@@ -16,7 +16,7 @@ React frontend for the HVAC Lead Generation platform that pulls permit data from
 - ✅ Deployed on Vercel at https://hvac-liard.vercel.app
 - ✅ Connected to Railway backend (https://hvac-backend-production-11e6.up.railway.app)
 - ✅ Supports rolling 30-year historical permits pulls
-- ✅ E2E tested with Playwright (all tests passing)
+- ⚠️ E2E tests need updates for new Coverage Dashboard UI
 
 **Current Data:**
 - 📊 **0 counties configured** (HCFL pilot deleted for statewide rebuild)
@@ -28,6 +28,7 @@ React frontend for the HVAC Lead Generation platform that pulls permit data from
 - Vite 7.2.4 (build tool)
 - React Router 7.9.6 (routing)
 - TanStack React Query 5.90.11 (API state management)
+- TanStack React Virtual 3.13.12 (virtual scrolling for performance)
 - Axios 1.13.2 (HTTP client)
 - TailwindCSS 4.1.17 (styling)
 - Lucide React 0.555.0 (icons)
@@ -77,6 +78,10 @@ frontend/
 │   ├── components/       # React components
 │   │   ├── Layout.jsx    # Main layout with navigation
 │   │   ├── counties/     # County-related components
+│   │   │   ├── StateSection.jsx           # State accordion header
+│   │   │   ├── CountiesVirtualList.jsx    # Virtual scrolling list
+│   │   │   ├── CountyCompactRow.jsx       # Lightweight county row
+│   │   │   └── CountyDetailPanel.jsx      # Slide-out detail panel
 │   │   ├── leads/        # Lead-related components
 │   │   └── settings/     # Settings components
 │   ├── pages/            # Page components
@@ -103,11 +108,23 @@ frontend/
 
 ## Key Features
 
-### Counties Page
-- View all configured counties with status indicators
-- Add new counties with 3-step wizard (name → credentials → test)
-- Pull permits with date range or "older than X years" filters
-- Visual status: Connected, Token Expired, Error
+### Coverage Dashboard (Counties Page)
+**Hierarchical state-grouped interface designed to scale to 3,000+ counties nationwide:**
+- **State Sections**: Expandable accordion view grouping counties by state
+  - Aggregate metrics per state (total counties, authorized count, total leads, last pull time)
+  - Florida (FL) expanded by default for immediate visibility
+- **County Compact Rows**: Lightweight 60px rows showing key info
+  - County name, platform badge, lead count, health status
+  - Click row to open detail panel
+- **Detail Panel**: Slide-out panel with full county configuration
+  - OAuth authorization management
+  - Platform detection info
+  - Delete functionality with confirmation
+- **Virtual Scrolling**: High-performance rendering using @tanstack/react-virtual
+  - Only renders visible rows (~20 at a time)
+  - Smooth scrolling with 3,000+ counties
+- **Search**: Filters states and counties in real-time
+- **Performance**: React.memo + useMemo optimization, debounced search
 
 ### Leads Page
 - Table view with filtering by county and sync status
