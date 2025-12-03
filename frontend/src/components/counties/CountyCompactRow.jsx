@@ -1,18 +1,20 @@
-import { CheckCircle, AlertCircle, ChevronRight, HelpCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, ChevronRight, HelpCircle, RefreshCw } from 'lucide-react';
 
 export default function CountyCompactRow({ county, onClick, isSelected }) {
   const getHealthStatus = () => {
     if (!county.oauth_authorized) return { color: 'yellow', text: 'Setup', icon: AlertCircle };
 
+    // Check if pull is in progress (authorized but initial pull not completed)
+    if (!county.initial_pull_completed) {
+      return { color: 'blue', text: 'Pulling', icon: RefreshCw };
+    }
+
     const hasLeads = (county.lead_count || 0) > 0;
     const lastPullFailed = county.last_pull_status === 'failed';
-    const hasEverPulled = county.last_pull_at !== null || county.initial_pull_completed;
 
     if (lastPullFailed) return { color: 'red', text: 'Error', icon: AlertCircle };
     if (hasLeads) return { color: 'green', text: 'Healthy', icon: CheckCircle };
-    if (hasEverPulled) return { color: 'green', text: 'Active', icon: CheckCircle };
-    // Authorized but never pulled yet - ready to pull
-    return { color: 'green', text: 'Ready', icon: CheckCircle };
+    return { color: 'green', text: 'Active', icon: CheckCircle };
   };
 
   const health = getHealthStatus();
@@ -41,9 +43,9 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
         ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}
       `}
     >
-      <div className="flex items-center space-x-4 flex-1 min-w-0">
-        {/* Auth indicator */}
-        <div className="flex-shrink-0">
+      <div className="grid grid-cols-[24px_1fr_80px_80px_80px] gap-4 items-center flex-1 min-w-0">
+        {/* Auth indicator - 24px fixed */}
+        <div>
           {county.oauth_authorized ? (
             <CheckCircle className="h-5 w-5 text-green-600" />
           ) : (
@@ -51,30 +53,31 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
           )}
         </div>
 
-        {/* County name */}
-        <span className="font-medium text-gray-900 truncate flex-shrink min-w-[150px]">
+        {/* County name - flexible */}
+        <span className="font-medium text-gray-900 truncate">
           {county.name}
         </span>
 
-        {/* Platform badge */}
-        <span className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${getPlatformBadge()}`}>
+        {/* Platform badge - 80px fixed */}
+        <span className={`px-2 py-1 rounded text-xs font-medium text-center ${getPlatformBadge()}`}>
           {county.platform === 'Unknown' && (
             <HelpCircle className="h-3 w-3 inline mr-1" />
           )}
           {county.platform || 'Unknown'}
         </span>
 
-        {/* Lead count */}
-        <span className="text-sm text-gray-600 flex-shrink-0 min-w-[80px]">
+        {/* Lead count - 80px fixed */}
+        <span className="text-sm text-gray-600 text-right">
           {(county.lead_count || 0).toLocaleString()} leads
         </span>
 
-        {/* Health status */}
+        {/* Health status - 80px fixed */}
         <span className={`
-          flex items-center text-sm font-medium flex-shrink-0
+          flex items-center justify-end text-sm font-medium
           ${health.color === 'green' ? 'text-green-700' : ''}
           ${health.color === 'yellow' ? 'text-yellow-700' : ''}
           ${health.color === 'red' ? 'text-red-700' : ''}
+          ${health.color === 'blue' ? 'text-blue-700' : ''}
         `}>
           <HealthIcon className="h-4 w-4 mr-1" />
           {health.text}

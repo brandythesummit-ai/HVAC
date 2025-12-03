@@ -5,6 +5,9 @@ export const useCounties = () => {
   return useQuery({
     queryKey: ['counties'],
     queryFn: countiesApi.getAll,
+    // Poll every 5 seconds to keep lead counts in sync with detail panel
+    refetchInterval: 5000,
+    staleTime: 2000,
   });
 };
 

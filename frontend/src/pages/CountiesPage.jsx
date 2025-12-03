@@ -10,15 +10,20 @@ export default function CountiesPage() {
   const [selectedCounty, setSelectedCounty] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Group counties by state
+  // Group counties by state and sort alphabetically
   const countiesByState = useMemo(() => {
     if (!allCounties) return {};
-    return allCounties.reduce((acc, county) => {
+    const grouped = allCounties.reduce((acc, county) => {
       const state = county.state || 'Unknown';
       if (!acc[state]) acc[state] = [];
       acc[state].push(county);
       return acc;
     }, {});
+    // Sort counties within each state alphabetically
+    Object.keys(grouped).forEach(state => {
+      grouped[state].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    return grouped;
   }, [allCounties]);
 
   // Calculate state metrics
