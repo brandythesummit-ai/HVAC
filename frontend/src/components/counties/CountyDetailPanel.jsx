@@ -292,7 +292,9 @@ export default function CountyDetailPanel({ county, onClose }) {
                                 )}
                               </td>
                               <td className="px-2 py-1 text-right font-mono">
-                                {status === 'completed' ? permits.toLocaleString() : '—'}
+                                {(status === 'completed' || status === 'in_progress') && permits > 0
+                                  ? permits.toLocaleString()
+                                  : '—'}
                               </td>
                             </tr>
                           );
