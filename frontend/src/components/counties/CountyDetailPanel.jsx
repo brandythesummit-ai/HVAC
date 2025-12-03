@@ -1,11 +1,10 @@
-import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Trash2, Key, ExternalLink, Loader2, Settings } from 'lucide-react';
-import { useCountyMetrics, useCountyPullStatus, useDeleteCounty, useSetupCountyWithPassword, useGetOAuthUrl, useUpdateCounty } from '../../hooks/useCounties';
+import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, BarChart3, Send, HelpCircle, Key, ExternalLink, Loader2, Settings } from 'lucide-react';
+import { useCountyMetrics, useCountyPullStatus, useSetupCountyWithPassword, useGetOAuthUrl, useUpdateCounty } from '../../hooks/useCounties';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function CountyDetailPanel({ county, onClose }) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCredentialForm, setShowCredentialForm] = useState(false);
   const [authMethod, setAuthMethod] = useState('password');
   const [credentials, setCredentials] = useState({ username: '', password: '' });
@@ -13,7 +12,6 @@ export default function CountyDetailPanel({ county, onClose }) {
 
   const { data: metrics, isLoading: metricsLoading } = useCountyMetrics(county.id);
   const { data: pullStatus } = useCountyPullStatus(county.id);
-  const deleteCounty = useDeleteCounty();
   const setupWithPassword = useSetupCountyWithPassword();
   const getOAuthUrl = useGetOAuthUrl();
   const updateCounty = useUpdateCounty();
@@ -47,16 +45,6 @@ export default function CountyDetailPanel({ county, onClose }) {
       'Unknown': 'badge badge-secondary'
     };
     return `badge ${colors[platform] || 'badge-secondary'}`;
-  };
-
-  const handleDelete = async () => {
-    try {
-      await deleteCounty.mutateAsync(county.id);
-      setShowDeleteConfirm(false);
-      onClose(); // Close panel after deleting
-    } catch {
-      // Deletion failed - error handled by mutation
-    }
   };
 
   const handleCredentialChange = (e) => {
@@ -121,7 +109,7 @@ export default function CountyDetailPanel({ county, onClose }) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-25 z-40"
+        className="fixed inset-0 z-40"
         onClick={onClose}
       />
 
@@ -659,67 +647,9 @@ export default function CountyDetailPanel({ county, onClose }) {
             </div>
           )}
 
-          {/* Actions - Delete only (pulls are automatic after authorization) */}
-          {county.oauth_authorized && (
-            <div className="pt-4 border-t border-gray-200">
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="btn-secondary w-full text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete County
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900 bg-opacity-50">
-          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl animate-slide-in">
-            <div className="px-6 py-6">
-              <div className="flex items-start mb-4">
-                <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mr-4">
-                  <Trash2 className="h-6 w-6 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Delete {county.name}?
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    This will permanently delete this county connection.
-                    All permits and leads will be preserved in the system.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Warning:</strong> This action cannot be undone.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="btn-secondary"
-                  disabled={deleteCounty.isPending}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleteCounty.isPending}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
-                >
-                  {deleteCounty.isPending ? 'Deleting...' : 'Delete County'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
