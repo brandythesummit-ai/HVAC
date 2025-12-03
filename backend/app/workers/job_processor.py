@@ -364,6 +364,33 @@ class JobProcessor:
                     logger.info(f"   ✅ No more permits for {year}")
                     break
 
+                # DATE VALIDATION: Check if Accela returned permits in the correct date range
+                date_validation = permit_data.get('date_validation', {})
+                if date_validation and not date_validation.get('all_in_range', True):
+                    out_of_range = date_validation.get('out_of_range_count', 0)
+                    sample_dates = date_validation.get('sample_dates', [])
+                    logger.warning(
+                        f"   ⚠️ DATE MISMATCH: {out_of_range}/{len(permits)} permits are outside "
+                        f"requested range {year_start} to {year_end}. Sample dates: {sample_dates}"
+                    )
+                    print(
+                        f"   ⚠️ DATE MISMATCH: {out_of_range}/{len(permits)} permits outside range. "
+                        f"Sample: {sample_dates[:3]}",
+                        flush=True
+                    )
+
+                    # Filter permits to only include those in the requested date range
+                    original_count = len(permits)
+                    permits = [
+                        p for p in permits
+                        if p.get('openedDate', '')[:10] >= year_start
+                        and p.get('openedDate', '')[:10] <= year_end
+                    ]
+                    filtered_count = original_count - len(permits)
+                    if filtered_count > 0:
+                        print(f"   🔧 Filtered out {filtered_count} permits with incorrect dates", flush=True)
+                        logger.info(f"   🔧 Filtered out {filtered_count} permits with incorrect dates")
+
                 year_permits_pulled += len(permits)
                 total_permits_pulled += len(permits)
 
@@ -662,22 +689,89 @@ class JobProcessor:
         # Extract primary parcel
         primary_parcel = parcels[0] if parcels else None
 
+        # Build property address from components (API returns separate fields, not fullAddress)
+        property_address = None
+        if primary_address:
+            addr_parts = [
+                primary_address.get('addressLine1', ''),
+                primary_address.get('city', ''),
+            ]
+            # Handle state (can be string or dict)
+            state = primary_address.get('state', '')
+            if isinstance(state, dict):
+                state = state.get('value') or state.get('text', '')
+            addr_parts.append(state)
+            addr_parts.append(primary_address.get('postalCode', ''))
+            property_address = ', '.join(filter(None, addr_parts))
+
+        # Extract owner contact info - check multiple possible field names
+        owner_phone = None
+        owner_email = None
+        if primary_owner:
+            # Try various phone field names
+            owner_phone = (
+                primary_owner.get('phone1') or
+                primary_owner.get('phone') or
+                primary_owner.get('phoneNumber') or
+                primary_owner.get('homePhone') or
+                primary_owner.get('workPhone')
+            )
+            # Try various email field names
+            owner_email = (
+                primary_owner.get('email') or
+                primary_owner.get('emailAddress') or
+                primary_owner.get('email1')
+            )
+
+        # Extract parcel data - check various field name patterns
+        year_built = None
+        square_footage = None
+        property_value = None
+        lot_size = None
+        if primary_parcel:
+            year_built = (
+                primary_parcel.get('yearBuilt') or
+                primary_parcel.get('actualYearBuilt')
+            )
+            square_footage = (
+                primary_parcel.get('buildingSquareFeet') or
+                primary_parcel.get('squareFeet') or
+                primary_parcel.get('livingArea')
+            )
+            property_value = (
+                primary_parcel.get('landValue') or
+                primary_parcel.get('totalValue') or
+                primary_parcel.get('assessedValue') or
+                primary_parcel.get('marketValue')
+            )
+            lot_size = (
+                primary_parcel.get('lotAreaSquareFeet') or
+                primary_parcel.get('lotSize') or
+                primary_parcel.get('acreage')
+            )
+
         return {
             'id': record_id,
             'type': permit.get('type', {}).get('text'),
             'description': permit.get('description'),
             'opened_date': permit.get('openedDate'),
             'status': permit.get('status', {}).get('text'),
-            'job_value': permit.get('estimatedCostOfConstruction'),
-            'property_address': primary_address.get('fullAddress') if primary_address else None,
-            'year_built': primary_parcel.get('yearBuilt') if primary_parcel else None,
-            'square_footage': primary_parcel.get('buildingSquareFeet') if primary_parcel else None,
-            'property_value': primary_parcel.get('landValue') if primary_parcel else None,
-            'lot_size': primary_parcel.get('lotAreaSquareFeet') if primary_parcel else None,
+            'job_value': permit.get('estimatedCostOfConstruction') or permit.get('jobValue'),
+            'property_address': property_address,
+            'year_built': year_built,
+            'square_footage': square_footage,
+            'property_value': property_value,
+            'lot_size': lot_size,
             'owner_name': primary_owner.get('fullName') if primary_owner else None,
-            'owner_phone': primary_owner.get('phone1') if primary_owner else None,
-            'owner_email': primary_owner.get('email') if primary_owner else None,
-            'raw_data': permit
+            'owner_phone': owner_phone,
+            'owner_email': owner_email,
+            # Store COMPLETE raw data including enrichment (not just base permit)
+            'raw_data': {
+                'permit': permit,
+                'addresses': addresses,
+                'owners': owners,
+                'parcels': parcels
+            }
         }
 
     async def _save_permit(self, county_id: str, permit_data: Dict) -> Optional[Dict]:

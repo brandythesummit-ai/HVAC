@@ -538,6 +538,17 @@ class AccelaClient:
 
         logger.info(f" [ACCELA API] Pagination complete: {len(all_permits)} permits across {pages_fetched} pages")
 
+        # DATE VALIDATION: Check if returned permits match requested date range
+        # This helps detect when Accela API ignores date filters
+        date_validation = self._validate_permit_dates(all_permits, date_from, date_to)
+
+        if not date_validation["all_in_range"]:
+            logger.warning(
+                f" [ACCELA API] DATE MISMATCH: Requested {date_from} to {date_to}, "
+                f"but {date_validation['out_of_range_count']}/{len(all_permits)} permits "
+                f"have dates outside this range. Sample dates: {date_validation['sample_dates']}"
+            )
+
         # Return permits with diagnostics
         return {
             "permits": all_permits,
@@ -555,7 +566,67 @@ class AccelaClient:
                 "total_returned": len(all_permits),
                 "pagination_enabled": True,
                 "api_endpoint": "/v4/records"
+            },
+            "date_validation": date_validation
+        }
+
+    def _validate_permit_dates(
+        self,
+        permits: List[Dict[str, Any]],
+        date_from: str,
+        date_to: str
+    ) -> Dict[str, Any]:
+        """
+        Validate that permit dates fall within the requested date range.
+
+        This helps detect when Accela API ignores date filters and returns
+        permits outside the requested range.
+
+        Args:
+            permits: List of permit records from Accela
+            date_from: Requested start date (YYYY-MM-DD)
+            date_to: Requested end date (YYYY-MM-DD)
+
+        Returns:
+            Dict with validation results:
+            - all_in_range: True if all permits are within range
+            - in_range_count: Number of permits within range
+            - out_of_range_count: Number of permits outside range
+            - sample_dates: List of unique dates found (for debugging)
+        """
+        if not permits:
+            return {
+                "all_in_range": True,
+                "in_range_count": 0,
+                "out_of_range_count": 0,
+                "sample_dates": []
             }
+
+        in_range_count = 0
+        out_of_range_count = 0
+        sample_dates = set()
+
+        for permit in permits:
+            # Get openedDate from permit (may be in different formats)
+            opened_date = permit.get("openedDate", "")
+            if not opened_date:
+                continue
+
+            # Extract just the date portion (YYYY-MM-DD) for comparison
+            permit_date = opened_date[:10] if len(opened_date) >= 10 else opened_date
+            sample_dates.add(permit_date)
+
+            # Check if within range
+            if date_from <= permit_date <= date_to:
+                in_range_count += 1
+            else:
+                out_of_range_count += 1
+
+        return {
+            "all_in_range": out_of_range_count == 0,
+            "in_range_count": in_range_count,
+            "out_of_range_count": out_of_range_count,
+            "sample_dates": sorted(list(sample_dates))[:10]  # Limit to 10 samples
         }
 
     async def get_addresses(self, record_id: str) -> List[Dict[str, Any]]:
