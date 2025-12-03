@@ -535,13 +535,18 @@ class PropertyAggregator:
             'notes': f"HVAC system {property_record['hvac_age_years']} years old ({property_record['lead_tier']} tier)"
         }
 
-        result = self.db.table('leads').insert(lead_data).execute()
+        # Use upsert to prevent duplicate leads per property
+        # If a lead already exists for this property_id, update it instead of inserting
+        result = self.db.table('leads').upsert(
+            lead_data,
+            on_conflict='property_id'
+        ).execute()
 
         if result.data:
-            logger.info(f"Created lead {result.data[0]['id']} for property {property_id}")
+            logger.info(f"Upserted lead {result.data[0]['id']} for property {property_id}")
             return result.data[0]['id']
         else:
-            raise Exception(f"Failed to create lead for property {property_id}")
+            raise Exception(f"Failed to upsert lead for property {property_id}")
 
     async def _update_lead(self, property_id: str, county_id: str) -> Optional[str]:
         """Update existing lead or create new one if needed."""
