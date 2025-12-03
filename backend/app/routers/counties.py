@@ -107,11 +107,20 @@ async def create_county(county: CountyCreate, db=Depends(get_db)):
 
 @router.get("", response_model=dict)
 async def list_counties(db=Depends(get_db)):
-    """List all counties with their status."""
+    """List all counties with their status and computed lead counts."""
     try:
         result = db.table("counties").select("*").order("created_at", desc=True).execute()
 
-        # Mask secrets and add oauth_authorized flag
+        # Get lead counts for all counties in one query
+        lead_counts = {}
+        leads_result = db.table("leads").select("county_id", count="exact").execute()
+        # Count leads per county using a subquery approach
+        for county in result.data:
+            county_id = county["id"]
+            count_result = db.table("leads").select("id", count="exact").eq("county_id", county_id).execute()
+            lead_counts[county_id] = count_result.count or 0
+
+        # Mask secrets and add oauth_authorized flag + computed lead_count
         counties = []
         for county in result.data:
             county_copy = county.copy()
@@ -120,6 +129,8 @@ async def list_counties(db=Depends(get_db)):
             county_copy.pop("oauth_state", None)
             # Add oauth_authorized flag
             county_copy["oauth_authorized"] = bool(county.get("refresh_token"))
+            # Add computed lead_count (actual count from leads table)
+            county_copy["lead_count"] = lead_counts.get(county["id"], 0)
             counties.append(county_copy)
 
         return {

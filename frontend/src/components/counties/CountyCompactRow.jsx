@@ -79,7 +79,7 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
           ${health.color === 'red' ? 'text-red-700' : ''}
           ${health.color === 'blue' ? 'text-blue-700' : ''}
         `}>
-          <HealthIcon className="h-4 w-4 mr-1" />
+          <HealthIcon className={`h-4 w-4 mr-1 ${health.color === 'blue' ? 'animate-spin' : ''}`} />
           {health.text}
         </span>
       </div>
