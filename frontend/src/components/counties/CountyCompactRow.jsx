@@ -43,9 +43,9 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
         ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}
       `}
     >
-      <div className="grid grid-cols-[24px_1fr_80px_80px_80px] gap-4 items-center flex-1 min-w-0">
-        {/* Auth indicator - 24px fixed */}
-        <div>
+      <div className="flex items-center gap-4">
+        {/* Auth indicator - fixed width */}
+        <div className="w-6 flex-shrink-0">
           {county.oauth_authorized ? (
             <CheckCircle className="h-5 w-5 text-green-600" />
           ) : (
@@ -53,27 +53,27 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
           )}
         </div>
 
-        {/* County name - flexible */}
-        <span className="font-medium text-gray-900 truncate">
+        {/* County name - fixed width for alignment */}
+        <span className="font-medium text-gray-900 truncate w-44 flex-shrink-0">
           {county.name}
         </span>
 
-        {/* Platform badge - 80px fixed */}
-        <span className={`px-2 py-1 rounded text-xs font-medium text-center ${getPlatformBadge()}`}>
+        {/* Platform badge - fixed width */}
+        <span className={`w-20 flex-shrink-0 px-2 py-1 rounded text-xs font-medium ${getPlatformBadge()}`}>
           {county.platform === 'Unknown' && (
             <HelpCircle className="h-3 w-3 inline mr-1" />
           )}
           {county.platform || 'Unknown'}
         </span>
 
-        {/* Lead count - 80px fixed */}
-        <span className="text-sm text-gray-600 text-right">
+        {/* Lead count - fixed width */}
+        <span className="w-16 flex-shrink-0 text-sm text-gray-600">
           {(county.lead_count || 0).toLocaleString()} leads
         </span>
 
-        {/* Health status - 80px fixed */}
+        {/* Health status - fixed width */}
         <span className={`
-          flex items-center justify-end text-sm font-medium
+          w-20 flex-shrink-0 flex items-center text-sm font-medium
           ${health.color === 'green' ? 'text-green-700' : ''}
           ${health.color === 'yellow' ? 'text-yellow-700' : ''}
           ${health.color === 'red' ? 'text-red-700' : ''}
