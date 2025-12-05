@@ -465,22 +465,22 @@ class AccelaClient:
         permit_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Get permits from Accela with automatic pagination.
+        Get permits from Accela using POST /v4/search/records with expand parameter.
 
-        Fetches permits in chunks of 100 (Accela max per request)
-        until reaching requested limit or no more results available.
+        Uses POST /v4/search/records (NOT GET /v4/records) because only the POST
+        endpoint supports the 'expand' parameter to include addresses, owners, and
+        parcels in each record. This eliminates the need for separate enrichment
+        API calls, reducing from 4 API calls per permit to 1 per batch.
 
-        Uses the 'expand' parameter to include addresses, owners, and parcels
-        in each record, eliminating the need for separate enrichment API calls.
-        This reduces API calls from 4 per permit to 1 per permit batch.
-        See: https://developer.accela.com/docs/construct-partialResponse.html
+        IMPORTANT: GET /v4/records silently ignores the expand parameter!
+        See: https://developer.accela.com/docs/api_reference/v4.post.search.records.html
 
         Args:
             date_from: Start date (YYYY-MM-DD)
             date_to: End date (YYYY-MM-DD)
             limit: Max results (default 100)
             status: Optional status filter (e.g., 'Finaled')
-            permit_type: Optional type filter (e.g., 'Residential Mechanical Trade Permit') - filters at API level
+            permit_type: Optional type filter (e.g., 'Residential Mechanical Trade Permit')
 
         Returns:
             Dict containing permits (with expanded addresses/owners/parcels), query_info, and debug_info
@@ -495,28 +495,36 @@ class AccelaClient:
         while offset < limit:
             current_page_size = min(page_size, limit - offset)
 
-            params = {
-                "module": "Building",
-                "openedDateFrom": date_from,
-                "openedDateTo": date_to,
+            # Query parameters for POST /v4/search/records
+            # Note: expand ONLY works on POST /v4/search/records, NOT on GET /v4/records!
+            query_params = {
                 "limit": current_page_size,
                 "offset": offset,  # ← KEY: Pagination offset
-                "expand": "addresses,owners,parcels"  # ← Include enrichment data in single call
+                "expand": "addresses,owners,parcels"  # ← Include enrichment data
             }
 
-            if status:
-                params["status"] = status
+            # Request body with filters (POST search uses body, not query params)
+            body = {
+                "module": "Building",
+                "openedDateFrom": date_from,
+                "openedDateTo": date_to
+            }
 
+            # Add type filter if specified (different format for POST body)
             if permit_type:
-                params["type"] = permit_type  # ← API-level filtering
+                body["type"] = {"value": permit_type}  # ← API-level filtering
+
+            if status:
+                body["status"] = {"value": status}
 
             logger.debug(f"   📄 Fetching page {pages_fetched + 1}: offset={offset}, limit={current_page_size}")
 
             result = await self._make_request(
-                "GET",
-                "/v4/records",
+                "POST",
+                "/v4/search/records",
                 request_type="pagination",  # Rate limiter applies pagination delays
-                params=params
+                params=query_params,
+                json=body
             )
             page_permits = result.get("result", [])
 
@@ -565,7 +573,7 @@ class AccelaClient:
             "debug_info": {
                 "total_returned": len(all_permits),
                 "pagination_enabled": True,
-                "api_endpoint": "/v4/records"
+                "api_endpoint": "/v4/search/records"  # POST endpoint with expand support
             },
             "date_validation": date_validation
         }
