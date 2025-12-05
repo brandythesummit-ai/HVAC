@@ -338,159 +338,166 @@ class JobProcessor:
                 'updated_at': datetime.utcnow().isoformat()
             })
 
-            # Pull permits for this year (in batches)
+            # Pull ALL permits for this year in one call
+            # Note: get_permits() handles internal pagination (100 per API call)
+            # We use a high limit (100,000) to get everything for the year
             year_permits_pulled = 0
-            batch_num = 0
-            batch_size = 1000
+            max_permits_per_year = 100000  # High limit - get_permits handles pagination internally
 
-            while True:
-                batch_num += 1
-                print(f"   📦 Batch {batch_num} for {year} - fetching up to {batch_size} permits...", flush=True)
-                logger.info(f"   📦 Batch {batch_num} (up to {batch_size} permits)")
+            print(f"   📦 Fetching permits for {year}...", flush=True)
+            logger.info(f"   📦 Fetching permits for {year} (limit {max_permits_per_year})")
 
-                # Fetch permits
-                permit_data = await accela_client.get_permits(
-                    date_from=year_start,
-                    date_to=year_end,
-                    limit=batch_size,
-                    permit_type=permit_type
-                )
-                print(f"   ✅ Batch {batch_num} returned from Accela", flush=True)
+            # Fetch ALL permits for this year in one call
+            permit_data = await accela_client.get_permits(
+                date_from=year_start,
+                date_to=year_end,
+                limit=max_permits_per_year,
+                permit_type=permit_type
+            )
+            print(f"   ✅ Permits returned from Accela for {year}", flush=True)
 
-                permits = permit_data.get('permits', [])
-                print(f"   📊 Got {len(permits)} permits for {year}", flush=True)
+            permits = permit_data.get('permits', [])
+            print(f"   📊 Got {len(permits)} permits for {year}", flush=True)
 
-                if not permits:
-                    logger.info(f"   ✅ No more permits for {year}")
-                    break
-
-                # DATE VALIDATION: Check if Accela returned permits in the correct date range
-                date_validation = permit_data.get('date_validation', {})
-                if date_validation and not date_validation.get('all_in_range', True):
-                    out_of_range = date_validation.get('out_of_range_count', 0)
-                    sample_dates = date_validation.get('sample_dates', [])
-                    logger.warning(
-                        f"   ⚠️ DATE MISMATCH: {out_of_range}/{len(permits)} permits are outside "
-                        f"requested range {year_start} to {year_end}. Sample dates: {sample_dates}"
-                    )
-                    print(
-                        f"   ⚠️ DATE MISMATCH: {out_of_range}/{len(permits)} permits outside range. "
-                        f"Sample: {sample_dates[:3]}",
-                        flush=True
-                    )
-
-                    # Filter permits to only include those in the requested date range
-                    original_count = len(permits)
-                    permits = [
-                        p for p in permits
-                        if p.get('openedDate', '')[:10] >= year_start
-                        and p.get('openedDate', '')[:10] <= year_end
-                    ]
-                    filtered_count = original_count - len(permits)
-                    if filtered_count > 0:
-                        print(f"   🔧 Filtered out {filtered_count} permits with incorrect dates", flush=True)
-                        logger.info(f"   🔧 Filtered out {filtered_count} permits with incorrect dates")
-
-                year_permits_pulled += len(permits)
-                total_permits_pulled += len(permits)
-
-                # Process each permit through property aggregator
-                batch_properties_created = 0
-                batch_properties_updated = 0
-                batch_leads_created = 0
-                batch_permits_saved = 0
-
-                permit_count = 0
-                last_progress_update = datetime.utcnow()
-
-                for permit in permits:
-                    permit_count += 1
-
-                    # Update progress every 50 permits or every 30 seconds
-                    now = datetime.utcnow()
-                    should_update = (permit_count % 50 == 0) or ((now - last_progress_update).total_seconds() >= 30)
-
-                    if should_update:
-                        # Check if job was cancelled or deleted
-                        if await self._is_job_cancelled_or_deleted(job_id):
-                            raise Exception("Job was cancelled or deleted by user")
-
-                        print(f"      ⏳ Processed {permit_count}/{len(permits)} permits in batch {batch_num}", flush=True)
-                        await self._update_job(job_id, {
-                            'updated_at': now.isoformat()
-                        })
-                        last_progress_update = now
-
-                    try:
-                        # Get additional permit details
-                        permit_details = await self._enrich_permit_data(accela_client, permit)
-
-                        # Save permit to database
-                        saved_permit = await self._save_permit(county_id, permit_details)
-                        if saved_permit:
-                            batch_permits_saved += 1
-
-                        # Process through property aggregator
-                        property_id, lead_id, was_created = await aggregator.process_permit(
-                            saved_permit,
-                            county_id
-                        )
-
-                        if property_id:
-                            if was_created:
-                                batch_properties_created += 1
-                                if lead_id:
-                                    batch_leads_created += 1
-                            else:
-                                batch_properties_updated += 1
-
-                    except Exception as e:
-                        logger.warning(f"Failed to process permit: {str(e)}")
-                        continue
-
-                # Update totals
-                total_permits_saved += batch_permits_saved
-                total_properties_created += batch_properties_created
-                total_properties_updated += batch_properties_updated
-                total_leads_created += batch_leads_created
-
-                # Calculate elapsed time and rate
-                elapsed = (datetime.utcnow() - start_time).total_seconds()
-                permits_per_second = total_permits_pulled / elapsed if elapsed > 0 else 0
-                estimated_remaining = ((total_years - years_processed) * 1000) / permits_per_second if permits_per_second > 0 else 0
-                estimated_completion = datetime.utcnow() + timedelta(seconds=estimated_remaining)
-
-                # Track per-year permits progressively (inside loop so crash-safe)
-                per_year_permits[str(year)] = year_permits_pulled
-
-                # Calculate batch-level progress (more granular than year-level)
-                # Progress = completed years + partial progress on current year
-                # Estimate current year as 50% done after first batch for smoother updates
-                year_progress_fraction = min(0.9, batch_num * 0.2)  # Cap at 90% until year complete
-                progress_percent = int(((years_processed + year_progress_fraction) / total_years) * 100)
-
-                # Update job progress
+            if not permits:
+                logger.info(f"   ✅ No permits found for {year}")
+                # Mark year complete and continue to next
+                year_permits_pulled = 0
+                per_year_permits[str(year)] = 0
+                years_processed += 1
+                years_status[str(year)] = 'completed'
                 await self._update_job(job_id, {
-                    'permits_pulled': total_permits_pulled,
-                    'permits_saved': total_permits_saved,
-                    'properties_created': total_properties_created,
-                    'properties_updated': total_properties_updated,
-                    'leads_created': total_leads_created,
-                    'current_year': year,
-                    'current_batch': batch_num,
-                    'progress_percent': progress_percent,
-                    'elapsed_seconds': int(elapsed),
-                    'permits_per_second': round(permits_per_second, 2),
-                    'estimated_completion_at': estimated_completion.isoformat(),
+                    'progress_percent': int((years_processed / total_years) * 100),
+                    'years_status': years_status,
                     'per_year_permits': per_year_permits,
                     'updated_at': datetime.utcnow().isoformat()
                 })
+                continue
 
-                logger.info(f"   ✅ Batch {batch_num}: {batch_permits_saved} saved, {batch_properties_created} properties created, {batch_leads_created} leads created")
+            # DATE VALIDATION: Check if Accela returned permits in the correct date range
+            date_validation = permit_data.get('date_validation', {})
+            if date_validation and not date_validation.get('all_in_range', True):
+                out_of_range = date_validation.get('out_of_range_count', 0)
+                sample_dates = date_validation.get('sample_dates', [])
+                logger.warning(
+                    f"   ⚠️ DATE MISMATCH: {out_of_range}/{len(permits)} permits are outside "
+                    f"requested range {year_start} to {year_end}. Sample dates: {sample_dates}"
+                )
+                print(
+                    f"   ⚠️ DATE MISMATCH: {out_of_range}/{len(permits)} permits outside range. "
+                    f"Sample: {sample_dates[:3]}",
+                    flush=True
+                )
 
-                # If we got fewer permits than batch size, we're done with this year
-                if len(permits) < batch_size:
-                    break
+                # Filter permits to only include those in the requested date range
+                original_count = len(permits)
+                permits = [
+                    p for p in permits
+                    if p.get('openedDate', '')[:10] >= year_start
+                    and p.get('openedDate', '')[:10] <= year_end
+                ]
+                filtered_count = original_count - len(permits)
+                if filtered_count > 0:
+                    print(f"   🔧 Filtered out {filtered_count} permits with incorrect dates", flush=True)
+                    logger.info(f"   🔧 Filtered out {filtered_count} permits with incorrect dates")
+
+            year_permits_pulled = len(permits)
+            total_permits_pulled += len(permits)
+
+            # Process each permit through property aggregator
+            year_properties_created = 0
+            year_properties_updated = 0
+            year_leads_created = 0
+            year_permits_saved = 0
+
+            permit_count = 0
+            last_progress_update = datetime.utcnow()
+
+            for permit in permits:
+                permit_count += 1
+
+                # Update progress every 50 permits or every 30 seconds
+                now = datetime.utcnow()
+                should_update = (permit_count % 50 == 0) or ((now - last_progress_update).total_seconds() >= 30)
+
+                if should_update:
+                    # Check if job was cancelled or deleted
+                    if await self._is_job_cancelled_or_deleted(job_id):
+                        raise Exception("Job was cancelled or deleted by user")
+
+                    print(f"      ⏳ Processed {permit_count}/{len(permits)} permits for {year}", flush=True)
+
+                    # Calculate progress within the year
+                    year_fraction = permit_count / len(permits) * 0.9  # Cap at 90% until fully done
+                    progress_percent = int(((years_processed + year_fraction) / total_years) * 100)
+
+                    await self._update_job(job_id, {
+                        'permits_pulled': total_permits_pulled,
+                        'permits_saved': total_permits_saved + year_permits_saved,
+                        'current_year': year,
+                        'progress_percent': progress_percent,
+                        'updated_at': now.isoformat()
+                    })
+                    last_progress_update = now
+
+                try:
+                    # Get additional permit details
+                    permit_details = await self._enrich_permit_data(accela_client, permit)
+
+                    # Save permit to database - returns (permit, is_new_insert)
+                    saved_permit, was_inserted = await self._save_permit(county_id, permit_details)
+                    if saved_permit and was_inserted:
+                        year_permits_saved += 1
+
+                    # Process through property aggregator
+                    property_id, lead_id, was_created = await aggregator.process_permit(
+                        saved_permit,
+                        county_id
+                    )
+
+                    if property_id:
+                        if was_created:
+                            year_properties_created += 1
+                            if lead_id:
+                                year_leads_created += 1
+                        else:
+                            year_properties_updated += 1
+
+                except Exception as e:
+                    logger.warning(f"Failed to process permit: {str(e)}")
+                    continue
+
+            # Update totals after processing all permits for the year
+            total_permits_saved += year_permits_saved
+            total_properties_created += year_properties_created
+            total_properties_updated += year_properties_updated
+            total_leads_created += year_leads_created
+
+            # Calculate elapsed time and rate
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            permits_per_second = total_permits_pulled / elapsed if elapsed > 0 else 0
+            estimated_remaining = ((total_years - years_processed - 1) * 1000) / permits_per_second if permits_per_second > 0 else 0
+            estimated_completion = datetime.utcnow() + timedelta(seconds=estimated_remaining)
+
+            # Track per-year permits
+            per_year_permits[str(year)] = year_permits_pulled
+
+            # Update job progress after completing year
+            await self._update_job(job_id, {
+                'permits_pulled': total_permits_pulled,
+                'permits_saved': total_permits_saved,
+                'properties_created': total_properties_created,
+                'properties_updated': total_properties_updated,
+                'leads_created': total_leads_created,
+                'current_year': year,
+                'elapsed_seconds': int(elapsed),
+                'permits_per_second': round(permits_per_second, 2),
+                'estimated_completion_at': estimated_completion.isoformat(),
+                'per_year_permits': per_year_permits,
+                'updated_at': datetime.utcnow().isoformat()
+            })
+
+            logger.info(f"   ✅ Year {year}: {year_permits_saved} NEW saved (of {year_permits_pulled} pulled), {year_properties_created} properties created, {year_leads_created} leads created")
 
             years_processed += 1
 
@@ -616,11 +623,12 @@ class JobProcessor:
         for permit in permits:
             try:
                 permit_details = await self._enrich_permit_data(accela_client, permit)
-                saved_permit = await self._save_permit(county_id, permit_details)
+                saved_permit, was_inserted = await self._save_permit(county_id, permit_details)
 
-                if saved_permit:
+                if saved_permit and was_inserted:
                     total_saved += 1
 
+                if saved_permit:
                     property_id, lead_id, was_created = await aggregator.process_permit(
                         saved_permit,
                         county_id
@@ -774,7 +782,7 @@ class JobProcessor:
             }
         }
 
-    async def _save_permit(self, county_id: str, permit_data: Dict) -> Optional[Dict]:
+    async def _save_permit(self, county_id: str, permit_data: Dict) -> tuple[Optional[Dict], bool]:
         """
         Save permit to database.
 
@@ -783,7 +791,10 @@ class JobProcessor:
             permit_data: Enriched permit data
 
         Returns:
-            Saved permit record or None if already exists
+            Tuple of (saved permit record, was_inserted boolean)
+            - If permit already existed: (existing_record, False)
+            - If new permit inserted: (new_record, True)
+            - If error: (None, False)
         """
         try:
             # Check if permit already exists
@@ -795,7 +806,8 @@ class JobProcessor:
 
             if existing.data:
                 # Permit already exists - return full record for property aggregator
-                return existing.data[0]
+                # but indicate this was NOT a new insert
+                return existing.data[0], False
 
             # Insert new permit
             insert_data = {
@@ -825,7 +837,9 @@ class JobProcessor:
             ).execute()
 
             if result.data:
-                return result.data[0]
+                return result.data[0], True
+
+            return None, False
 
         except Exception as e:
             logger.error(f"Error saving permit: {str(e)}")
