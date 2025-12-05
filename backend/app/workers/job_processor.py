@@ -416,6 +416,11 @@ class JobProcessor:
             for permit in permits:
                 permit_count += 1
 
+                # CRITICAL: Yield to event loop every 10 permits to allow HTTP requests to be processed
+                # Without this, the tight loop starves the HTTP server and causes timeouts
+                if permit_count % 10 == 0:
+                    await asyncio.sleep(0)
+
                 # Update progress every 50 permits or every 30 seconds
                 now = datetime.utcnow()
                 should_update = (permit_count % 50 == 0) or ((now - last_progress_update).total_seconds() >= 30)
