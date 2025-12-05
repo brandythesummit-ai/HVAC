@@ -2,7 +2,7 @@
 import httpx
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, AsyncGenerator
 import logging
 from app.services.encryption import encryption_service
 from app.services.rate_limiter import AccelaRateLimiter
@@ -577,6 +577,95 @@ class AccelaClient:
             },
             "date_validation": date_validation
         }
+
+    async def get_permits_stream(
+        self,
+        date_from: str,
+        date_to: str,
+        batch_size: int = 100,
+        status: Optional[str] = None,
+        permit_type: Optional[str] = None
+    ) -> AsyncGenerator[List[Dict[str, Any]], None]:
+        """
+        Stream permits from Accela in batches to avoid memory issues.
+
+        CRITICAL: This method yields batches of permits (up to batch_size) instead
+        of accumulating all permits in memory. This is essential for processing
+        large result sets like 10,000+ permits per year.
+
+        Memory savings example:
+        - Old approach: 10,000 permits x ~10KB each = 100MB in memory
+        - New approach: 100 permits x ~10KB each = 1MB in memory (99% reduction)
+
+        Uses POST /v4/search/records with expand=addresses,owners,parcels to
+        include enrichment data in each batch.
+
+        Args:
+            date_from: Start date (YYYY-MM-DD)
+            date_to: End date (YYYY-MM-DD)
+            batch_size: Permits per batch (default 100, Accela API max)
+            status: Optional status filter (e.g., 'Finaled')
+            permit_type: Optional type filter (e.g., 'Building/Residential/Trade/Mechanical')
+
+        Yields:
+            List of permits (up to batch_size) with expanded addresses/owners/parcels
+        """
+        offset = 0
+        page_num = 0
+
+        logger.debug(f"📡 [STREAM] Starting permit stream for {date_from} to {date_to}")
+
+        while True:
+            # Query parameters for POST /v4/search/records
+            query_params = {
+                "limit": batch_size,
+                "offset": offset,
+                "expand": "addresses,owners,parcels"
+            }
+
+            # Request body with filters
+            body = {
+                "module": "Building",
+                "openedDateFrom": date_from,
+                "openedDateTo": date_to
+            }
+
+            if permit_type:
+                body["type"] = {"value": permit_type}
+
+            if status:
+                body["status"] = {"value": status}
+
+            logger.debug(f"   📄 [STREAM] Fetching batch {page_num + 1}: offset={offset}")
+
+            result = await self._make_request(
+                "POST",
+                "/v4/search/records",
+                request_type="pagination",
+                params=query_params,
+                json=body
+            )
+
+            batch_permits = result.get("result", [])
+
+            if not batch_permits:
+                logger.debug(f"   ✅ [STREAM] No more permits (empty batch)")
+                break
+
+            page_num += 1
+            logger.info(f"   📦 [STREAM] Yielding batch {page_num}: {len(batch_permits)} permits")
+
+            # YIELD immediately - don't accumulate in memory!
+            yield batch_permits
+
+            # If we got fewer than requested, we've hit the end
+            if len(batch_permits) < batch_size:
+                logger.debug(f"   ✅ [STREAM] Last batch (partial)")
+                break
+
+            offset += batch_size
+
+        logger.info(f"📡 [STREAM] Complete: {page_num} batches yielded for {date_from} to {date_to}")
 
     def _validate_permit_dates(
         self,

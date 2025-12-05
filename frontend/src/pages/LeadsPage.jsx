@@ -147,7 +147,7 @@ const LeadsPage = () => {
       </div>
 
       {/* Leads Table */}
-      <LeadsTable leads={leads || []} isLoading={isLoading} />
+      <LeadsTable leads={leads?.leads || []} isLoading={isLoading} />
     </div>
   );
 };
