@@ -11,6 +11,11 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+class TokenExpiredError(Exception):
+    """Raised when the OAuth refresh token has expired and re-authentication is required."""
+    pass
+
+
 class AccelaClient:
     """Client for Accela Civic Platform V4 API using OAuth refresh_token flow."""
 
@@ -452,6 +457,30 @@ class AccelaClient:
                 # 429 on final attempt - raise
                 if attempt == max_retries - 1:
                     raise
+
+            # LAYER 3: Connection error handling with exponential backoff
+            except httpx.RemoteProtocolError as e:
+                # Server closed connection unexpectedly (e.g., "Server disconnected without sending a response")
+                logger.warning(f"[ACCELA API] Connection dropped: {e} (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 2s, 4s, 8s...
+                    wait_time = 2 ** (attempt + 1)
+                    logger.info(f"[ACCELA API] Waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                # Final attempt failed
+                raise httpx.HTTPError(f"Connection dropped after {max_retries} attempts: {e}")
+
+            except httpx.ConnectError as e:
+                # Network connectivity issue (e.g., DNS failure, connection refused)
+                logger.warning(f"[ACCELA API] Connection failed: {e} (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    # Fixed 5s wait for network issues
+                    logger.info("[ACCELA API] Waiting 5s before retry (network issue)...")
+                    await asyncio.sleep(5.0)
+                    continue
+                # Final attempt failed
+                raise httpx.HTTPError(f"Connection failed after {max_retries} attempts: {e}")
 
         # Should not reach here, but if we do, raise generic error
         raise httpx.HTTPError(f"Max retries ({max_retries}) exceeded for {endpoint}")

@@ -562,6 +562,7 @@ async def setup_county_with_password(
         update_data = {
             "refresh_token": refresh_token_encrypted,
             "token_expires_at": token_response.get("expires_at"),
+            "token_obtained_at": datetime.utcnow().isoformat(),  # LAYER 4: Track when token was obtained
             "status": "connected"
         }
 
@@ -734,6 +735,7 @@ async def oauth_callback(
         update_data = {
             "refresh_token": refresh_token_encrypted,
             "token_expires_at": token_response.get("expires_at"),
+            "token_obtained_at": datetime.utcnow().isoformat(),  # LAYER 4: Track when token was obtained
             "status": "connected",
             "oauth_state": None  # Clear state token
         }

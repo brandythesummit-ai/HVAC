@@ -18,7 +18,7 @@ import traceback
 
 from supabase import Client
 from app.database import get_db
-from app.services.accela_client import AccelaClient
+from app.services.accela_client import AccelaClient, TokenExpiredError
 from app.services.property_aggregator import PropertyAggregator
 from app.services.encryption import encryption_service
 from app.config import settings
@@ -162,6 +162,29 @@ class JobProcessor:
             print(f"✅ JOB {job_id} COMPLETED SUCCESSFULLY", flush=True)
             logger.info(f"✅ Job {job_id} completed successfully")
 
+        except TokenExpiredError as e:
+            # LAYER 6: Token expiration - fail immediately (no retries)
+            # Re-authentication is required, retrying won't help
+            error_message = str(e)
+            error_details = {
+                'error': error_message,
+                'traceback': traceback.format_exc(),
+                'requires_reauth': True
+            }
+
+            await self._update_job(
+                job_id,
+                {
+                    'status': 'failed',
+                    'error_message': f"🔐 RE-AUTHENTICATION REQUIRED: {error_message}",
+                    'error_details': error_details,
+                    'completed_at': datetime.utcnow().isoformat(),
+                    'updated_at': datetime.utcnow().isoformat()
+                }
+            )
+            print(f"🔐 JOB {job_id} FAILED - TOKEN EXPIRED (no retry): {error_message}", flush=True)
+            logger.error(f"🔐 Job {job_id} failed due to token expiration - requires re-authentication")
+
         except Exception as e:
             # Mark as failed and check for retry
             error_message = str(e)
@@ -175,17 +198,15 @@ class JobProcessor:
 
             if retry_count < max_retries:
                 # Retry - set back to pending
-                # CRITICAL: Reset counters to avoid accumulation across retries
+                # IMPORTANT: Keep years_status to allow resuming from where we left off
+                # Only reset permits_pulled/saved as they'll be recalculated
                 await self._update_job(
                     job_id,
                     {
                         'status': 'pending',
                         'retry_count': retry_count + 1,
-                        'permits_pulled': 0,       # Reset counter
-                        'permits_saved': 0,        # Reset counter
-                        'per_year_permits': {},    # Reset year tracking
+                        # DO NOT reset years_status or per_year_permits - these enable resume!
                         'current_year': None,      # Reset current year
-                        'progress_percent': 0,     # Reset progress
                         'error_message': error_message,
                         'error_details': error_details,
                         'updated_at': datetime.utcnow().isoformat()
@@ -270,10 +291,32 @@ class JobProcessor:
                     'updated_at': datetime.utcnow().isoformat()
                 }).eq('id', county_id).execute()
                 print(f"⚠️ County {county['name']} marked as disconnected - needs re-authorization", flush=True)
+                # LAYER 6: Raise TokenExpiredError for immediate failure (no retries)
+                raise TokenExpiredError(f"OAuth token expired for {county['name']}: {token_result['error']}")
 
-            raise ValueError(f"OAuth token invalid for {county['name']}: {token_result['error']}")
+            # Non-auth error - allow retries
+            raise ValueError(f"OAuth token error for {county['name']}: {token_result['error']}")
 
         print(f"✅ Token validated for {county['name']}", flush=True)
+
+        # LAYER 4: Token Age Warning
+        # Warn if token is >5 days old (may fail mid-job due to refresh token expiration)
+        token_obtained_at = county.get('token_obtained_at')
+        if token_obtained_at:
+            try:
+                from dateutil.parser import parse as parse_datetime
+                token_obtained = parse_datetime(token_obtained_at)
+                token_age_days = (datetime.utcnow() - token_obtained.replace(tzinfo=None)).days
+                if token_age_days >= 5:
+                    print(f"⚠️ WARNING: Token is {token_age_days} days old. "
+                          f"Consider re-authenticating before starting long jobs.", flush=True)
+                    logger.warning(f"Token age warning for {county['name']}: {token_age_days} days old")
+                else:
+                    print(f"🔒 Token age: {token_age_days} days (fresh)", flush=True)
+            except Exception as e:
+                logger.warning(f"Could not parse token_obtained_at: {e}")
+        else:
+            print(f"⚠️ Token age unknown (token_obtained_at not set)", flush=True)
 
         # DIAGNOSTIC: Print after each step to find hang location
         print(f"🔍 [DEBUG] Step 1: Initializing aggregator...", flush=True)
@@ -296,13 +339,35 @@ class JobProcessor:
         total_properties_updated = 0
         total_leads_created = 0
 
-        # Track permits per year for live UI updates
-        per_year_permits = {}
+        # LAYER 1: RESUMABLE JOBS
+        # Check if we have existing progress from a previous run/retry
+        existing_years_status = job.get('years_status', {})
+        existing_per_year_permits = job.get('per_year_permits', {})
+        is_resuming = bool(existing_years_status)
+
+        if is_resuming:
+            # Count completed years and their permits for accurate totals
+            completed_years = [y for y, status in existing_years_status.items() if status == 'completed']
+            print(f"♻️ RESUMING JOB - {len(completed_years)} years already completed", flush=True)
+            logger.info(f"♻️ Resuming job with {len(completed_years)} completed years")
+
+            # Restore previous progress for accurate totals
+            for year_str in completed_years:
+                if year_str in existing_per_year_permits:
+                    total_permits_pulled += existing_per_year_permits[year_str]
+
+        # Track permits per year for live UI updates (preserve existing)
+        per_year_permits = existing_per_year_permits.copy() if is_resuming else {}
 
         # Track year-level status for accurate progress display
         # Status values: 'not_started', 'in_progress', 'completed'
         print(f"🔍 [DEBUG] Step 3: Creating years_status dict for {start_year}-{end_year}...", flush=True)
-        years_status = {str(year): 'not_started' for year in range(start_year, end_year + 1)}
+        if is_resuming:
+            # Use existing status but ensure all years are present
+            years_status = {str(year): 'not_started' for year in range(start_year, end_year + 1)}
+            years_status.update(existing_years_status)  # Preserve completed status
+        else:
+            years_status = {str(year): 'not_started' for year in range(start_year, end_year + 1)}
         print(f"🔍 [DEBUG] Step 4: years_status created with {len(years_status)} years", flush=True)
 
         start_time = datetime.utcnow()
@@ -322,11 +387,34 @@ class JobProcessor:
 
         # Process year by year (oldest first)
         for year in range(start_year, end_year + 1):
+            year_str = str(year)
+
+            # LAYER 1: Skip completed years when resuming
+            if years_status.get(year_str) == 'completed':
+                print(f"⏭️ Skipping {year} (already completed)", flush=True)
+                logger.info(f"⏭️ Skipping {year} (already completed)")
+                years_processed += 1
+                continue
+
             print(f"📆 Processing year {year}...", flush=True)
             year_start = f"{year}-01-01"
             year_end = f"{year}-12-31"
 
             logger.info(f"📆 Processing year {year}...")
+
+            # LAYER 2: Validate token at each year boundary
+            # This catches token expiration early instead of failing mid-year
+            token_result = await accela_client.ensure_valid_token()
+            if not token_result['success']:
+                print(f"❌ Token validation failed at year {year}: {token_result['error']}", flush=True)
+                if token_result.get('needs_reauth'):
+                    # Mark county as disconnected
+                    self.db.table('counties').update({
+                        'status': 'disconnected',
+                        'updated_at': datetime.utcnow().isoformat()
+                    }).eq('id', county_id).execute()
+                    raise TokenExpiredError(f"Re-authentication required: {token_result['error']}")
+                raise Exception(f"Token validation failed: {token_result['error']}")
 
             # Mark this year as in_progress
             years_status[str(year)] = 'in_progress'
@@ -576,8 +664,11 @@ class JobProcessor:
                     'updated_at': datetime.utcnow().isoformat()
                 }).eq('id', county_id).execute()
                 print(f"⚠️ County {county['name']} marked as disconnected - needs re-authorization", flush=True)
+                # LAYER 6: Raise TokenExpiredError for immediate failure (no retries)
+                raise TokenExpiredError(f"OAuth token expired for {county['name']}: {token_result['error']}")
 
-            raise ValueError(f"OAuth token invalid for {county['name']}: {token_result['error']}")
+            # Non-auth error - allow retries
+            raise ValueError(f"OAuth token error for {county['name']}: {token_result['error']}")
 
         print(f"✅ Token validated for {county['name']}", flush=True)
 

@@ -29,11 +29,12 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # Accela API Rate Limiting
-    # Threshold: fraction remaining before pausing (0.15 = pause at 15% remaining, i.e., 85% threshold)
-    accela_rate_limit_threshold: float = 0.15
+    # LAYER 5: Speed Optimizations - reduced delays and threshold
+    # Threshold: fraction remaining before pausing (0.10 = pause at 10% remaining, i.e., 90% usage)
+    accela_rate_limit_threshold: float = 0.10
     # Fallback delays (used when rate limit headers not available)
-    accela_pagination_delay_fallback: float = 0.5  # 500ms between pagination requests
-    accela_enrichment_delay_fallback: float = 0.1  # 100ms between enrichment requests
+    accela_pagination_delay_fallback: float = 0.2  # 200ms between pagination requests (was 500ms)
+    accela_enrichment_delay_fallback: float = 0.05  # 50ms between enrichment requests (was 100ms)
     # Request settings
     accela_max_retries: int = 3  # Max retries on 429 errors
     accela_request_timeout: float = 30.0  # Request timeout in seconds
