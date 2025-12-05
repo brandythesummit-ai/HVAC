@@ -441,8 +441,8 @@ class JobProcessor:
                     last_progress_update = now
 
                 try:
-                    # Get additional permit details
-                    permit_details = await self._enrich_permit_data(accela_client, permit)
+                    # Get additional permit details (now extracted from expanded data, no API calls)
+                    permit_details = self._enrich_permit_data(permit)
 
                     # Save permit to database - returns (permit, is_new_insert)
                     saved_permit, was_inserted = await self._save_permit(county_id, permit_details)
@@ -622,7 +622,7 @@ class JobProcessor:
 
         for permit in permits:
             try:
-                permit_details = await self._enrich_permit_data(accela_client, permit)
+                permit_details = self._enrich_permit_data(permit)  # No API calls needed
                 saved_permit, was_inserted = await self._save_permit(county_id, permit_details)
 
                 if saved_permit and was_inserted:
@@ -670,23 +670,26 @@ class JobProcessor:
         logger.info("Property aggregation not yet implemented")
         pass
 
-    async def _enrich_permit_data(self, client: AccelaClient, permit: Dict) -> Dict:
+    def _enrich_permit_data(self, permit: Dict) -> Dict:
         """
-        Enrich permit with additional data (addresses, owners, parcels).
+        Extract enrichment data from permit with expanded data.
+
+        Note: Permit already contains addresses, owners, parcels from the
+        'expand' parameter used in get_permits(). No additional API calls needed.
 
         Args:
-            client: AccelaClient instance
-            permit: Raw permit data
+            permit: Permit data with expanded addresses/owners/parcels
 
         Returns:
             Enriched permit dictionary
         """
         record_id = permit.get('id')
 
-        # Fetch additional data
-        addresses = await client.get_addresses(record_id)
-        owners = await client.get_owners(record_id)
-        parcels = await client.get_parcels(record_id)
+        # Extract from expanded data - NO API CALLS NEEDED
+        # The 'expand' parameter in get_permits() already fetched this data
+        addresses = permit.get('addresses', [])
+        owners = permit.get('owners', [])
+        parcels = permit.get('parcels', [])
 
         # Extract primary address
         primary_address = next((addr for addr in addresses if addr.get('isPrimary')), None) if addresses else None

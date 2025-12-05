@@ -470,6 +470,11 @@ class AccelaClient:
         Fetches permits in chunks of 100 (Accela max per request)
         until reaching requested limit or no more results available.
 
+        Uses the 'expand' parameter to include addresses, owners, and parcels
+        in each record, eliminating the need for separate enrichment API calls.
+        This reduces API calls from 4 per permit to 1 per permit batch.
+        See: https://developer.accela.com/docs/construct-partialResponse.html
+
         Args:
             date_from: Start date (YYYY-MM-DD)
             date_to: End date (YYYY-MM-DD)
@@ -478,13 +483,7 @@ class AccelaClient:
             permit_type: Optional type filter (e.g., 'Residential Mechanical Trade Permit') - filters at API level
 
         Returns:
-            Dict containing permits, query_info, and debug_info
-
-        Future Enhancement:
-            The Accela API supports an 'expand' parameter to include related data
-            in a single request. Could use: expand=addresses,owners,parcels,contacts
-            This would reduce from 4 API calls to 1 per permit.
-            See: https://developer.accela.com/docs/construct-partialResponse.html
+            Dict containing permits (with expanded addresses/owners/parcels), query_info, and debug_info
         """
         all_permits = []
         offset = 0
@@ -501,7 +500,8 @@ class AccelaClient:
                 "openedDateFrom": date_from,
                 "openedDateTo": date_to,
                 "limit": current_page_size,
-                "offset": offset  # ← KEY: Pagination offset
+                "offset": offset,  # ← KEY: Pagination offset
+                "expand": "addresses,owners,parcels"  # ← Include enrichment data in single call
             }
 
             if status:
