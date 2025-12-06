@@ -579,37 +579,80 @@ async def setup_county_with_password(
             .execute()
 
         job_id = None
+        resumed_job = False
         if county_check.data and not county_check.data.get("initial_pull_completed"):
-            # Create initial_pull job (same as POST /api/counties)
-            job_data = {
-                "county_id": county_id,
-                "job_type": "initial_pull",
-                "status": "pending",
-                "parameters": {"years": 30},
-                "created_at": datetime.utcnow().isoformat(),
-            }
-            job_result = db.table("background_jobs").insert(job_data).execute()
-            job_id = job_result.data[0]["id"] if job_result.data else None
+            # ===============================================
+            # LAYER 7: Check for existing failed/stalled job to RESUME
+            # ===============================================
+            # Before creating a new job, look for an existing failed job that has
+            # years_status data - this means it made progress and can be resumed
+            existing_job = db.table("background_jobs")\
+                .select("id, status, years_status")\
+                .eq("county_id", county_id)\
+                .eq("job_type", "initial_pull")\
+                .in_("status", ["failed", "running"])\
+                .order("created_at", desc=True)\
+                .limit(1)\
+                .execute()
 
-            # Update county with job reference
-            if job_id:
+            if existing_job.data and existing_job.data[0].get("years_status"):
+                # Resume existing job - reset status to pending
+                existing_id = existing_job.data[0]["id"]
+                db.table("background_jobs").update({
+                    "status": "pending",
+                    "error_message": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("id", existing_id).execute()
+
+                # Update county's job reference (in case it's different)
                 db.table("counties").update({
-                    "initial_pull_job_id": job_id
+                    "initial_pull_job_id": existing_id
                 }).eq("id", county_id).execute()
 
-            # Assign weekly pull schedule (staggered across week)
-            assign_pull_schedule(db, county_id)
+                job_id = existing_id
+                resumed_job = True
+                logger.info(f"LAYER 7: Resuming existing job {job_id} for county {county_id}")
+            else:
+                # No existing job with progress - create new one (original behavior)
+                job_data = {
+                    "county_id": county_id,
+                    "job_type": "initial_pull",
+                    "status": "pending",
+                    "parameters": {"years": 30},
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+                job_result = db.table("background_jobs").insert(job_data).execute()
+                job_id = job_result.data[0]["id"] if job_result.data else None
 
-            logger.info(f"Auto-triggered initial_pull job {job_id} for county {county_id}")
+                # Update county with job reference
+                if job_id:
+                    db.table("counties").update({
+                        "initial_pull_job_id": job_id
+                    }).eq("id", county_id).execute()
+
+                # Assign weekly pull schedule (staggered across week)
+                assign_pull_schedule(db, county_id)
+
+                logger.info(f"Auto-triggered initial_pull job {job_id} for county {county_id}")
+
+        # Build appropriate message based on job status
+        if resumed_job:
+            job_message = ". Resuming previous historical pull from where it left off."
+        elif job_id:
+            job_message = ". 30-year historical pull started."
+        else:
+            job_message = ""
 
         return {
             "success": True,
             "data": {
-                "message": "County connected successfully using password grant" +
-                          (". 30-year historical pull started." if job_id else ""),
+                "message": "County connected successfully using password grant" + job_message,
                 "county_id": county_id,
                 "county_name": county["name"],
-                "initial_pull_job_id": job_id
+                "initial_pull_job_id": job_id,
+                "resumed_job": resumed_job
             },
             "error": None
         }
