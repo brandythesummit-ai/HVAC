@@ -526,7 +526,7 @@ class JobProcessor:
                 years_processed += 1
                 years_status[str(year)] = 'completed'
                 await self._update_job(job_id, {
-                    'progress_percent': int((years_processed / total_years) * 100),
+                    'progress_percent': min(100, int((years_processed / total_years) * 100)),
                     'years_status': years_status,
                     'per_year_permits': per_year_permits,
                     'updated_at': datetime.utcnow().isoformat()
@@ -574,7 +574,7 @@ class JobProcessor:
 
             # Update progress after year completion (ensures accurate % between years)
             await self._update_job(job_id, {
-                'progress_percent': int((years_processed / total_years) * 100),
+                'progress_percent': min(100, int((years_processed / total_years) * 100)),
                 'years_status': years_status,
                 'updated_at': datetime.utcnow().isoformat()
             })
