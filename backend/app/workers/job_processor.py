@@ -21,6 +21,7 @@ from app.database import get_db
 from app.services.accela_client import AccelaClient, TokenExpiredError
 from app.services.property_aggregator import PropertyAggregator
 from app.services.encryption import encryption_service
+from app.services.agency_discovery import AgencyDiscoveryService
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -248,7 +249,6 @@ class JobProcessor:
 
         # Get parameters
         years = params.get('years', 30)
-        permit_type = params.get('permit_type', self.PERMIT_TYPE_HVAC)
 
         # Get county info
         county_result = self.db.table('counties').select('*').eq('id', county_id).execute()
@@ -257,7 +257,19 @@ class JobProcessor:
 
         county = county_result.data[0]
 
-        # Get Accela app credentials from database
+        # Use county's permit_type if configured, otherwise job params, otherwise None (no filter)
+        # If permit_type is None, Accela API returns ALL Building permits (no type filtering)
+        permit_type = (
+            params.get('permit_type') or
+            county.get('permit_type')  # May be None for counties without configured type
+        )
+
+        if permit_type:
+            print(f"📋 Using permit type filter: {permit_type}", flush=True)
+        else:
+            print(f"📋 No permit type filter - fetching all Building permits", flush=True)
+
+        # Get Accela app credentials from database (needed for both discovery and API calls)
         app_settings = self.db.table("app_settings").select("*").eq("key", "accela").execute()
         if not app_settings.data or not app_settings.data[0].get("app_id"):
             raise ValueError("Accela app credentials not configured. Please configure in Settings.")
@@ -265,6 +277,35 @@ class JobProcessor:
         app_id = app_settings.data[0]["app_id"]
         app_secret_encrypted = app_settings.data[0]["app_secret"]
         app_secret = encryption_service.decrypt(app_secret_encrypted)
+
+        # ============================================================
+        # SELF-HEALING: Auto-discover county_code if missing
+        # ============================================================
+        if not county.get('county_code'):
+            print(f"⚠️ County code missing for {county['name']}, attempting auto-discovery...", flush=True)
+            logger.warning(f"County code missing for {county['name']}, attempting auto-discovery")
+
+            discovery = AgencyDiscoveryService()
+            match = await discovery.discover_county_code(
+                county_name=county['name'],
+                state=county.get('state', 'FL'),
+                app_id=app_id  # Required for Agencies API
+            )
+
+            if match:
+                await self._update_county_code(
+                    county_id=county['id'],
+                    county_code=match['county_code'],
+                    confidence=match['confidence'],
+                    match_score=match['match_score']
+                )
+                county['county_code'] = match['county_code']
+                print(f"✅ Auto-discovered county code: {match['county_code']}", flush=True)
+            else:
+                raise ValueError(
+                    f"Could not auto-discover Accela agency code for '{county['name']}'. "
+                    f"This county may not use Accela or uses a different platform."
+                )
 
         # Initialize Accela client
         accela_client = AccelaClient(
@@ -943,6 +984,35 @@ class JobProcessor:
     async def _update_job(self, job_id: str, updates: Dict):
         """Update job with arbitrary fields."""
         self.db.table('background_jobs').update(updates).eq('id', job_id).execute()
+
+    async def _update_county_code(
+        self,
+        county_id: str,
+        county_code: str,
+        confidence: str,
+        match_score: int
+    ) -> None:
+        """
+        Update county with discovered Accela agency code.
+
+        This is called when auto-discovery finds a county's serviceProviderCode.
+        Sets the platform to 'Accela' and records discovery confidence.
+
+        Args:
+            county_id: UUID of the county record
+            county_code: The discovered serviceProviderCode
+            confidence: Match confidence level ('exact', 'code_match', 'fuzzy')
+            match_score: Numeric match score (0-100)
+        """
+        self.db.table('counties').update({
+            'county_code': county_code,
+            'platform': 'Accela',
+            'platform_confidence': f"Auto-discovered ({confidence}, score={match_score})",
+            'updated_at': datetime.utcnow().isoformat()
+        }).eq('id', county_id).execute()
+
+        logger.info(f"✅ Updated county {county_id} with discovered code: {county_code}")
+        print(f"   📝 Saved county_code='{county_code}' to database", flush=True)
 
     async def _is_job_cancelled_or_deleted(self, job_id: str) -> bool:
         """
