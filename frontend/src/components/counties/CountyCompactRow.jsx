@@ -4,6 +4,12 @@ export default function CountyCompactRow({ county, onClick, isSelected }) {
   const getHealthStatus = () => {
     if (!county.oauth_authorized) return { color: 'yellow', text: 'Setup', icon: AlertCircle };
 
+    // Check if initial pull FAILED before checking if it's in progress
+    // This ensures we show "Failed" instead of "Pulling" for failed jobs
+    if (county.initial_pull_status === 'failed' && !county.initial_pull_completed) {
+      return { color: 'red', text: 'Failed', icon: AlertCircle };
+    }
+
     // Check if pull is in progress (authorized but initial pull not completed)
     if (!county.initial_pull_completed) {
       return { color: 'blue', text: 'Pulling', icon: RefreshCw };

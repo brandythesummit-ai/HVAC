@@ -120,6 +120,14 @@ async def list_counties(db=Depends(get_db)):
             count_result = db.table("leads").select("id", count="exact").eq("county_id", county_id).execute()
             lead_counts[county_id] = count_result.count or 0
 
+        # Get job statuses for all counties with initial_pull_job_id (batch query)
+        job_statuses = {}
+        job_ids = [c["initial_pull_job_id"] for c in result.data if c.get("initial_pull_job_id")]
+        if job_ids:
+            jobs_result = db.table("background_jobs").select("id, status").in_("id", job_ids).execute()
+            for job in jobs_result.data:
+                job_statuses[job["id"]] = job["status"]
+
         # Mask secrets and add oauth_authorized flag + computed lead_count
         counties = []
         for county in result.data:
@@ -131,6 +139,9 @@ async def list_counties(db=Depends(get_db)):
             county_copy["oauth_authorized"] = bool(county.get("refresh_token"))
             # Add computed lead_count (actual count from leads table)
             county_copy["lead_count"] = lead_counts.get(county["id"], 0)
+            # Add initial_pull_status from job lookup
+            job_id = county.get("initial_pull_job_id")
+            county_copy["initial_pull_status"] = job_statuses.get(job_id) if job_id else None
             counties.append(county_copy)
 
         return {
