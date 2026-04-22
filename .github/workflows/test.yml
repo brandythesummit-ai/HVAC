@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/test.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/test.yml"
+
+jobs:
+  backend-tests:
+    name: Backend pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest (unit + integration, skip live)
+        env:
+          ENABLE_LIVE_TESTS: "0"
+          # Test-only placeholders — real secrets live in Railway, never in CI.
+          SUPABASE_URL: "https://example.supabase.co"
+          SUPABASE_KEY: "test-key"
+          ENCRYPTION_KEY: "dGVzdC1rZXktMzItYnl0ZXMtMDAwMDAwMDAwMDAwMDAwMA=="
+          SUMMIT_API_KEY: "test"
+          GHL_API_KEY: "test"
+        run: pytest -v
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: backend/coverage.xml
+          if-no-files-found: ignore
