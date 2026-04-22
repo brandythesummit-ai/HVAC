@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1" />
+    <title>Building Permit Reports - </title>
+    <link rel="Shortcut Icon" href="/DevelopmentServices/PermitReports/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Open%20Sans" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/v/dt/dt-1.10.22/r-2.2.6/datatables.min.css" integrity="sha384-RouEN1K1mwD2KU4MJgO/fsgU83aSvf2sGW64poysy/NVMvjiOqAXNNS2jAEnxp15" crossorigin="anonymous" />
+    
+    <link rel="stylesheet" href="/DevelopmentServices/PermitReports/css/site.css" />
+    <style>.ead-header .nav-link {color:#fff !important}</style>
+</head>
+<body>
+    <div class="ead-full-body">
+        <header class="ead-header">
+            <div class="ead-header-top"></div>
+            <div class="ead-header-logo">
+                <a href="https://www.hillsboroughcounty.org/"><img src="/DevelopmentServices/PermitReports/img/hc_logo.png" alt="Hillsborough County Logo" /></a>
+            </div>
+            <nav class="ead-header-nav navbar navbar-expand-sm navbar-toggleable-sm navbar-dark">
+                <a class="navbar-brand" href="/DevelopmentServices/PermitReports">Building Permit Reports</a>
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target=".navbar-collapse" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex flex-sm-row-reverse">
+                    <ul class="navbar-nav flex-grow-1 text-center">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=Inspections">Inspections</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=Electrical">Electrical Releases</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=Payments">Fee Payment History</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=LHNC">Locks / Holds / Notices / Comments</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=Contractors">Contractors</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=Requests">Inspection Requests</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/DevelopmentServices/PermitReports/Permit?id=NME36051&amp;searchType=Certificate">Certificate of Occupancy</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </header>
+        <main>
+            <div class="container">
+                
+<div class="col-12 mt-4">
+    <div class="alert alert-secondary">
+        <h5 class="alert-heading">Inspection Status Information</h5>
+
+        <div class="row">
+            <div class="col-12">Your search returned 0 result(s).</div>
+        </div>
+        <hr />
+        <div class="mb-0">
+            
+<div class="row mb-2">
+    <div class="col-sm-4">
+        <strong>Project No.: </strong><span>NME36051  </span>
+    </div>
+    <div class="col-sm-8">
+        <strong>Description: </strong><span>HVAC equal change out 3 ton Straight  Cool system with 10 kw</span>
+    </div>
+</div>
+<div class="row mb-2">
+    <div class="col-sm-4">
+        <strong>Address: </strong><span>1519 DALE MABRY HWY</span>
+    </div>
+    <div class="col-sm-8">
+        <strong>City: </strong><span></span>
+    </div>
+</div>
+<div class="row">
+    <div class="col-sm-4">
+        <strong>Parcel: </strong><span></span>
+    </div>
+    <div class="col-sm-4">
+        <strong>Permit Issue Date: </strong><span></span>
+    </div>
+    <div class="col-sm-4">
+        <strong>Permit Status: </strong><span>CANCEL</span>
+    </div>
+</div>
+
+
+        </div>
+    </div>
+</div>
+
+<div class="col-12 mb-4">
+    <table class="table table-striped table-sm-px" id="inspections">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Inspection Item</th>
+                <th>Description</th>
+                <th>Inspector / Initial</th>
+                <th>Action</th>
+                <th>Notation</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+
+            </div>
+        </main>
+        <footer class="ead-footer">
+            <div class="container-fluid ead-footer-container">
+                <div class="row text-center">
+                    <div class="col-sm-4 mt-5">
+                        <div class="ead-footer-logo mb-3">
+                            <a href="https://www.hillsboroughcounty.org/"><img src="/DevelopmentServices/PermitReports/img/hc_logo_dark.png" alt="Hillsborough County Logo" /></a>
+                        </div>
+                        <p>
+                            <a href="http://g.co/maps/gt8ce" target="_blank" rel="noopener noreferrer">
+                                601 E. Kennedy Blvd. <br />
+                                Tampa, FL 33602
+                            </a>
+                            <br /><br />
+                            <strong>Phone: </strong>813-272-5900
+                            <br />
+                            <a href="http://g.co/maps/3qyx2" target="_blank" rel="noopener noreferrer">Driving Directions </a><br />
+                        </p>
+                    </div>
+                    <div class="col-sm-4 mt-5">
+                        <a href="https://www.hillsboroughcounty.org/en/government/board-of-county-commissioners" target="_blank" rel="noopener noreferrer">Board&nbsp;of County&nbsp;Commissioners</a>
+                        <span> | </span>
+                        <a href="https://www.hillsboroughcounty.org/en/about-hillsborough/contact-us" target="_blank" rel="noopener noreferrer">Contact&nbsp;Us</a>
+                        <span> | </span>
+                        <a href="https://www.hillsboroughcounty.org/en/residents/citizens/county-locations" target="_blank" rel="noopener noreferrer">County&nbsp;Locations</a>
+                        <span> | </span>
+                        <a href="https://www.hillsboroughcounty.org/en/about-hillsborough/jobs" target="_blank" rel="noopener noreferrer">Jobs</a>
+                        <span> | </span>
+                        <a href="https://www.hillsboroughcounty.org/en/residents/public-safety/emergency-management/hcfl-alert" target="_blank" rel="noopener noreferrer">HCFL&nbsp;Alert&nbsp;Information</a>
+                        <span> | </span>
+                        <a href="https://www.hillsboroughcounty.org/en/government/departments/ada" target="_blank" rel="noopener noreferrer">Accessibility</a>
+                        <span> | </span>
+                        <a href="https://www.hillsboroughcounty.org/en/about-hillsborough/open-data/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
+                        <br /><br />
+                        <p id="ead-translate-url"></p>
+                    </div>
+                    <div class="col-sm-4 mt-5">
+                        <div class="ead-social-links mb-3">
+                            <div class="ead-social-icon">
+                                <a href="https://www.facebook.com/HillsboroughFL/" target="_blank" rel="noopener noreferrer">
+                                    <img src="/DevelopmentServices/PermitReports/img/social/facebook.png" alt="Facebook">
+                                </a>
+                            </div>
+                            <div class="ead-social-icon">
+                                <a href="https://twitter.com/HillsboroughFL" target="_blank" rel="noopener noreferrer">
+                                    <img src="/DevelopmentServices/PermitReports/img/social/twitter.png" alt="Twitter">
+                                </a>
+                            </div>
+                            <div class="ead-social-icon">
+                                <a href="https://www.youtube.com/user/HillsboroughCounty" target="_blank" rel="noopener noreferrer">
+                                    <img src="/DevelopmentServices/PermitReports/img/social/youtube.png" alt="you-tube-icon">
+                                </a>
+                            </div>
+                            <div class="ead-social-icon">
+                                <a href="https://www.instagram.com/hillsboroughfl/" target="_blank" rel="noopener noreferrer">
+                                    <img src="/DevelopmentServices/PermitReports/img/social/instagram.png" alt="Instagram">
+                                </a>
+                            </div>
+                            <div class="ead-social-icon">
+                                <a href="https://www.linkedin.com/company/hillsboroughfl" target="_blank" rel="noopener noreferrer">
+                                    <img src="/DevelopmentServices/PermitReports/img/social/linkedin.png" alt="LinkedIn">
+                                </a>
+                            </div>
+                        </div>
+                        <p>
+                            <a href="https://hcflgov.formstack.com/forms/website_feedback" target="_blank" rel="noopener noreferrer">Provide Website Feedback</a>
+                        </p>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <p class="mb-4">
+                        The mission of Hillsborough County government is to provide effective quality service at a reasonable cost with courtesy, integrity and accountability in a manner that protects and enhances the quality of life of our diverse population.
+                        <br /><br />
+                        Under Florida law, e-mail addresses are public records. If you do not want your e-mail address released in response to a public records request, do not send electronic mail to this entity. Instead, contact this office by phone or in writing.
+                        <br /><br />
+                        <span class="small">2021, Hillsborough County Board of County Commissioners</span>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js" integrity="sha512-ubuT8Z88WxezgSqf3RLuNi5lmjstiJcyezx34yIU2gAHonIi27Na7atqzUZCOoY4CExaoFumzOsFQ2Ch+I/HCw==" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha512-M5KW3ztuIICmVIhjSqXe01oV2bpe248gOxqmlcYrEzAvws7Pw3z6BK0iGbrwvdrUQUhi3eXgtxp5I8PDo9YfjQ==" crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/v/dt/dt-1.10.22/r-2.2.6/datatables.min.js" integrity="sha384-rukNbIQqk6omRZIoKAf5ghkWBTTTUCOdB0TYjfVtB61ImepsnnU2Yvn4dexKqgvK" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="/DevelopmentServices/PermitReports/js/site.js?v=XY15A6R_0xRhsg_AwCh5lacyCrwxt_rAP-4gph-xR7E"></script>
+    <script type="text/javascript">
+        document.getElementById("ead-translate-url").innerHTML = "<a href=\"http://translate.google.com/translate?hl=en&sl=en&tl=es&u=" + window.location.href + "\" target=\"_blank\" rel=\"noopener noreferrer\">Translate This Page</a>";
+    </script>
+    
+    <script>
+        $(document).ready(function () {
+            $('#inspections').DataTable({
+                paging: false,
+                ordering: false,
+                info: false,
+                searching: false,
+                responsive: {
+                    details: {
+                        type: 'inline'
+                    }
+                },
+                columnDefs: [{
+                    className: 'dtr-control'
+                }],
+                language: {
+                    emptyTable: "There are no recorded inspections for this permit"
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
