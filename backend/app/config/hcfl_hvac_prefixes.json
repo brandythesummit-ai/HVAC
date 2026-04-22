@@ -1,0 +1,647 @@
+{
+  "generated_at": "2026-04-22T16:38:30-0700",
+  "seed_streets": [
+    "KENNEDY",
+    "DALE MABRY",
+    "NEBRASKA",
+    "BUSCH",
+    "HOWARD",
+    "HARBOUR ISLAND",
+    "BAYSHORE",
+    "COLUMBUS",
+    "HILLSBOROUGH",
+    "LINEBAUGH"
+  ],
+  "max_samples_per_prefix": 3,
+  "hvac_prefixes": [
+    "FCM",
+    "NMC",
+    "NME"
+  ],
+  "review_needed": [
+    "FCG",
+    "RGB"
+  ],
+  "all_classifications": [
+    {
+      "prefix": "ALU",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "NC/RES/SCREEN ROOM Address: 5419 KENNEDY HILLS DR City: SEF  33584 Parcel: 063427.0000 Permit Issue ",
+        "W/BN/COMM/FREE STANDING ALUM COVER Address: 13804 NEBRASKA AVE City: TPA 33613 Parcel: 017526.0000 P",
+        "NC/RES/   ALUMINUM SCREEN ROOM Address: 12902 HOWARD AVE City: TPA 33612 Parcel: 020846.0000 Permit "
+      ]
+    },
+    {
+      "prefix": "ATF",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COM/INT REMODEL 2ND FL SOUTH/NURSING UNITS Address: 7171 DALE MABRY HWY City: TPA 33614 Parcel: 0259",
+        "COMM/FIRE DAMAGE/ATF Address: 7214 DALE MABRY HWY City: TPA 33614 Parcel: 026846.0000 Permit Issue D",
+        "COMM/REM NON-LOAD WALLS (TREE MART) Address: 12505 NEBRASKA AVE City: TPA 33612 Parcel: 035901.0050 "
+      ]
+    },
+    {
+      "prefix": "BFL",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM PL/DOMESTIC BF FOR MAKEUP WTR SYS/CHILLER Address: 7171 DALE MABRY HWY City: TPA 33613 Parcel: ",
+        "COM/REPL/1\" IRRIGATION BACKFLOW Address: 7814 DALE MABRY HWY City: TAMPA 33614 Parcel: 026642.0000 P",
+        "COM/BACKFLOWS (DOMESTIC & IRRIGATION) Address: 7981 DALE MABRY HWY City: TPA 33614 Parcel: 025936.02"
+      ]
+    },
+    {
+      "prefix": "CCS",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 6037 DALE MABRY HWY City: \\ Parcel: Permit Issue Date: 8/3/1999 Permit Status: FINAL Date I",
+        "INVESTIGATOR - TOM ALDERMAN                       12-4-98 - CITATION ISSUED - ACTING IN CAPACITY OF ",
+        "INVESTIGATOR - TOM ALDERMAN                       12-4-98 - N.O.V. ISSUED - PERFORMING CONSTRUCTION "
+      ]
+    },
+    {
+      "prefix": "CNS",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 6008 DALE MABRY HWY City: Parcel: 029254.0000 Permit Issue Date: 12/29/2009 Permit Status: "
+      ]
+    },
+    {
+      "prefix": "COM",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM/SERVICE GARAGE & 3-STORY PARKING GARAGE/LEXUS Address: 5852 DALE MABRY HWY City: Parcel: 029274",
+        "COMM/SERVICE/PARTS DEPT./LEXUS OF TAMPA BAY Address: 5852 DALE MABRY HWY City: Parcel: 029274.0000 P",
+        "COMM/SHOWROOM/OFFICES-LEXUS OF TAMPA BAY Address: 5852 DALE MABRY HWY City: Parcel: 029274.0000 Perm"
+      ]
+    },
+    {
+      "prefix": "CPO",
+      "sample_count": 2,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: 12/17/2012 Permit S",
+        "NC17/COM/SWIMMING POOL Address: 6821 LINEBAUGH AVE City: TPA  33625 Parcel: 003729.0000 Permit Issue"
+      ]
+    },
+    {
+      "prefix": "DAT",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 5701 HILLSBOROUGH AVE City: Parcel: Permit Issue Date: Permit Status: CLOSED Date Inspectio"
+      ]
+    },
+    {
+      "prefix": "DEM",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "NC/RES/DEMO SHED Address: 5636 KENNEDY HILLS DR City: SEF 33584 Parcel: 063368.0000 Permit Issue Dat",
+        "BILLBOARD DEMOLITION Address: 6202 DALE MABRY HWY City: TPA 33614 Parcel: 029252.0000 Permit Issue D",
+        "NC04/COMM DEMOLITION Address: 6251 DALE MABRY HWY City: TPA 33614 Parcel: 029211.0000 Permit Issue D"
+      ]
+    },
+    {
+      "prefix": "DUP",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "TEST TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit Status:"
+      ]
+    },
+    {
+      "prefix": "FCG",
+      "sample_count": 3,
+      "hvac_matches": 1,
+      "match_ratio": 0.333,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "one(1) like for like Split  AC unit # 4   Changeout Address: 3000 BUSCH LAKE BLVD City: Parcel: 0242",
+        "COM/FIRE PUMP HOUSE/NR #42993,43262,43263 Address: 9250 COLUMBUS DR City: TPA 33619 Parcel: 043262.0",
+        "COMM CANOPY @THORNTONS   FCM01246 Address: 6405 HILLSBOROUGH AVE City: TPA 33634 Parcel: 008131.0000"
+      ]
+    },
+    {
+      "prefix": "FCM",
+      "sample_count": 3,
+      "hvac_matches": 3,
+      "match_ratio": 1.0,
+      "is_hvac": true,
+      "sample_descriptions": [
+        "Disconnect /reconnect roof top a/c unit Address: 7171 DALE MABRY HWY City: Parcel: 026000.0000 Permi",
+        "disconnect & re-connect roof top a/c unit Address: 7171 DALE MABRY HWY City: Parcel: 026000.0000 Per",
+        "Roof top A/C disconnect and re-connect Address: 7171 DALE MABRY HWY City: Parcel: 026000.0000 Permit"
+      ]
+    },
+    {
+      "prefix": "FEM",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "PORTION OF PROPERTY REMOVED FROM SFHA Address: 6450 HILLSBOROUGH AVE City: Parcel: 009676.0000 Permi"
+      ]
+    },
+    {
+      "prefix": "FGB",
+      "sample_count": 2,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES/ADDITION & REMODEL SEE COMM Address: 3414 LINEBAUGH AVE City: TPA 33618 Parcel: 022522.0100 Perm",
+        "RES/ADD DETACHED ACCESSORY STRUCTURE /SEE COMM Address: 3414 LINEBAUGH AVE City: TPA 33618 Parcel: 0"
+      ]
+    },
+    {
+      "prefix": "FMH",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "MH SETUP REPL PRIV PROP 3 BDRM Address: 11308 HILLSBOROUGH AVE City: Parcel: 063076.0002 Permit Issu"
+      ]
+    },
+    {
+      "prefix": "FNC",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES-4 CL FENCE Address: 5540 KENNEDY HILLS DR City: SEF 33584 Parcel: 063436.0000 Permit Issue Date:",
+        "CPMM 6 CHAIN LINK Address: 6251 DALE MABRY HWY City: TPA 33614 Parcel: 029211.0000 Permit Issue Date",
+        "COMM/INSTALL 6 CHAIN LINK FENCE Address: 7222 DALE MABRY HWY City: TPA 33614 Parcel: 026853.0000 Per"
+      ]
+    },
+    {
+      "prefix": "FSH",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "OC/ COM/SHELL/NR(C)#2907    BLDG #1 (NORTH BLDG) Address: 12911 NEBRASKA AVE City: Parcel: 035868.00",
+        "OC/COM/SHELL/NR(C)#2907- BLDG #2  SOUTH SIDE Address: 12931 NEBRASKA AVE City: Parcel: 035868.0000 P",
+        "COM/SHELL BLDG 3/STORAGE/NR #42993,43262,43263 Address: 9230 COLUMBUS DR City: 3 Parcel: 042993.0000"
+      ]
+    },
+    {
+      "prefix": "GAS",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES/LP/3 OUTLET FIX/RANGE/WATER HEATER/DRYER Address: 5417 KENNEDY HILLS DR City: SEF 33584 Parcel: ",
+        "RES/LP/TANK SET ONLY Address: 5417 KENNEDY HILLS DR City: SEF 33584 Parcel: 063426.0000 Permit Issue",
+        "NC/RES/TANK SET ONLY FOR SPA HEATER Address: 5609 KENNEDY HILLS DR City: SEF 33584 Parcel: 063433.03"
+      ]
+    },
+    {
+      "prefix": "GFR",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "test Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit Status: CANC",
+        "TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0100 Permit Issue Date: Permit Status: CANC",
+        "test Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0100 Permit Issue Date: Permit Status: CANC"
+      ]
+    },
+    {
+      "prefix": "GLU",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: 1/1/2013 Permit Sta"
+      ]
+    },
+    {
+      "prefix": "INF",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "NC/COM/INT FIN/STE 405/DR ZBELLA/SHP00043 Address: 7171 DALE MABRY HWY City: \\ Parcel: 025994.0000 P",
+        "NC/COM/INT FIN/CARROLLWOOD OB/GYN 3RD FL/SUITE 301 Address: 7171 DALE MABRY HWY City: \\ Parcel: 0259",
+        "COMM/INTFIN/SUITE 502 (FLORIDA ORTHO)SHP00043 Address: 7171 DALE MABRY HWY City: Parcel: 026000.0000"
+      ]
+    },
+    {
+      "prefix": "INR",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM/INT REMODEL/SHOWROOMS Address: 5804 DALE MABRY HWY City: Parcel: 029276.0000 Permit Issue Date:",
+        "COMM/INST REMODEL FOR SERVICE WRITE UP BOOTH Address: 5804 DALE MABRY HWY City: Parcel: 029276.0000 ",
+        "COMM/INT REM/CAR DEALERSHIP Address: 6008 DALE MABRY HWY City: Parcel: 029254.0000 Permit Issue Date"
+      ]
+    },
+    {
+      "prefix": "LIC",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "GENERAL Address: 5415 LINEBAUGH AVE City: Parcel: 023816.0000 Permit Issue Date: 12/31/1999 Permit S"
+      ]
+    },
+    {
+      "prefix": "MHP",
+      "sample_count": 2,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "7 SPACES/LOTS 10-16/FLOOD ZONE X/NO IMPACTS Address: 6435 HILLSBOROUGH AVE City: TPA 33634 Parcel: 0",
+        "95 SPACES/SEE FILE FOR SITE PLAN AND ADDR/NO IMPAC Address: 6450 HILLSBOROUGH AVE City: TPA 33634 Pa"
+      ]
+    },
+    {
+      "prefix": "NCG",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COM/INT & EXT REM/SHOWROOM  LEXUS OF TAMPA Address: 5804 DALE MABRY HWY City: TPA 33614 Parcel: 0292",
+        "COM/CARPORT/VOLVO OF TAMPA Address: 6008 DALE MABRY HWY City: TPA 33614 Parcel: 029254.0000 Permit I",
+        "COM/INT & EXT REM/ADD/VOLVO OF TAMPA/ID#3577 Address: 6008 DALE MABRY HWY City: TPA 33614 Parcel: 02"
+      ]
+    },
+    {
+      "prefix": "NEL",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "OC/COM/UPGRADE/REPL MONITOR SYSTEM/TELE EQUIPT Address: 5404 KENNEDY HILLS DR City: SEF 33584 Parcel",
+        "COM/REPLACE WATER MONITARING SYSTEM Address: 5404 KENNEDY HILLS DR City: SEF 33584 Parcel: 063441.00",
+        "200 amp service change Address: 5416 KENNEDY HILLS DR City: SEF 33584 Parcel: 063440.0000 Permit Iss"
+      ]
+    },
+    {
+      "prefix": "NGB",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES-DETACHED GARAGE Address: 5544 KENNEDY HILLS DR City: SEF 33584 Parcel: 063435.0000 Permit Issue ",
+        "RES-DETACHED GARAGE Address: 5544 KENNEDY HILLS DR City: SEF 33584 Parcel: 063435.0000 Permit Issue ",
+        "COMM/CARWASH REF COM00352 Address: 5852 DALE MABRY HWY City: TPA 33614 Parcel: 029274.0000 Permit Is"
+      ]
+    },
+    {
+      "prefix": "NMC",
+      "sample_count": 3,
+      "hvac_matches": 3,
+      "match_ratio": 1.0,
+      "is_hvac": true,
+      "sample_descriptions": [
+        "HVAC CHANGE OUT - A/H IN ATTIC Address: 5417 KENNEDY HILLS DR City: SEF 33584 Parcel: 063426.0000 Pe",
+        "5 ton change out Address: 5511 KENNEDY HILLS DR City: SEF 33584 Parcel: 063428.0000 Permit Issue Dat",
+        "AC EQUAL CHANGE OUT Address: 5523 KENNEDY HILLS DR City: SEF 33584 Parcel: 063429.0000 Permit Issue "
+      ]
+    },
+    {
+      "prefix": "NME",
+      "sample_count": 3,
+      "hvac_matches": 2,
+      "match_ratio": 0.667,
+      "is_hvac": true,
+      "sample_descriptions": [
+        "NC/RES NEW AC SYSTEM Address: 5405 KENNEDY HILLS DR City: SEF 33584 Parcel: 063422.0000 Permit Issue",
+        "C/O HVAC system Address: 5551 KENNEDY HILLS DR City: SEF 33584 Parcel: 063432.0000 Permit Issue Date",
+        "equal c/o horz in the attic, DZ13SN036, \r\n\r\nASPT36C14 Address: 5609 KENNEDY HILLS DR City: SEF 33584"
+      ]
+    },
+    {
+      "prefix": "NMH",
+      "sample_count": 2,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "LOT 15 MH REPL SETUP Address: 6435 HILLSBOROUGH AVE City: Parcel: 008128.0000 Permit Issue Date: 4/2",
+        "LOT 12 MH PARK REPLACEMENT Address: 6435 HILLSBOROUGH AVE City: Parcel: 008128.0000 Permit Issue Dat"
+      ]
+    },
+    {
+      "prefix": "NPL",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "38 gl electric water heater replacement Address: 5602 KENNEDY HILLS DR City: SEF 33584 Parcel: 06343",
+        "2 bath while house repipe. Address: 5420 KENNEDY HILLS DR City: Parcel: 063471.0004 Permit Issue Dat",
+        "2 bath whole house repipe Address: 5420 KENNEDY HILLS DR City: SEF 33584 Parcel: 063471.0004 Permit "
+      ]
+    },
+    {
+      "prefix": "NPO",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES SPA & EQUIP Address: 3411 BUSCH BLVD City: TPA 33618 Parcel: 024243.0000 Permit Issue Date: 8/3/",
+        "NC10-RES/POOL SHOT - REF PO007482 Address: 3411 BUSCH BLVD City: Parcel: 024243.0000 Permit Issue Da",
+        "WB-Y/RES/POOL/SPA Address: 3413 BUSCH BLVD City: TPA 33618 Parcel: 024243.0000 Permit Issue Date: 10"
+      ]
+    },
+    {
+      "prefix": "NSG",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "WALL SIGN/CLINIC Address: 3635 DALE MABRY HWY City: TPA 33614 Parcel: 024173.1000 Permit Issue Date:",
+        "BLDG SIGN/LEXUS/EAST ELEVATION Address: 5804 DALE MABRY HWY City: TPA 33614 Parcel: 029276.0000 Perm",
+        "BLDG SIGN/PRE-OWNED(LEXUS)/EAST ELEVATION Address: 5804 DALE MABRY HWY City: TPA 33614 Parcel: 02927"
+      ]
+    },
+    {
+      "prefix": "NWP",
+      "sample_count": 2,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 12705 HOWARD AVE City: Parcel: 021072.0000 Permit Issue Date: Permit Status: CANCEL Date In",
+        "RES/ INST NEW WELL PUMP Address: 6208 LINEBAUGH AVE City: TPA 33625 Parcel: Permit Issue Date: 7/9/2"
+      ]
+    },
+    {
+      "prefix": "OSP",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM/ON SITE PIPING Address: 7171 DALE MABRY HWY City: TPA 33614 Parcel: 025994.0000 Permit Issue Da",
+        "COM/ON SITE PIPING   (COM03129) Address: 7901 DALE MABRY HWY City: TPA Parcel: 025936.0200 Permit Is",
+        "COM/INSTALL SANITARY SEWER/#FCM03397 Address: 12911 NEBRASKA AVE City: TPA 33612 Parcel: 035868.0000"
+      ]
+    },
+    {
+      "prefix": "PAL",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "NC10/REPL EXISTING POOL ENCL Address: 3407 BUSCH BLVD City: TPA 33618 Parcel: 024244.0000 Permit Iss",
+        "NC/RES/POOL ENCL/NPO12704 Address: 12905 HOWARD AVE City: TPA 33612 Parcel: 020894.0000 Permit Issue",
+        "TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: 1/1/2013 Permit Sta"
+      ]
+    },
+    {
+      "prefix": "PCR",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 13507 NEBRASKA AVE City: Parcel: 035229.0000 Permit Issue Date: Permit Status: COMPLETE Dat",
+        "Address: 13507 NEBRASKA AVE City: Parcel: 035229.0000 Permit Issue Date: Permit Status: COMPLETE Dat",
+        "Address: 14540 NEBRASKA AVE City: Parcel: 017741.0000 Permit Issue Date: Permit Status: COMPLETE Dat"
+      ]
+    },
+    {
+      "prefix": "PMP",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "NC/COMM/ELECT TO WIRE LIFT STATION- COM02088 Address: 6701 DALE MABRY HWY City: TPA 33614 Parcel: 02",
+        "NC04/COMM SVC FOR LIFT STATEION Address: 8003 DALE MABRY HWY City: TPA 33614 Parcel: 025928.0000 Per",
+        "COMM/LIFT STATION Address: 8205 DALE MABRY HWY City: TPA Parcel: 025923.4050 Permit Issue Date: 12/1"
+      ]
+    },
+    {
+      "prefix": "PVS",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM EL/PHOTO VOTAIC SYSTEM FOR CLUBHOUSE Address: 14600 NEBRASKA AVE City: LTZ 33549 Parcel: 017741",
+        "COM/PHOTO VOLTAIC -BLDG 400/STE #403 Address: 2901 BUSCH BLVD City: TPA 33618 Parcel: 024209.2000 Pe",
+        "COM/PHOTO VOLTAIC/BLDG #400/ STE 406,407,407 Address: 2901 BUSCH BLVD City: TPA 33618 Parcel: 024209"
+      ]
+    },
+    {
+      "prefix": "RCV",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COVID Compliance Address: 7210 HILLSBOROUGH AVE City: Parcel: 039942.0000 Permit Issue Date: Permit "
+      ]
+    },
+    {
+      "prefix": "RFG",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES/REROOF/OUTSIDE W/B Address: 5407 KENNEDY HILLS DR City: SEF 33584 Parcel: 063421.0000 Permit Iss",
+        "NC04/RES/RE-ROOF Address: 5416 KENNEDY HILLS DR City: SEF  33584 Parcel: 063440.0000 Permit Issue Da",
+        "RES/REROOF Address: 5551 KENNEDY HILLS DR City: SEF 33584 Parcel: 063432.0000 Permit Issue Date: 9/1"
+      ]
+    },
+    {
+      "prefix": "RGB",
+      "sample_count": 3,
+      "hvac_matches": 1,
+      "match_ratio": 0.333,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "NC/RES/REPAIRS FIRE DAMAGE Address: 5404 KENNEDY HILLS DR City: SEF 33584 Parcel: 063441.0000 Permit",
+        "W/B  N RES/ REPLACE GARAGE DOOR Address: 5417 KENNEDY HILLS DR City: SEF 33584 Parcel: 063426.0000 P",
+        "NC 5TH ED 2014/RES INSTALL LVL BEAM TO SPAN OVER OPENING Address: 5417 KENNEDY HILLS DR City: SEF 33"
+      ]
+    },
+    {
+      "prefix": "ROF",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Tear off and haul away 8sq. garage \r\n\r\nshingle roof down to decking and re-\r\n\r\nroof new. Address: 54",
+        "Remove existing shingle, replace with new \r\n\r\nshingles per manufactures spec and local \r\n\r\ncodes. \r\n",
+        "Re-roof Address: 5511 KENNEDY HILLS DR City: SEF 33584 Parcel: 063428.0000 Permit Issue Date: 10/16/"
+      ]
+    },
+    {
+      "prefix": "ROW",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Concrete Driveway Address: 12903 HOWARD AVE City: Parcel: 020893.0100 Permit Issue Date: 10/13/2020 ",
+        "Address: 12905 HOWARD AVE City: Parcel: 020894.0000 Permit Issue Date: Permit Status: CMPL Date Insp",
+        "Office/warehouse Address: 5730 COLUMBUS DR City: Parcel: 041992.0116 Permit Issue Date: Permit Statu"
+      ]
+    },
+    {
+      "prefix": "RPO",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "RES POOL REMODEL W/DECKING Address: 3414 LINEBAUGH AVE City: TPA 33618 Parcel: 022522.0000 Permit Is"
+      ]
+    },
+    {
+      "prefix": "RWD",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "replace rear door, size for size Address: 5405 KENNEDY HILLS DR City: SEF 33584 Parcel: 063422.0000 ",
+        "Replace 3 window units in 3 openings  (size for size) Address: 5416 KENNEDY HILLS DR City: Parcel: 0",
+        "Replace 3 window units in 2 openings \r\n\r\n(size for size) Address: 5416 KENNEDY HILLS DR City: SEF 33"
+      ]
+    },
+    {
+      "prefix": "SDR",
+      "sample_count": 2,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 7171 DALE MABRY HWY City: Parcel: 026000.0000 Permit Issue Date: Permit Status: PENDING Dat",
+        ". Address: 3702 LINEBAUGH AVE City: Parcel: 023969.0000 Permit Issue Date: Permit Status: CANCEL Dat"
+      ]
+    },
+    {
+      "prefix": "SFR",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "P2-NEW-1S-SFD/3BR/2BA LAL#298.153 Address: 5544 KENNEDY HILLS DR City: SEF 33584 Parcel: 063435.0000",
+        "P2-NEW-1S-SFD/3BR/2BA LAL#298.153 Address: 5544 KENNEDY HILLS DR City: SEF 33584 Parcel: 063435.0000",
+        "ERROR Address: 6800 DALE MABRY HWY City: TPA 33614 Parcel: 029153.0000 Permit Issue Date: Permit Sta"
+      ]
+    },
+    {
+      "prefix": "SFT",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "TEST TEST TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit St",
+        "TEST Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit Status: CANC",
+        "test Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit Status: CANC"
+      ]
+    },
+    {
+      "prefix": "SHP",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM HEALTHCARE FACILITY SHELL Address: 7171 DALE MABRY HWY City: Parcel: 026000.0000 Permit Issue D",
+        "COM/SHELL/BUS CTR/BLDG A1/NR # 35226.0000 Address: 13719 NEBRASKA AVE City: A1 Parcel: 035226.0000 P",
+        "COMM/NEW SHELL BLDG #3 Address: 13761 NEBRASKA AVE City: 3 Parcel: 035225.0000 Permit Issue Date: 11"
+      ]
+    },
+    {
+      "prefix": "SPP",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "tesajfsdgkjfasp'fjwefsdlmvs Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Da",
+        "test test Address: 5701 HILLSBOROUGH AVE City: PCY 33567 Parcel: 041687.0000 Permit Issue Date: Perm",
+        "test test Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit Status:"
+      ]
+    },
+    {
+      "prefix": "SSR",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "test test test Address: 5701 HILLSBOROUGH AVE City: Parcel: 041687.0000 Permit Issue Date: Permit St"
+      ]
+    },
+    {
+      "prefix": "SVA",
+      "sample_count": 1,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "Address: 5701 HILLSBOROUGH AVE City: APB 33572 Parcel: 041687.0000 Permit Issue Date: Permit Status:"
+      ]
+    },
+    {
+      "prefix": "TNT",
+      "sample_count": 3,
+      "hvac_matches": 0,
+      "match_ratio": 0.0,
+      "is_hvac": false,
+      "sample_descriptions": [
+        "COMM FURNITURE SALES 3/16 THRU 3/21 Address: 7817 DALE MABRY HWY City: TPA 33614 Parcel: 025941.0100",
+        "TEMP TENT PERMIT (1/21/98-1/22/98) Address: 14320 NEBRASKA AVE City: TPA 33613 Parcel: 017737.0000 P",
+        "8- 20 X 30 TEMP TENTS Address: 14320 NEBRASKA AVE City: TPA 33613 Parcel: 017737.0000 Permit Issue D"
+      ]
+    }
+  ]
+}
