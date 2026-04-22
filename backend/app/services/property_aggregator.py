@@ -332,7 +332,17 @@ class PropertyAggregator:
                     if isinstance(current_hvac_date, str):
                         current_hvac_date = datetime.fromisoformat(current_hvac_date).date()
 
-                # Update if this permit is more recent OR if no current HVAC date
+                # LOAD-ORDER INDEPENDENCE INVARIANT (tested by
+                # test_property_aggregation_load_order.py):
+                # This check is what makes process_permit commutative
+                # under repeated invocations. Any new permit strictly
+                # newer than the current most_recent_hvac_date becomes
+                # the new date; anything else increments the counter
+                # and stops. The final state of the property after N
+                # permits is therefore identical regardless of insertion
+                # order — critical because permits arrive from two
+                # sources (Accela API, legacy scraper) in different
+                # orders and retries can re-process rows mid-stream.
                 if not current_hvac_date or opened_date > current_hvac_date:
                     property_id = await self._update_property(
                         property_id,
