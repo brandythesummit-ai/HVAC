@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/background-jobs", tags=["Background Jobs"])
 
 class CreateJobRequest(BaseModel):
     """Request model for creating a background job."""
-    job_type: str = Field(..., description="Job type: initial_pull, incremental_pull, or property_aggregation")
+    job_type: str = Field(..., description="Job type: initial_pull, incremental_pull, property_aggregation, or hcfl_legacy_backfill")
     parameters: dict = Field(default={}, description="Job-specific parameters")
 
 
@@ -87,7 +87,12 @@ async def create_job(
         raise HTTPException(status_code=404, detail="County not found")
 
     # Validate job_type
-    valid_job_types = ['initial_pull', 'incremental_pull', 'property_aggregation']
+    valid_job_types = [
+        'initial_pull',
+        'incremental_pull',
+        'property_aggregation',
+        'hcfl_legacy_backfill',
+    ]
     if request.job_type not in valid_job_types:
         raise HTTPException(
             status_code=400,

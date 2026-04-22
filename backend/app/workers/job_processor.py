@@ -3,9 +3,11 @@ Background Job Processor
 
 Polls the background_jobs table for pending jobs and processes them.
 Supports:
-- initial_pull: Pull 30 years of historical HVAC permits
+- initial_pull: Pull 30 years of historical HVAC permits from Accela API
 - incremental_pull: Pull recent permits (e.g., last 24 hours)
 - property_aggregation: Rebuild property records from existing permits
+- hcfl_legacy_backfill: Scrape historical permits from HCFL's legacy
+  PermitReports tool (pre-2021 coverage that the Accela API doesn't have)
 
 No external dependencies (no Celery/Redis/ARQ) - just PostgreSQL polling.
 """
@@ -19,6 +21,7 @@ import traceback
 from supabase import Client
 from app.database import get_db
 from app.services.accela_client import AccelaClient, TokenExpiredError
+from app.services.hcfl_legacy_scraper import HcflLegacyScraper, PermitDetail
 from app.services.property_aggregator import PropertyAggregator
 from app.services.encryption import encryption_service
 from app.services.agency_discovery import AgencyDiscoveryService
@@ -149,6 +152,8 @@ class JobProcessor:
                 await self._process_incremental_pull(job)
             elif job['job_type'] == 'property_aggregation':
                 await self._process_property_aggregation(job)
+            elif job['job_type'] == 'hcfl_legacy_backfill':
+                await self._process_hcfl_legacy_backfill(job)
             else:
                 raise ValueError(f"Unknown job type: {job['job_type']}")
 
@@ -781,6 +786,195 @@ class JobProcessor:
         # This would be used for data migration or rebuilding corrupted data
         logger.info("Property aggregation not yet implemented")
         pass
+
+    async def _process_hcfl_legacy_backfill(self, job: Dict):
+        """
+        Scrape historical HVAC permits from HCFL's legacy PermitReports tool.
+
+        Work queue lives in the hcfl_streets table. Streets with scraped_at
+        IS NULL are the remaining work. On success the street is stamped;
+        on failure retry_count is incremented and last_error captured.
+
+        Resume is automatic: the processor re-queries unscraped streets
+        on every run, so a crashed/restarted job picks up where it left off.
+
+        Job parameters (stored in job.parameters JSONB):
+          - street_batch_size: int, default 50. Max streets to process in
+            this job invocation. Keeps single runs bounded.
+          - prefix_allowlist: list[str], optional. Overrides the file-based
+            default (hcfl_hvac_prefixes.json) for testing.
+          - max_street_retries: int, default 3. Streets exceeding this
+            count stop being picked up by future job runs.
+
+        Progress:
+          - Total denominator = unscraped streets at job start
+          - Numerator increments after each street completes (success OR
+            permanent failure after retry_count exceeds max)
+        """
+        job_id = job['id']
+        county_id = job.get('county_id')
+        if not county_id:
+            raise ValueError("hcfl_legacy_backfill job requires county_id")
+
+        params = job.get('parameters') or {}
+        street_batch_size = int(params.get('street_batch_size', 50))
+        prefix_allowlist_override = params.get('prefix_allowlist')
+        max_street_retries = int(params.get('max_street_retries', 3))
+
+        logger.info(
+            "[HCFL-LEGACY] Starting backfill job %s (county=%s, batch=%d)",
+            job_id, county_id, street_batch_size,
+        )
+
+        # Query unscraped streets capped by street_batch_size
+        streets_query = (
+            self.db.table('hcfl_streets')
+            .select('id, street_name, retry_count')
+            .is_('scraped_at', 'null')
+            .lt('retry_count', max_street_retries)
+            .order('street_name')
+            .limit(street_batch_size)
+            .execute()
+        )
+        streets = streets_query.data or []
+
+        if not streets:
+            logger.info("[HCFL-LEGACY] No unscraped streets remaining; job is a no-op")
+            await self._update_job(job_id, {'progress_percent': 100})
+            return
+
+        logger.info("[HCFL-LEGACY] Picked up %d streets for this batch", len(streets))
+
+        # Track counters across the run
+        streets_done = 0
+        streets_failed = 0
+        permits_ingested = 0
+        permits_skipped_hvac_filter = 0
+
+        async with HcflLegacyScraper(hvac_prefixes=prefix_allowlist_override) as scraper:
+            for idx, street_row in enumerate(streets):
+                street_name = street_row['street_name']
+                try:
+                    result = await self._scrape_one_street(
+                        scraper, street_row, county_id,
+                    )
+                    permits_ingested += result['permits_ingested']
+                    permits_skipped_hvac_filter += result['permits_skipped_hvac_filter']
+                    streets_done += 1
+                except Exception as exc:
+                    streets_failed += 1
+                    logger.exception(
+                        "[HCFL-LEGACY] Street %s failed: %s", street_name, exc,
+                    )
+                    # Increment retry_count; capture last_error for debugging.
+                    self.db.table('hcfl_streets').update({
+                        'retry_count': (street_row.get('retry_count') or 0) + 1,
+                        'last_error': str(exc)[:500],
+                    }).eq('id', street_row['id']).execute()
+
+                # Update job progress every 5 streets or on last
+                if (idx + 1) % 5 == 0 or (idx + 1) == len(streets):
+                    pct = min(100, int(((idx + 1) / len(streets)) * 100))
+                    await self._update_job(job_id, {
+                        'progress_percent': pct,
+                        'permits_pulled': permits_ingested,
+                        'permits_saved': permits_ingested,
+                    })
+
+        logger.info(
+            "[HCFL-LEGACY] Batch complete: %d/%d streets done, %d permits ingested, "
+            "%d permits dropped by HVAC filter, %d street failures, rate-limiter stats=%s",
+            streets_done, len(streets), permits_ingested,
+            permits_skipped_hvac_filter, streets_failed,
+            # scraper went out of scope; take stats from what we tracked
+            {"streets_failed": streets_failed},
+        )
+
+    async def _scrape_one_street(
+        self,
+        scraper: HcflLegacyScraper,
+        street_row: Dict,
+        county_id: str,
+    ) -> Dict[str, int]:
+        """
+        Scrape all HVAC permits for one street, insert them, stamp scraped_at.
+
+        Returns counters for the caller to aggregate:
+          - permits_ingested: new rows upserted to `permits`
+          - permits_skipped_hvac_filter: HVAC-prefix matches that failed
+            the description regex at ingest time (mis-prefixed permits)
+        """
+        street_name = street_row['street_name']
+        street_id = street_row['id']
+
+        search_result = await scraper.search_street(street_name)
+        if isinstance(search_result, dict) and 'error' in search_result:
+            raise RuntimeError(f"search failed: {search_result['error']}")
+
+        all_stubs = search_result or []
+        hvac_stubs = scraper.filter_hvac(all_stubs)
+
+        permits_ingested = 0
+        permits_skipped_hvac_filter = 0
+
+        for stub in hvac_stubs:
+            detail_result = await scraper.fetch_permit_detail(stub.permit_number)
+            if isinstance(detail_result, dict) and 'error' in detail_result:
+                logger.warning(
+                    "[HCFL-LEGACY] Detail fetch failed for %s: %s",
+                    stub.permit_number, detail_result['error'],
+                )
+                continue
+
+            detail: PermitDetail = detail_result
+
+            # Two-stage HVAC filter: second stage at ingest time checks
+            # the description regex to catch mis-prefixed permits.
+            if not scraper.is_hvac_permit(stub, detail):
+                permits_skipped_hvac_filter += 1
+                logger.info(
+                    "[HCFL-LEGACY] Skipping %s (HVAC-prefix but description "
+                    "doesn't match HVAC regex): %r",
+                    stub.permit_number, (detail.description or "")[:80],
+                )
+                continue
+
+            # Upsert to permits. Composite UNIQUE(county_id, source,
+            # source_permit_id) makes this idempotent on retries.
+            row = detail.to_permit_row(county_id=county_id)
+            try:
+                self.db.table('permits').upsert(
+                    row,
+                    on_conflict='county_id,source,source_permit_id',
+                    ignore_duplicates=False,  # update on conflict
+                ).execute()
+                permits_ingested += 1
+            except Exception as exc:
+                logger.exception(
+                    "[HCFL-LEGACY] Permit upsert failed for %s: %s",
+                    stub.permit_number, exc,
+                )
+                # Don't fail the whole street on one bad permit.
+                continue
+
+        # Mark street as scraped (successful processing).
+        self.db.table('hcfl_streets').update({
+            'scraped_at': datetime.utcnow().isoformat(),
+            'permit_count_at_scrape': len(all_stubs),
+            'hvac_permit_count': permits_ingested,
+            'last_error': None,
+        }).eq('id', street_id).execute()
+
+        logger.info(
+            "[HCFL-LEGACY] Street %s done: %d total permits, %d HVAC ingested, "
+            "%d skipped by description filter",
+            street_name, len(all_stubs), permits_ingested, permits_skipped_hvac_filter,
+        )
+
+        return {
+            'permits_ingested': permits_ingested,
+            'permits_skipped_hvac_filter': permits_skipped_hvac_filter,
+        }
 
     def _enrich_permit_data(self, permit: Dict) -> Dict:
         """
