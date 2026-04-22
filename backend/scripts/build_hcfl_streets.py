@@ -201,7 +201,7 @@ def main():
         if dotenv_path.exists():
             load_dotenv(dotenv_path)
     except ImportError:
-        pass
+        log.debug("python-dotenv not installed; skipping .env autoload")
 
     year = args.year or detect_latest_tiger_year()
     zip_path = download_tiger_zip(year, Path(args.cache_dir))
