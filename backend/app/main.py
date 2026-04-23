@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import counties, permits, leads, summit, background_jobs, properties, health
+from app.routers import counties, permits, leads, summit, background_jobs, properties, health, map_pins
 from app.routers import settings as settings_router
 from app.workers.job_processor import start_job_processor, stop_job_processor
 from app.services.health_checker import background_health_checker
@@ -43,6 +43,7 @@ app.include_router(summit.router)
 app.include_router(settings_router.router)
 app.include_router(background_jobs.router)
 app.include_router(properties.router)
+app.include_router(map_pins.router)
 
 
 def _handle_shutdown_signal(signum, frame):
