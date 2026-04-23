@@ -1,13 +1,38 @@
 import apiClient from './client';
 
+// FilterBar uses its own param names for URL-sync readability. The backend
+// at /api/leads uses snake_case names from before the post-pivot rebuild.
+// Translate here so neither side has to change its naming convention.
+// Arrays get comma-joined — the backend splits on commas for list filters.
+const FILTER_KEY_MAP = {
+  tier: 'lead_tier',
+  status: 'status',
+  minAge: 'min_hvac_age',
+  maxAge: 'max_hvac_age',
+  valueMin: 'min_property_value',
+  valueMax: 'max_property_value',
+  dateFrom: 'date_from',
+  dateTo: 'date_to',
+  zip: 'zip',
+  ownerOccupied: 'owner_occupied',
+  permitType: 'permit_type',
+  search: 'search',
+};
+
+function toBackendParams(params = {}) {
+  const out = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v === '' || v == null) continue;
+    const backendKey = FILTER_KEY_MAP[k] || k;
+    out[backendKey] = Array.isArray(v) ? v.join(',') : v;
+  }
+  return out;
+}
+
 export const leadsApi = {
   // Get all leads with filters and pagination metadata
   getAll: async (params = {}) => {
-    // Filter out empty string values to avoid validation errors
-    const cleanParams = Object.fromEntries(
-      Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
-    );
-
+    const cleanParams = toBackendParams(params);
     const response = await apiClient.get('/api/leads', { params: cleanParams });
     // Backend returns {success, data: {leads, count, total, limit, offset}, error}
     // Return full data object with pagination metadata

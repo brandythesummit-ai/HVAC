@@ -28,7 +28,8 @@ async def list_leads(
     county_id: str = None,
     sync_status: str = None,
 
-    # Lead tier and scoring filters
+    # Lead tier and scoring filters. lead_tier accepts either a single
+    # tier (HOT) or a comma-separated list (HOT,WARM) — parsed below.
     lead_tier: str = None,
     min_score: int = None,
     max_score: int = None,
@@ -57,6 +58,16 @@ async def list_leads(
     year_built_max: int = None,
     city: str = None,
     state: str = None,
+
+    # FilterBar (post-pivot UI) filters. Comma-separated lists are
+    # parsed into Python lists and mapped to PostgREST `in.(...)`.
+    status: str = None,
+    date_from: str = None,  # permit most_recent_hvac_date lower bound
+    date_to: str = None,
+    zip: str = None,
+    owner_occupied: bool = None,
+    permit_type: str = None,
+    search: str = None,  # free-text over address + owner_name
 
     # Pagination
     limit: int = 50,
@@ -93,165 +104,94 @@ async def list_leads(
         if limit > 20000:
             limit = 20000
 
+        # Parse comma-separated lists from FilterBar multi-selects.
+        tier_list = [t.strip().upper() for t in lead_tier.split(",") if t.strip()] if lead_tier else None
+        status_list = [s.strip().upper() for s in status.split(",") if s.strip()] if status else None
+
+        def apply_filters(q):
+            """Apply every filter to the given query-builder. Same semantics
+            for the main query and the count query — single source of truth."""
+            if county_id:
+                q = q.eq("county_id", county_id)
+            if sync_status:
+                q = q.eq("summit_sync_status", sync_status)
+            if tier_list:
+                q = q.in_("lead_tier", tier_list) if len(tier_list) > 1 else q.eq("lead_tier", tier_list[0])
+            if status_list:
+                q = q.in_("lead_status", status_list) if len(status_list) > 1 else q.eq("lead_status", status_list[0])
+            if min_score is not None:
+                q = q.gte("lead_score", min_score)
+            if max_score is not None:
+                q = q.lte("lead_score", max_score)
+            if is_qualified is True:
+                q = q.not_.is_("property_id", "null")
+            elif is_qualified is False:
+                q = q.is_("property_id", "null")
+            if min_hvac_age is not None:
+                q = q.gte("properties.hvac_age_years", min_hvac_age)
+            if max_hvac_age is not None:
+                q = q.lte("properties.hvac_age_years", max_hvac_age)
+            if contact_completeness:
+                q = q.eq("properties.contact_completeness", contact_completeness.lower())
+            if affluence_tier:
+                q = q.eq("properties.affluence_tier", affluence_tier.lower())
+            if recommended_pipeline:
+                q = q.eq("properties.recommended_pipeline", recommended_pipeline.lower())
+            if min_pipeline_confidence is not None:
+                q = q.gte("properties.pipeline_confidence", min_pipeline_confidence)
+            if min_property_value is not None:
+                q = q.gte("properties.total_property_value", min_property_value)
+            if max_property_value is not None:
+                q = q.lte("properties.total_property_value", max_property_value)
+            if has_phone is True:
+                q = q.not_.is_("properties.owner_phone", "null")
+            elif has_phone is False:
+                q = q.is_("properties.owner_phone", "null")
+            if has_email is True:
+                q = q.not_.is_("properties.owner_email", "null")
+            elif has_email is False:
+                q = q.is_("properties.owner_email", "null")
+            if year_built_min is not None:
+                q = q.gte("properties.year_built", year_built_min)
+            if year_built_max is not None:
+                q = q.lte("properties.year_built", year_built_max)
+            if city:
+                q = q.ilike("properties.city", f"%{city}%")
+            if state:
+                q = q.eq("properties.state", state.upper())
+            # FilterBar additions
+            if date_from:
+                q = q.gte("properties.most_recent_hvac_date", date_from)
+            if date_to:
+                q = q.lte("properties.most_recent_hvac_date", date_to)
+            if zip:
+                q = q.eq("properties.zip_code", zip)
+            # owner_occupied / permit_type: the FilterBar sends these, but
+            # the properties schema doesn't track either today. Accepted
+            # silently so the URL stays clean until Signal B / permit-level
+            # tagging lands. Ignoring in filter = no-op, no false matches.
+            if search:
+                # Free-text across normalized_address and owner_name via PostgREST `or`.
+                esc = search.replace(",", " ").replace("(", "").replace(")", "")
+                q = q.or_(
+                    f"normalized_address.ilike.%{esc}%,owner_name.ilike.%{esc}%",
+                    reference_table="properties",
+                )
+            return q
+
         # Build the base query for filtering.
         # Permits can have large raw_data JSONB (Accela API responses,
         # 10KB+ each) — dropping them from the list projection so the
         # map view fetching 12K leads doesn't freeze the browser with
         # ~100MB of JSON. DetailSheet fetches per-lead via GET /leads/:id
         # and can include permits there.
-        query = db.table("leads").select("*, properties(*)")
+        query = apply_filters(db.table("leads").select("*, properties(*)"))
 
-        # County filter
-        if county_id:
-            query = query.eq("county_id", county_id)
-
-        # Sync status filter
-        if sync_status:
-            query = query.eq("summit_sync_status", sync_status)
-
-        # Lead tier filter
-        if lead_tier:
-            query = query.eq("lead_tier", lead_tier.upper())
-
-        # Score range filters
-        if min_score is not None:
-            query = query.gte("lead_score", min_score)
-        if max_score is not None:
-            query = query.lte("lead_score", max_score)
-
-        # Qualification filter
-        if is_qualified is True:
-            query = query.not_.is_("property_id", "null")
-        elif is_qualified is False:
-            query = query.is_("property_id", "null")
-        # If is_qualified is None, don't apply any filter
-
-        # HVAC age filters (filter through properties)
-        if min_hvac_age is not None:
-            query = query.gte("properties.hvac_age_years", min_hvac_age)
-        if max_hvac_age is not None:
-            query = query.lte("properties.hvac_age_years", max_hvac_age)
-
-        # Contact completeness filter
-        if contact_completeness:
-            query = query.eq("properties.contact_completeness", contact_completeness.lower())
-
-        # Affluence tier filter
-        if affluence_tier:
-            query = query.eq("properties.affluence_tier", affluence_tier.lower())
-
-        # Recommended pipeline filter
-        if recommended_pipeline:
-            query = query.eq("properties.recommended_pipeline", recommended_pipeline.lower())
-
-        # Pipeline confidence filter
-        if min_pipeline_confidence is not None:
-            query = query.gte("properties.pipeline_confidence", min_pipeline_confidence)
-
-        # Property value range filters
-        if min_property_value is not None:
-            query = query.gte("properties.total_property_value", min_property_value)
-        if max_property_value is not None:
-            query = query.lte("properties.total_property_value", max_property_value)
-
-        # Contact info filters
-        if has_phone is not None:
-            if has_phone:
-                query = query.not_.is_("properties.owner_phone", "null")
-            else:
-                query = query.is_("properties.owner_phone", "null")
-
-        if has_email is not None:
-            if has_email:
-                query = query.not_.is_("properties.owner_email", "null")
-            else:
-                query = query.is_("properties.owner_email", "null")
-
-        # Year built range filters
-        if year_built_min is not None:
-            query = query.gte("properties.year_built", year_built_min)
-        if year_built_max is not None:
-            query = query.lte("properties.year_built", year_built_max)
-
-        # Geographic filters
-        if city:
-            query = query.ilike("properties.city", f"%{city}%")
-        if state:
-            query = query.eq("properties.state", state.upper())
-
-        # Get total count first (before pagination)
-        # Build a count-only query with same filters including property join
-        count_query = db.table("leads").select("id, properties(id)", count="exact")
-
-        # Apply ALL the same filters to the count query
-        if county_id:
-            count_query = count_query.eq("county_id", county_id)
-        if sync_status:
-            count_query = count_query.eq("summit_sync_status", sync_status)
-        if lead_tier:
-            count_query = count_query.eq("lead_tier", lead_tier.upper())
-        if min_score is not None:
-            count_query = count_query.gte("lead_score", min_score)
-        if max_score is not None:
-            count_query = count_query.lte("lead_score", max_score)
-        if is_qualified is True:
-            count_query = count_query.not_.is_("property_id", "null")
-        elif is_qualified is False:
-            count_query = count_query.is_("property_id", "null")
-        # If is_qualified is None, don't apply any filter
-
-        # HVAC age filters
-        if min_hvac_age is not None:
-            count_query = count_query.gte("properties.hvac_age_years", min_hvac_age)
-        if max_hvac_age is not None:
-            count_query = count_query.lte("properties.hvac_age_years", max_hvac_age)
-
-        # Contact completeness filter
-        if contact_completeness:
-            count_query = count_query.eq("properties.contact_completeness", contact_completeness.lower())
-
-        # Affluence tier filter
-        if affluence_tier:
-            count_query = count_query.eq("properties.affluence_tier", affluence_tier.lower())
-
-        # Recommended pipeline filter
-        if recommended_pipeline:
-            count_query = count_query.eq("properties.recommended_pipeline", recommended_pipeline.lower())
-
-        # Pipeline confidence filter
-        if min_pipeline_confidence is not None:
-            count_query = count_query.gte("properties.pipeline_confidence", min_pipeline_confidence)
-
-        # Property value range filters
-        if min_property_value is not None:
-            count_query = count_query.gte("properties.total_property_value", min_property_value)
-        if max_property_value is not None:
-            count_query = count_query.lte("properties.total_property_value", max_property_value)
-
-        # Contact info filters
-        if has_phone is not None:
-            if has_phone:
-                count_query = count_query.not_.is_("properties.owner_phone", "null")
-            else:
-                count_query = count_query.is_("properties.owner_phone", "null")
-        if has_email is not None:
-            if has_email:
-                count_query = count_query.not_.is_("properties.owner_email", "null")
-            else:
-                count_query = count_query.is_("properties.owner_email", "null")
-
-        # Year built range filters
-        if year_built_min is not None:
-            count_query = count_query.gte("properties.year_built", year_built_min)
-        if year_built_max is not None:
-            count_query = count_query.lte("properties.year_built", year_built_max)
-
-        # Geographic filters
-        if city:
-            count_query = count_query.ilike("properties.city", f"%{city}%")
-        if state:
-            count_query = count_query.eq("properties.state", state.upper())
-
+        # Count query uses the same filter pipeline — keeps main and
+        # count results perfectly consistent.
+        count_query = apply_filters(
+            db.table("leads").select("id, properties(id)", count="exact")
+        )
         count_result = count_query.execute()
         total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else 0
 
