@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 import AuthGuard from './components/auth/AuthGuard';
+import DetailSheet from './components/shared/DetailSheet';
 import MapPage from './pages/MapPage';
 import ListPage from './pages/ListPage';
 import PlanForTodayPage from './pages/PlanForTodayPage';
@@ -53,6 +54,10 @@ function App() {
             Any old bookmark redirects to /map. */}
         <Route path="*" element={<Navigate to="/map" replace />} />
       </Routes>
+      {/* DetailSheet lives at the app root so it's available from any
+          authed view. It listens for 'open-lead-detail' events
+          dispatched by pin/row clicks. */}
+      <DetailSheet />
     </>
   );
 }

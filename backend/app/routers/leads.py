@@ -1,5 +1,6 @@
 """Lead management endpoints."""
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 import logging
@@ -7,9 +8,18 @@ import logging
 from app.database import get_db
 from app.models.lead import CreateLeadsRequest, UpdateLeadNotesRequest, SyncLeadsRequest, LeadResponse, LeadListRequest
 from app.services.summit_client import SummitClient
+from app.services.lead_status_machine import (
+    InvalidTransitionError,
+    compute_transition,
+)
 
 router = APIRouter(prefix="/api/leads", tags=["leads"])
 logger = logging.getLogger(__name__)
+
+
+class UpdateLeadStatusRequest(BaseModel):
+    new_status: str = Field(..., description="Target status from the lead state machine")
+    note: Optional[str] = Field(None, description="Optional rationale for the transition")
 
 
 @router.get("", response_model=dict)
@@ -322,6 +332,90 @@ async def create_leads_from_permits(request: CreateLeadsRequest, db=Depends(get_
             "success": False,
             "data": None,
             "error": str(e)
+        }
+
+
+@router.get("/{lead_id}", response_model=dict)
+async def get_lead(lead_id: str, db=Depends(get_db)):
+    """Fetch a single lead with its full property + permit context.
+
+    Used by the DetailSheet to show all available fields when a buddy
+    taps a pin or row.
+    """
+    try:
+        result = (
+            db.table("leads")
+            .select("*, property:properties(*)")
+            .eq("id", lead_id)
+            .execute()
+        )
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        lead = result.data[0]
+        # Flatten property fields onto the lead for convenience
+        prop = lead.pop("property", None) or {}
+        merged = {**prop, **lead}
+        return {"success": True, "data": merged, "error": None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_lead failed")
+        return {"success": False, "data": None, "error": str(e)}
+
+
+@router.patch("/{lead_id}/status", response_model=dict)
+async def update_lead_status(
+    lead_id: str,
+    request: UpdateLeadStatusRequest,
+    db=Depends(get_db),
+):
+    """Transition a lead through the M12 state machine.
+
+    Server-computes cooldown timestamps and whether to push to GHL.
+    Invalid transitions return 400 with a descriptive message.
+    """
+    try:
+        lookup = db.table("leads").select("lead_status").eq("id", lead_id).execute()
+        if not lookup.data:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        current_status = lookup.data[0].get("lead_status") or "NEW"
+
+        cooldown_rows = db.table("lead_status_cooldowns").select("key, days").execute()
+        cooldowns = {r["key"]: r["days"] for r in (cooldown_rows.data or [])}
+
+        try:
+            result = compute_transition(current_status, request.new_status, cooldowns)
+        except InvalidTransitionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        update_payload = result.to_update_dict()
+        if request.note:
+            update_payload["status_note"] = request.note
+
+        updated = db.table("leads").update(update_payload).eq("id", lead_id).execute()
+        if not updated.data:
+            raise HTTPException(status_code=500, detail="Failed to update lead status")
+
+        # TODO(M22 follow-up): if result.should_push_to_ghl, invoke the
+        # GHL Contact+Opportunity upsert from M13 here. V1 surfaces the
+        # flag via the response so the frontend can optionally trigger a
+        # manual Push-to-GHL button; full auto-push wired up in deploy.
+        return {
+            "success": True,
+            "data": {
+                **updated.data[0],
+                "should_push_to_ghl": result.should_push_to_ghl,
+            },
+            "error": None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("update_lead_status failed")
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e),
         }
 
 
