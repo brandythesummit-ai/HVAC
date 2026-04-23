@@ -130,6 +130,26 @@ export default function MapPage() {
     );
   }, [pins]);
 
+  // Precedence: active search feedback wins over generic map-state
+  // hints, so the user understands what their search did before we
+  // surface anything about zoom or pin count.
+  const trimmedSearch = (filters.search || '').trim();
+  const hasSearch = trimmedSearch.length >= 2;
+  let hintText = null;
+  if (hasSearch && searchResult.loading) {
+    hintText = 'Searching addresses…';
+  } else if (hasSearch && searchResult.tooBroad) {
+    hintText = `“${trimmedSearch}” matches ${searchResult.count.toLocaleString()}+ parcels — refine your search`;
+  } else if (hasSearch && !searchResult.found) {
+    hintText = `No matches for “${trimmedSearch}”`;
+  } else if (!shouldFetch) {
+    hintText = `Zoom in to load pins (zoom ≥ ${MIN_FETCH_ZOOM})`;
+  } else {
+    hintText = `${displayPins.length.toLocaleString()} pinned${
+      truncated ? ' · showing first 10K (zoom in for more)' : ''
+    }`;
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <ViewToggle />
@@ -197,23 +217,7 @@ export default function MapPage() {
         </MapContainer>
 
         <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10">
-          {searchResult.loading && <>Searching addresses…</>}
-          {!searchResult.loading && filters.search && filters.search.trim().length >= 2 && !searchResult.found && (
-            <>No matches for “{filters.search}”</>
-          )}
-          {!searchResult.loading && !(filters.search && filters.search.trim().length >= 2 && !searchResult.found) && (
-            <>
-              {!shouldFetch && (
-                <>Zoom in to load pins (zoom ≥ {MIN_FETCH_ZOOM})</>
-              )}
-              {shouldFetch && (
-                <>
-                  {displayPins.length.toLocaleString()} pinned
-                  {truncated && ' · showing first 10K (zoom in for more)'}
-                </>
-              )}
-            </>
-          )}
+          {hintText}
         </div>
       </div>
     </div>

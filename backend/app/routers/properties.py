@@ -74,24 +74,30 @@ async def search_address_bounds(
     search is too broad (e.g. "DRIVE" matching 50K streets), the sampled
     bbox will naturally widen — the client can warn the user to refine.
     """
-    # Strip and normalize — the column is uppercase in the DB. ILIKE is
-    # case-insensitive so the uppercase isn't strictly required, but being
-    # explicit avoids a Postgres collation surprise.
     needle = q.strip()
     if not needle:
         raise HTTPException(status_code=400, detail="Empty search")
 
+    # Escape LIKE wildcards so a user typing "first_street" or "100%"
+    # doesn't accidentally match-anything. Backslash is PostgreSQL's
+    # default LIKE escape char.
+    escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
     # Fetch only the coord columns we need for the bbox calculation.
-    # PostgREST caps at ~1000 per request, so request up to max_sample.
+    # Pull one extra row so we can detect when we'd have needed more
+    # than max_sample rows — that signals a too-broad query (e.g. a
+    # common street suffix like "DRIVE") where any bbox we compute
+    # would fly the user to a county-wide view and reproduce the
+    # original "no pins" bug.
     try:
         res = (
             db.table("properties")
             .select("latitude, longitude")
             .eq("is_residential", True)
-            .ilike("normalized_address", f"%{needle}%")
+            .ilike("normalized_address", f"%{escaped}%")
             .not_.is_("latitude", "null")
             .not_.is_("longitude", "null")
-            .limit(max_sample)
+            .limit(max_sample + 1)
             .execute()
         )
     except Exception as e:
@@ -101,7 +107,15 @@ async def search_address_bounds(
     if not rows:
         return {
             "success": True,
-            "data": {"found": False, "count": 0, "bbox": None},
+            "data": {"found": False, "too_broad": False, "count": 0, "bbox": None},
+            "error": None,
+        }
+
+    too_broad = len(rows) > max_sample
+    if too_broad:
+        return {
+            "success": True,
+            "data": {"found": False, "too_broad": True, "count": len(rows), "bbox": None},
             "error": None,
         }
 
@@ -110,7 +124,7 @@ async def search_address_bounds(
     if not lats or not lngs:
         return {
             "success": True,
-            "data": {"found": False, "count": len(rows), "bbox": None},
+            "data": {"found": False, "too_broad": False, "count": len(rows), "bbox": None},
             "error": None,
         }
 
@@ -118,6 +132,7 @@ async def search_address_bounds(
         "success": True,
         "data": {
             "found": True,
+            "too_broad": False,
             "count": len(rows),
             "bbox": {
                 "ne_lat": max(lats),

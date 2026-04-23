@@ -16,7 +16,13 @@ const DEBOUNCE_MS = 350;
 const MIN_LENGTH = 2;
 
 export function useAddressSearchBounds(query) {
-  const [result, setResult] = useState({ bounds: null, found: false, count: 0, loading: false });
+  const [result, setResult] = useState({
+    bounds: null,
+    found: false,
+    tooBroad: false,
+    count: 0,
+    loading: false,
+  });
   const debounceRef = useRef(null);
   const activeRequestRef = useRef(0);
 
@@ -25,7 +31,7 @@ export function useAddressSearchBounds(query) {
     if (q.length < MIN_LENGTH) {
       // Clear any stale result so MapPage doesn't keep flying to the
       // previous subdivision after the user clears the search.
-      setResult({ bounds: null, found: false, count: 0, loading: false });
+      setResult({ bounds: null, found: false, tooBroad: false, count: 0, loading: false });
       return;
     }
 
@@ -37,14 +43,16 @@ export function useAddressSearchBounds(query) {
         const resp = await apiClient.get('/api/properties/search-bounds', { params: { q } });
         if (requestId !== activeRequestRef.current) return;
         const data = resp.data?.data;
-        if (data?.found) {
-          setResult({ bounds: data.bbox, found: true, count: data.count, loading: false });
-        } else {
-          setResult({ bounds: null, found: false, count: data?.count || 0, loading: false });
-        }
+        setResult({
+          bounds: data?.found ? data.bbox : null,
+          found: !!data?.found,
+          tooBroad: !!data?.too_broad,
+          count: data?.count || 0,
+          loading: false,
+        });
       } catch {
         if (requestId !== activeRequestRef.current) return;
-        setResult({ bounds: null, found: false, count: 0, loading: false });
+        setResult({ bounds: null, found: false, tooBroad: false, count: 0, loading: false });
       }
     }, DEBOUNCE_MS);
 
