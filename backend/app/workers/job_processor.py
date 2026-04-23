@@ -86,10 +86,14 @@ class JobProcessor:
         """
         Reset jobs stuck in 'running' state from server crash/restart.
 
-        Jobs that have been 'running' for > 10 minutes without progress
+        Jobs that have been 'running' for > 3 minutes without progress
         are assumed to be orphaned and reset to 'pending' for retry.
+        The scraper updates permits_pulled / updated_at on every batch
+        (sub-minute cadence), so 3 min with no update is a clear signal
+        the worker died. Previous value (10 min) left redeployed workers
+        idle for too long — a bad trade when redeploy cadence is high.
         """
-        stale_threshold = datetime.utcnow() - timedelta(minutes=10)
+        stale_threshold = datetime.utcnow() - timedelta(minutes=3)
 
         try:
             # Find and reset stale jobs
