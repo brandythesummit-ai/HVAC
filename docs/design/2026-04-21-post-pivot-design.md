@@ -226,3 +226,33 @@ Multi-session. Gut desktop-first React table, rebuild around:
 Every decision in this document is traceable to a specific grill question (Q1–Q14) documented in Claude's task-tracking system during the 2026-04-21 session. If a decision here conflicts with code written later, this design is the source of truth — the code should be updated to match, not the other way around.
 
 When future Claude sessions, code reviewers, or the user themselves have doubts about why something is built a certain way, read the relevant section of this document first.
+
+---
+
+## Addendum (2026-04-22): Path A — HCFL Legacy Scraper
+
+After validating that HCFL's Accela API only has permits from 2021-01-19 forward, we added a second data source: **HCFL's legacy PermitReports tool** (https://app.hillsboroughcounty.org/DevelopmentServices/PermitReports). This covers 2001–2021, extending our HVAC-age lookback to 20+ years.
+
+Implementation sprawls 9 milestones (M1–M9 per the velvety-cooking-kernighan plan):
+- **Street enumeration**: pulled from US Census TIGER/Line (Hillsborough FIPS 12057). 14,446 unique streets populated into a new `hcfl_streets` iteration table.
+- **HVAC prefix classification**: `app/services/hcfl_prefix_classifier.py` identified FCM, NMC, NME as the HVAC prefixes HCFL uses. Allowlist stored as `backend/app/config/hcfl_hvac_prefixes.json`.
+- **Scraper service** (`app/services/hcfl_legacy_scraper.py`): polite fixed delay + jitter + 60-req/min cap + exponential backoff on 429/5xx. Mirrors `accela_client.py`'s dict-return error convention so the job processor handles both identically.
+- **Job processor wiring** (`app/workers/job_processor.py`): new `hcfl_legacy_backfill` job type, idempotent upserts with composite UNIQUE `(county_id, source, source_permit_id)`.
+- **Aggregation correctness** (`property_aggregator.py` line 336): proven commutative by a 6-permutation test suite that asserts byte-identical final state regardless of permit insertion order.
+- **Silent-failure audit**: AST introspection test forbids bare `except: pass` in scraper pipeline files.
+- **Live E2E**: 5 tests against real HCFL pass in ~26s, gated behind `ENABLE_LIVE_TESTS=1`.
+
+Data source primary keys:
+- `permits.source` = `'accela_api'` (2021+) or `'hcfl_legacy_scraper'` (pre-2021)
+- `permits.source_permit_id` = original permit number from the source (e.g., `NME36051` for legacy)
+
+Both sources feed the same `property_aggregator.process_permit()`, so the unified property view always reflects the most recent HVAC date across both data sets.
+
+## Addendum (2026-04-22): Lead status machine + GHL handoff
+
+Implemented per §4 as `app/services/lead_status_machine.py` with explicit `VALID_TRANSITIONS` map, cooldown computation (7-day NO_ANSWER, 180-day NOT_INTERESTED, configurable via `lead_status_cooldowns` table), and `should_push_to_ghl` flag for the backend to act on. 26 unit tests with freezegun for deterministic time.
+
+GHL client extended to Contact + Opportunity model (`app/services/ghl_client.py`): property-keyed Contact dedupes across re-knocks, Opportunity per sales cycle. 11 tests using pytest-httpx.
+
+Summit.AI → GHL rename complete in code + env vars; backward-compat shim at `summit_client.py` for any in-flight imports.
+

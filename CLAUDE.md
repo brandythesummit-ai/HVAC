@@ -2,23 +2,22 @@
 
 ## Project Overview
 
-This is a full-stack HVAC lead generation platform that pulls permit data from county Accela systems, enriches it with property information, and syncs qualified leads to Summit.AI CRM.
+A full-stack HVAC lead gen tool. **V1 is HCFL-only** (Hillsborough County, FL) — a map-first mobile field-sales product for door-knocking homes whose HVAC is likely due for replacement. Pulls permits from two sources, aggregates by property, drives a door-knock state machine, hands qualified leads off to GHL (GoHighLevel / Summit.AI white-label).
 
-**Core Workflow:** Pull HVAC permits → Enrich with property data → Convert to leads → Sync to CRM
+**Core Workflow:** Pull HVAC permits (Accela 2021+ or legacy scraper 2001–2021) → Aggregate by property with load-order-independent reducer → Surface via Map / List / Plan-for-Today UIs → Door-knock state transitions → GHL Contact+Opportunity handoff on INTERESTED.
 
-## MVP Requirements
+## Post-Pivot V1 Scope (2026-04-21)
 
-**Scope:** All **67 Florida counties** must be pre-configured for MVP launch.
+The product has pivoted from a 67-county multi-tenant SaaS to a **single-user, HCFL-only field-sales tool** for the user's buddy. Design of record: `docs/design/2026-04-21-post-pivot-design.md` (plus 2026-04-22 addenda for the legacy scraper and lead status machine).
 
-**Current Status (V1):**
-- ✅ **Accela Integration:** Production-ready (validated with Hillsborough County pilot)
-- 📊 **Current Deployment:** 0 counties configured (HCFL pilot deleted for statewide rebuild)
-- 🎯 **Potential V1 Coverage:** ~25-30 Florida counties use Accela (can be added immediately)
-- 🚧 **Multi-Platform Support:** Planned for V2 (see README.md Future Vision section)
-- 🎯 **Remaining Counties:** 37-42 counties require V2 multi-platform integrations
-
-**Why All 67 Counties?**
-Florida's climate and aging HVAC systems create high replacement demand. Statewide coverage ensures HVAC contractors can target any Florida market without artificial geographic limitations.
+**V1 current state (22-milestone rebuild completed 2026-04-22):**
+- ✅ **HCFL data pipeline:** Accela API (2021+) + legacy PermitReports scraper (2001–2021). Production run: 19,549 permits → 11,800 leads in production DB.
+- ✅ **Lead status machine:** 10-state workflow (NEW → KNOCKED_* → INTERESTED → APPOINTMENT_SET → QUOTED → WON/LOST) with configurable cooldowns. 7-day NO_ANSWER, 180-day NOT_INTERESTED.
+- ✅ **GHL handoff:** Contact + Opportunity model. INTERESTED transition creates both; post-INTERESTED stages update the Opportunity.
+- ✅ **Magic-link auth:** Supabase Auth passwordless, 30-day sessions, RLS on permits/leads/properties by agency_id.
+- ✅ **Frontend:** Map (Leaflet + Mapbox) / List (TanStack virtual-scroll) / Plan-for-Today (nearest-neighbor route → Google/Apple Maps export). URL-synced FilterBar shared across all 3 surfaces.
+- ✅ **Testing:** 210 offline + 5 live (gated behind ENABLE_LIVE_TESTS=1). Load-order-independent aggregation proven by 6-permutation permit-insertion test. AST-based silent-failure audit forbids bare `except: pass` in scraper pipeline.
+- 🚧 **V2 (deferred):** Signal B (GIS house-age), Pinellas + other FL counties (Accela agency-allowlist blocker), Google SSO, self-serve onboarding, billing.
 
 ## Tech Stack
 
@@ -650,3 +649,53 @@ ACCELA_REQUEST_TIMEOUT=30.0                   # Request timeout (seconds)
 ### API Testing
 - `curl` commands: **Always foreground** (takes <5 seconds)
 - Never use background for one-off API calls
+
+## Stale Background Process Reminders (Claude Code Bug)
+
+### The Problem
+
+When a Claude Code conversation is **continued** (context summarization), background process system reminders persist showing `(status: running)` even though:
+- The actual processes completed hours/days ago
+- `jobs` command shows no running processes
+- `KillShell` confirms status is "completed"
+
+**This is a state synchronization bug** between Claude Code's shell tracking system (accurate) and the system reminder generator (uses stale conversation context).
+
+**Evidence:**
+```
+KillShell returns: "Shell 734386 is not running (status: completed)"
+System reminder:   "Background Bash 734386 ... (status: running)"
+```
+
+**Impact:** 20-30+ spurious reminders per response (~2000+ tokens wasted)
+
+### Rules to Prevent Accumulation
+
+**ONLY use `run_in_background: true` for:**
+- Streaming logs you're actively monitoring (railway logs)
+- Watch mode for development (npm run dev, uvicorn --reload)
+- Processes >5 minutes where you'll do other work
+
+**NEVER use background for:**
+- curl, API calls, gh commands
+- Tests (<3 min) - use foreground
+- One-off commands
+- Sleep timers for delayed checks
+
+**ALWAYS clean up before session ends:**
+1. Run `jobs` to check for running processes
+2. Kill any remaining background processes
+3. Verify with `jobs` again
+
+### On Continued Sessions (Stale Reminders)
+
+When you see stale process reminders from a continued session:
+- **DO NOT** attempt to kill them (will fail with "already completed")
+- **IGNORE** the reminders - they cannot be cleared
+- **DO NOT** waste output on BashOutput calls for completed processes
+- This is a Claude Code infrastructure bug - only Anthropic can fix it
+
+### Bug Report
+
+Filed at: https://github.com/anthropics/claude-code/issues/13405
+Status: Open (filed 2025-12-08)
