@@ -42,7 +42,9 @@ jobs:
           # Test-only placeholders — real secrets live in Railway, never in CI.
           SUPABASE_URL: "https://example.supabase.co"
           SUPABASE_KEY: "test-key"
-          ENCRYPTION_KEY: "dGVzdC1rZXktMzItYnl0ZXMtMDAwMDAwMDAwMDAwMDAwMA=="
+          # Valid Fernet key for CI — 32 raw bytes base64-url-safe encoded.
+          # NOT a real secret; generated via Fernet.generate_key() for test env.
+          ENCRYPTION_KEY: "HE7JNz1ErqVzoA9XcpYHYt5KpHT3ZGAyVppX73k7eLs="
           SUMMIT_API_KEY: "test"
           GHL_API_KEY: "test"
         run: pytest -v

@@ -851,14 +851,10 @@ class JobProcessor:
 
         logger.info("[HCFL-LEGACY] Picked up %d streets for this batch", len(streets))
 
-        # Concurrency lever: how many streets to process in parallel.
-        # Each worker gets its own HcflLegacyScraper (→ own polite rate
-        # limiter, own httpx client). HCFL doesn't publish rate limits;
-        # 4 concurrent at 400-600ms/req means ~600 req/min total across
-        # workers, which is well below what a residential-scale site
-        # should tolerate. Can be dialed down via job.parameters.concurrency
-        # if 429s show up.
-        concurrency = int(params.get('concurrency', 4))
+        # Concurrency lever. Starting at 2 after the first 4-wide run
+        # triggered HTTP 500s from HCFL — they apparently don't like 4+
+        # concurrent connections from the same IP. Tune via job.parameters.
+        concurrency = int(params.get('concurrency', 2))
 
         # Track counters across the run (atomic via GIL — no locks needed
         # for simple int increments between await points).
@@ -868,35 +864,49 @@ class JobProcessor:
         permits_skipped_hvac_filter = 0
 
         async def _worker_one_street(street_row):
-            """Own scraper instance per worker → independent rate limiter."""
+            """Own scraper instance per worker → independent rate limiter.
+
+            Bulletproof against all exception paths: if a worker dies for
+            ANY reason, we still want the rest of the chunk (and all
+            subsequent chunks) to continue. Return None on error.
+            """
             nonlocal streets_done, streets_failed, permits_ingested, permits_skipped_hvac_filter
             street_name = street_row['street_name']
-            async with HcflLegacyScraper(hvac_prefixes=prefix_allowlist_override) as scraper:
-                try:
+            try:
+                async with HcflLegacyScraper(hvac_prefixes=prefix_allowlist_override) as scraper:
                     result = await self._scrape_one_street(
                         scraper, street_row, county_id,
                     )
                     permits_ingested += result['permits_ingested']
                     permits_skipped_hvac_filter += result['permits_skipped_hvac_filter']
                     streets_done += 1
-                except Exception as exc:
-                    streets_failed += 1
-                    logger.exception(
-                        "[HCFL-LEGACY] Street %s failed: %s", street_name, exc,
-                    )
+            except Exception as exc:
+                streets_failed += 1
+                logger.exception(
+                    "[HCFL-LEGACY] Street %s failed: %s", street_name, exc,
+                )
+                # Update retry_count but absorb any DB error so a flaky
+                # Supabase write doesn't take down the whole job.
+                try:
                     self.db.table('hcfl_streets').update({
                         'retry_count': (street_row.get('retry_count') or 0) + 1,
                         'last_error': str(exc)[:500],
                     }).eq('id', street_row['id']).execute()
+                except Exception as db_exc:
+                    logger.warning(
+                        "[HCFL-LEGACY] Failed to record retry for %s: %s",
+                        street_name, db_exc,
+                    )
 
-        # Process streets in parallel chunks of `concurrency`. Each chunk
-        # waits for all workers before starting the next chunk — simpler
-        # than a sliding semaphore and keeps per-chunk progress reporting.
+        # Process streets in parallel chunks of `concurrency`. With
+        # return_exceptions=True any unexpected raise (defensive — the
+        # worker already has try/except) is surfaced as a return value
+        # and the rest of the chunk continues.
         for chunk_start in range(0, len(streets), concurrency):
             chunk = streets[chunk_start : chunk_start + concurrency]
             await asyncio.gather(
                 *(_worker_one_street(s) for s in chunk),
-                return_exceptions=False,  # inner try/except already handles
+                return_exceptions=True,
             )
 
             processed = chunk_start + len(chunk)
