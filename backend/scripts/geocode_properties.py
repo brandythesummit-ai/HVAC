@@ -220,19 +220,23 @@ def main():
         # per property hits Supabase with 10K+ individual HTTP/2 streams
         # and Cloudflare terminates the connection after ~20K. Upsert-
         # batches drop that to a handful of requests.
-        # county_id pulled from the SELECT so PostgREST upsert satisfies
-        # the NOT NULL constraint on INSERT (even though we're really
-        # UPDATEing on conflict). Without it: 23502 "null value in
-        # column county_id of relation properties" every batch.
+        # PostgREST upsert is conceptually INSERT...ON CONFLICT DO UPDATE,
+        # so the payload must satisfy every NOT NULL column even when the
+        # operation will really be UPDATE. The properties schema requires:
+        # id, county_id, normalized_address (created_at/updated_at have
+        # defaults). We round-trip those from the SELECT so the upsert
+        # can succeed without re-reading them.
         matched_rows = []
         missed_rows = []
         for row_id, _street, _city, _state, _zip in chunk:
             prop = index_to_prop.get(row_id, {})
             county_id = prop.get("county_id")
+            normalized_address = prop.get("normalized_address")
             if row_id in results:
                 matched_rows.append({
                     "id": row_id,
                     "county_id": county_id,
+                    "normalized_address": normalized_address,
                     "latitude": results[row_id]["lat"],
                     "longitude": results[row_id]["lng"],
                     "geocoded_at": now_iso,
@@ -243,6 +247,7 @@ def main():
                 missed_rows.append({
                     "id": row_id,
                     "county_id": county_id,
+                    "normalized_address": normalized_address,
                     "geocoded_at": now_iso,
                     "geocode_source": "us_census_no_match",
                 })
