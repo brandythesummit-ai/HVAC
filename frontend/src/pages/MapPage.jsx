@@ -7,17 +7,18 @@
  * house as a pin with tier coloring, clicks → DetailSheet opens.
  */
 import 'leaflet/dist/leaflet.css';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
 import { useMapPins } from '../hooks/useMapPins';
 import { useLeadFilters } from '../hooks/useLeadFilters';
+import { useAddressSearchBounds } from '../hooks/useAddressSearchBounds';
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2xUrl,
@@ -58,6 +59,31 @@ const tileProps = MAPBOX_TOKEN
         '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     };
 
+/** When the search bounds from useAddressSearchBounds change, fly the
+ * map to cover them. Child of MapContainer so it can access the map
+ * instance via useMap(). Remembers the last bbox we flew to so we
+ * don't re-fly on unrelated state updates (e.g. when filters change
+ * but the search text didn't). */
+function SearchFlyTo({ bounds }) {
+  const map = useMap();
+  const lastKey = useRef(null);
+  useEffect(() => {
+    if (!bounds) return;
+    const key = `${bounds.sw_lat},${bounds.sw_lng},${bounds.ne_lat},${bounds.ne_lng}`;
+    if (key === lastKey.current) return;
+    lastKey.current = key;
+    const latLngBounds = L.latLngBounds(
+      [bounds.sw_lat, bounds.sw_lng],
+      [bounds.ne_lat, bounds.ne_lng],
+    );
+    // maxZoom caps how far we zoom in — a single-address match would
+    // otherwise zoom to z=18 and show one lonely pin; z=16 keeps a
+    // subdivision in view.
+    map.flyToBounds(latLngBounds, { maxZoom: 16, padding: [40, 40], duration: 0.8 });
+  }, [bounds, map]);
+  return null;
+}
+
 /** Pushes the current map bounds up to the parent via onBboxChange. */
 function BboxWatcher({ onBboxChange, onZoomChange }) {
   const pushBbox = useCallback((map) => {
@@ -85,6 +111,11 @@ export default function MapPage() {
   const [bbox, setBbox] = useState(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
+  // Search text → bbox of matching parcels. Lets a buddy type
+  // "newberry grove" and be flown to that subdivision instead of
+  // seeing a blank county-wide view.
+  const searchResult = useAddressSearchBounds(filters.search);
+
   const shouldFetch = bbox && zoom >= MIN_FETCH_ZOOM;
   const { pins, isLoading, truncated } = useMapPins({
     bbox,
@@ -98,6 +129,26 @@ export default function MapPage() {
       && !Number.isNaN(p.latitude) && !Number.isNaN(p.longitude),
     );
   }, [pins]);
+
+  // Precedence: active search feedback wins over generic map-state
+  // hints, so the user understands what their search did before we
+  // surface anything about zoom or pin count.
+  const trimmedSearch = (filters.search || '').trim();
+  const hasSearch = trimmedSearch.length >= 2;
+  let hintText = null;
+  if (hasSearch && searchResult.loading) {
+    hintText = 'Searching addresses…';
+  } else if (hasSearch && searchResult.tooBroad) {
+    hintText = `“${trimmedSearch}” matches ${searchResult.count.toLocaleString()}+ parcels — refine your search`;
+  } else if (hasSearch && !searchResult.found) {
+    hintText = `No matches for “${trimmedSearch}”`;
+  } else if (!shouldFetch) {
+    hintText = `Zoom in to load pins (zoom ≥ ${MIN_FETCH_ZOOM})`;
+  } else {
+    hintText = `${displayPins.length.toLocaleString()} pinned${
+      truncated ? ' · showing first 10K (zoom in for more)' : ''
+    }`;
+  }
 
   return (
     <div className="flex flex-col h-screen">
@@ -119,6 +170,7 @@ export default function MapPage() {
         >
           <TileLayer {...tileProps} />
           <BboxWatcher onBboxChange={setBbox} onZoomChange={setZoom} />
+          <SearchFlyTo bounds={searchResult.bounds} />
           {displayPins.map((p) => (
             <CircleMarker
               key={p.id}
@@ -165,15 +217,7 @@ export default function MapPage() {
         </MapContainer>
 
         <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10">
-          {!shouldFetch && (
-            <>Zoom in to load pins (zoom ≥ {MIN_FETCH_ZOOM})</>
-          )}
-          {shouldFetch && (
-            <>
-              {displayPins.length.toLocaleString()} pinned
-              {truncated && ' · showing first 10K (zoom in for more)'}
-            </>
-          )}
+          {hintText}
         </div>
       </div>
     </div>
