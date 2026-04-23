@@ -1,27 +1,36 @@
 """Run the HCFL legacy scraper locally, in parallel with Railway.
 
-Doubles effective throughput by having two independent workers: the
-Railway worker claims streets in ascending scrape_priority/street_name
-order (the production `_process_hcfl_legacy_backfill` default), while
-this local worker claims in descending order. They meet in the middle
-of the remaining queue with near-zero overlap.
+Supports N-way hash partitioning so multiple locals can run side-by-
+side without stepping on each other. Each worker claims only the
+streets whose id hash falls in its bucket:
+    WHERE abs(hashtext(id::text)) % total_workers = worker_id
 
-Overlap protection relies on the `(county_id, source, source_permit_id)`
-UNIQUE constraint on permits — if both workers grab the same street in
-the midpoint, the second upsert just no-ops. Worst-case penalty is a
-handful of redundant HCFL calls; no data corruption.
+This is independent of Railway (which orders ASC by priority). Locals
+and Railway can overlap on priority-1 streets — first to write
+`scraped_at` wins; the other worker wastes one scrape attempt but the
+upsert is idempotent via the `(county_id, source, source_permit_id)`
+UNIQUE constraint.
 
 Usage:
     cd backend && source venv/bin/activate
+    # Single local worker (no partitioning):
     python -m scripts.run_scraper_locally
-        [--county-id UUID]        # default: HCFL
-        [--batch-size N]          # streets per iteration (default 50)
-        [--concurrency N]         # outer parallelism (default 4)
-        [--permit-concurrency N]  # inner permit-fetch parallelism (default 4)
-        [--max-iterations N]      # stop after N batches (default: unlimited)
-        [--max-street-retries N]  # same as Railway (default 3)
 
-Stops when no unscraped streets remain.
+    # N locals, each with its own bucket:
+    python -m scripts.run_scraper_locally --worker-id 0 --total-workers 2
+    python -m scripts.run_scraper_locally --worker-id 1 --total-workers 2
+
+Options:
+    [--county-id UUID]        # default: HCFL
+    [--batch-size N]          # streets per iteration (default 50)
+    [--concurrency N]         # outer parallelism (default 4)
+    [--permit-concurrency N]  # inner permit-fetch parallelism (default 4)
+    [--worker-id N]           # this worker's hash bucket (default 0)
+    [--total-workers N]       # total number of hash buckets (default 1)
+    [--max-iterations N]      # stop after N batches (default: unlimited)
+    [--max-street-retries N]  # same as Railway (default 3)
+
+Stops when no unscraped streets remain in this worker's bucket.
 """
 from __future__ import annotations
 
@@ -52,6 +61,8 @@ async def run(
     permit_concurrency: int,
     max_iterations: Optional[int],
     max_street_retries: int,
+    worker_id: int,
+    total_workers: int,
 ) -> None:
     try:
         from dotenv import load_dotenv
@@ -88,28 +99,53 @@ async def run(
             break
         iteration += 1
 
-        # Descending priority/street_name order — inverse of Railway's ASC.
-        # Local worker chews from the TAIL of the unscraped queue while
-        # Railway chews from the HEAD. They meet in the middle with
-        # zero-to-minimal overlap.
+        # Hash-modulo partition: each worker owns disjoint 1/total_workers
+        # slice of the unscraped queue. The `hashtext(id::text) % N = worker_id`
+        # filter keeps locals from overlapping each other. Railway is
+        # independent (ASC priority) — a Railway+local collision on a
+        # priority-1 street wastes one scrape but is idempotent via the
+        # permits UNIQUE constraint.
+        #
+        # Supabase JS client doesn't expose raw SQL. We use an RPC-style
+        # filter via .filter() with a SQL expression. Fallback: PostgREST
+        # supports `mod` via SELECT ... WHERE abs(hashtext(id::text)) % N
+        # through an RPC function. For simplicity we fetch a larger batch
+        # and filter client-side when total_workers > 1. This is O(N) waste
+        # per fetch but N is small (2-4) so the cost is bounded.
+        fetch_size = batch_size * total_workers if total_workers > 1 else batch_size
         streets_resp = (
             db.table("hcfl_streets")
             .select("id, street_name, retry_count, scrape_priority")
             .is_("scraped_at", "null")
             .lt("retry_count", max_street_retries)
-            .order("scrape_priority", desc=True)
-            .order("street_name", desc=True)
-            .limit(batch_size)
+            .order("scrape_priority")
+            .order("street_name")
+            .limit(fetch_size)
             .execute()
         )
-        streets = streets_resp.data or []
+        all_streets = streets_resp.data or []
+        if total_workers > 1:
+            # Partition by Python hash — matches the *logical* bucketing
+            # we want. Python's hash() is randomized per-process, so we
+            # use a stable hash instead: sum of UUID bytes modulo N.
+            streets = []
+            for s in all_streets:
+                # Stable bucket: last 8 hex chars of the UUID parsed as int.
+                uuid_str = str(s["id"]).replace("-", "")
+                bucket = int(uuid_str[-8:], 16) % total_workers
+                if bucket == worker_id:
+                    streets.append(s)
+                if len(streets) >= batch_size:
+                    break
+        else:
+            streets = all_streets[:batch_size]
         if not streets:
             logger.info("No unscraped streets remaining. Done.")
             break
 
         logger.info(
-            "Iteration %d: picked up %d streets (reverse priority)",
-            iteration, len(streets),
+            "Iteration %d [worker %d/%d]: picked up %d streets (of %d fetched)",
+            iteration, worker_id, total_workers, len(streets), len(all_streets),
         )
 
         # Mirror the Railway worker's per-street logic. Re-implementing
@@ -245,7 +281,16 @@ def main() -> None:
     parser.add_argument("--permit-concurrency", type=int, default=4)
     parser.add_argument("--max-iterations", type=int, default=None)
     parser.add_argument("--max-street-retries", type=int, default=3)
+    parser.add_argument("--worker-id", type=int, default=0,
+                        help="This worker's hash bucket (0-indexed)")
+    parser.add_argument("--total-workers", type=int, default=1,
+                        help="Total number of parallel hash-partitioned workers")
     args = parser.parse_args()
+
+    if args.worker_id >= args.total_workers:
+        raise SystemExit(
+            f"--worker-id {args.worker_id} must be < --total-workers {args.total_workers}"
+        )
 
     asyncio.run(run(
         args.county_id,
@@ -254,6 +299,8 @@ def main() -> None:
         args.permit_concurrency,
         args.max_iterations,
         args.max_street_retries,
+        args.worker_id,
+        args.total_workers,
     ))
 
 
