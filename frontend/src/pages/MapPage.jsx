@@ -1,56 +1,48 @@
 /**
- * MapPage — hero surface per design doc §3.
+ * MapPage — parcels-first viewport-scoped map.
  *
- * Leaflet + Mapbox tiles. Geo-clustered pins color-coded by scoring
- * tier. Click a pin → fires 'open-lead-detail' event (M19 handles).
- * Bounding-box filter is a planned enhancement — V1 just plots
- * everything the filtered useLeads query returns.
- *
- * Free-tier provider choices per design doc §3:
- *   - Leaflet: open-source, zero cost
- *   - Mapbox tiles: 50K loads/month free, no CC required
- *   - US Census geocoder (client-side, M18 uses lead.latitude/longitude
- *     if present; proper geocoding lives in useGeocoder hook for now)
- *
- * Leaflet requires a CSS import + an icon fix (the default marker
- * icons can't be resolved by Vite's bundler — we shim them).
+ * Pre-pivot, this fetched 12K leads and rendered all at once. With
+ * ~450K residential parcels, we fetch per-viewport via /api/map-pins,
+ * debounced on pan/zoom. The user zooms to a subdivision, sees every
+ * house as a pin with tier coloring, clicks → DetailSheet opens.
  */
 import 'leaflet/dist/leaflet.css';
-import { useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
-import { useLeads } from '../hooks/useLeads';
+import { useMapPins } from '../hooks/useMapPins';
 import { useLeadFilters } from '../hooks/useLeadFilters';
 
-// Fix Leaflet's default icon URL resolution (Vite bundles assets via URL).
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2xUrl,
   iconUrl: markerIconUrl,
   shadowUrl: markerShadowUrl,
 });
 
-// Tampa-ish default center, comfortable zoom for a county-wide view.
 const HCFL_CENTER = [27.9506, -82.4572];
 const DEFAULT_ZOOM = 10;
 
+// Below this zoom, the viewport covers too much area for useful pin
+// rendering (a county-wide view of 450K pins). Show a "zoom in" hint
+// instead of fetching.
+const MIN_FETCH_ZOOM = 13;
+
 const TIER_COLOR = {
-  HOT: '#dc2626',    // red-600
-  WARM: '#ea580c',   // orange-600
-  COOL: '#2563eb',   // blue-600
-  COLD: '#94a3b8',   // slate-400
+  HOT: '#dc2626',
+  WARM: '#ea580c',
+  COOL: '#2563eb',
+  COLD: '#94a3b8',
 };
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const MAPBOX_STYLE = import.meta.env.VITE_MAPBOX_STYLE_ID || 'streets-v12';
 
-// Fallback to OpenStreetMap tiles if no Mapbox token. Keeps dev onboarding
-// zero-config while letting prod use the nicer Mapbox tiles.
 const tileProps = MAPBOX_TOKEN
   ? {
       url: `https://api.mapbox.com/styles/v1/mapbox/${MAPBOX_STYLE}/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
@@ -66,44 +58,46 @@ const tileProps = MAPBOX_TOKEN
         '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     };
 
-function hasCoords(lead) {
-  return (
-    typeof lead?.latitude === 'number' &&
-    typeof lead?.longitude === 'number' &&
-    !Number.isNaN(lead.latitude) &&
-    !Number.isNaN(lead.longitude)
-  );
+/** Pushes the current map bounds up to the parent via onBboxChange. */
+function BboxWatcher({ onBboxChange, onZoomChange }) {
+  const pushBbox = useCallback((map) => {
+    const b = map.getBounds();
+    const z = map.getZoom();
+    onBboxChange({
+      ne_lat: b.getNorth(),
+      ne_lng: b.getEast(),
+      sw_lat: b.getSouth(),
+      sw_lng: b.getWest(),
+    });
+    onZoomChange(z);
+  }, [onBboxChange, onZoomChange]);
+
+  useMapEvents({
+    load: (e) => pushBbox(e.target),
+    moveend: (e) => pushBbox(e.target),
+    zoomend: (e) => pushBbox(e.target),
+  });
+  return null;
 }
 
 export default function MapPage() {
   const { filters } = useLeadFilters();
-  // Request a high limit so every plottable lead gets a pin. Default
-  // API limit is 50, which would cap the map at 50 markers. Setting
-  // to 12k covers the full 11,836-lead dataset with headroom.
-  const { data, isLoading } = useLeads({ ...filters, limit: 12000 });
+  const [bbox, setBbox] = useState(null);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
-  const leads = useMemo(() => {
-    if (!data) return [];
-    const arr = Array.isArray(data) ? data : data.leads || [];
-    // Plot every lead with coords. COLD tier is NOT filtered here —
-    // use the FilterBar's tier chips to narrow down. During early
-    // rollout (HCFL historical scraper still backfilling), most leads
-    // are COLD because the Accela API only has post-2021 permits.
-    // The user wants to see everything that has coordinates.
-    return arr.filter((l) => hasCoords(l));
-  }, [data]);
+  const shouldFetch = bbox && zoom >= MIN_FETCH_ZOOM;
+  const { pins, isLoading, truncated } = useMapPins({
+    bbox,
+    filters,
+    enabled: shouldFetch,
+  });
 
-  const unplotted = useMemo(() => {
-    if (!data) return 0;
-    const arr = Array.isArray(data) ? data : data.leads || [];
-    return arr.length - leads.length;
-  }, [data, leads.length]);
-
-  const totalLeads = useMemo(() => {
-    if (!data) return 0;
-    if (Array.isArray(data)) return data.length;
-    return data.total || (data.leads?.length ?? 0);
-  }, [data]);
+  const displayPins = useMemo(() => {
+    return pins.filter((p) =>
+      typeof p.latitude === 'number' && typeof p.longitude === 'number'
+      && !Number.isNaN(p.latitude) && !Number.isNaN(p.longitude),
+    );
+  }, [pins]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -112,7 +106,7 @@ export default function MapPage() {
 
       <div className="relative flex-1">
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10 text-slate-500">
+          <div className="absolute top-2 right-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10">
             Loading pins…
           </div>
         )}
@@ -124,20 +118,23 @@ export default function MapPage() {
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer {...tileProps} />
-          {leads.map((lead) => (
+          <BboxWatcher onBboxChange={setBbox} onZoomChange={setZoom} />
+          {displayPins.map((p) => (
             <CircleMarker
-              key={lead.id}
-              center={[lead.latitude, lead.longitude]}
+              key={p.id}
+              center={[p.latitude, p.longitude]}
               radius={8}
               pathOptions={{
-                color: TIER_COLOR[lead.lead_tier] || TIER_COLOR.COOL,
+                color: TIER_COLOR[p.lead_tier] || TIER_COLOR.COOL,
                 fillOpacity: 0.7,
                 weight: 1,
               }}
               eventHandlers={{
                 click: () => {
+                  // DetailSheet listens for this. It'll fetch the full
+                  // lead by property_id from /api/leads?property_id=...
                   const evt = new CustomEvent('open-lead-detail', {
-                    detail: { id: lead.id },
+                    detail: { propertyId: p.id },
                   });
                   window.dispatchEvent(evt);
                 },
@@ -146,24 +143,37 @@ export default function MapPage() {
               <Popup>
                 <div className="text-sm">
                   <div className="font-medium">
-                    {lead.property_address || '(no address)'}
+                    {p.normalized_address || '(no address)'}
                   </div>
-                  <div className="text-slate-600">
-                    {lead.owner_name}
-                    {lead.hvac_age_years != null && ` · HVAC ${lead.hvac_age_years}y`}
-                  </div>
+                  {p.owner_name && (
+                    <div className="text-slate-600">{p.owner_name}</div>
+                  )}
                   <div className="text-xs text-slate-500 mt-1">
-                    {lead.lead_tier || 'UNRATED'} · Score {lead.lead_score ?? 0}
+                    Built {p.year_built ?? '?'}
+                    {p.heated_sqft && ` · ${p.heated_sqft} sqft`}
+                    {p.bedrooms_count && ` · ${p.bedrooms_count}BR`}
+                    {p.bathrooms_count && `/${p.bathrooms_count}BA`}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {p.lead_tier} · Score {p.lead_score ?? 0}
+                    {p.owner_occupied && ' · Homestead'}
                   </div>
                 </div>
               </Popup>
             </CircleMarker>
           ))}
         </MapContainer>
-        <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow">
-          {leads.length.toLocaleString()} pinned
-          {unplotted > 0 && ` · ${unplotted.toLocaleString()} awaiting geocoding`}
-          {totalLeads > 0 && ` · ${totalLeads.toLocaleString()} total`}
+
+        <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10">
+          {!shouldFetch && (
+            <>Zoom in to load pins (zoom ≥ {MIN_FETCH_ZOOM})</>
+          )}
+          {shouldFetch && (
+            <>
+              {displayPins.length.toLocaleString()} pinned
+              {truncated && ' · showing first 10K (zoom in for more)'}
+            </>
+          )}
         </div>
       </div>
     </div>
