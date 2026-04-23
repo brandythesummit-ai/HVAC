@@ -53,17 +53,33 @@ BENCHMARK = "Public_AR_Current"
 
 
 def fetch_ungeocoded_properties(client, limit: int | None = None, retry_failed: bool = False):
-    q = client.table("properties").select(
-        "id, normalized_address, street_number, street_name, street_suffix, city, state, zip_code",
-    )
-    if retry_failed:
-        q = q.is_("latitude", "null")
-    else:
-        q = q.is_("geocoded_at", "null")
-    if limit:
-        q = q.limit(limit)
-    resp = q.execute()
-    return resp.data or []
+    # Supabase defaults to 1000 rows per request. Paginate with range()
+    # until the server returns a short page (< PAGE_SIZE) indicating EOF.
+    # Without pagination, this silently caps at 1000 and misses ~11K
+    # properties in production.
+    PAGE_SIZE = 1000
+    out = []
+    offset = 0
+    while True:
+        q = client.table("properties").select(
+            "id, normalized_address, street_number, street_name, street_suffix, city, state, zip_code",
+        )
+        if retry_failed:
+            q = q.is_("latitude", "null")
+        else:
+            q = q.is_("geocoded_at", "null")
+        q = q.range(offset, offset + PAGE_SIZE - 1)
+        resp = q.execute()
+        chunk = resp.data or []
+        out.extend(chunk)
+        log.info("Fetched page offset=%d rows=%d (total so far %d)", offset, len(chunk), len(out))
+        if len(chunk) < PAGE_SIZE:
+            break
+        if limit and len(out) >= limit:
+            out = out[:limit]
+            break
+        offset += PAGE_SIZE
+    return out
 
 
 def build_address_line(prop: dict) -> str | None:

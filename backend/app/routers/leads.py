@@ -81,18 +81,25 @@ async def list_leads(
     - has_phone/has_email: Filter by contact info availability
     - year_built_min/year_built_max: Year built range
     - city/state: Geographic filters
-    - limit: Results per page (default 50, max 200)
+    - limit: Results per page (default 50, max 20000 for map view)
     - offset: Pagination offset
 
     Returns leads with property and permit data joined, plus total count.
     """
     try:
-        # Validate limit
-        if limit > 200:
-            limit = 200
+        # Validate limit. Map view needs the full dataset (~12K leads)
+        # to plot pins without paginated fetching; cap at 20000 to prevent
+        # accidental unbounded queries.
+        if limit > 20000:
+            limit = 20000
 
-        # Build the base query for filtering
-        query = db.table("leads").select("*, properties(*), permits(*)")
+        # Build the base query for filtering.
+        # Permits can have large raw_data JSONB (Accela API responses,
+        # 10KB+ each) — dropping them from the list projection so the
+        # map view fetching 12K leads doesn't freeze the browser with
+        # ~100MB of JSON. DetailSheet fetches per-lead via GET /leads/:id
+        # and can include permits there.
+        query = db.table("leads").select("*, properties(*)")
 
         # County filter
         if county_id:
@@ -252,16 +259,31 @@ async def list_leads(
         # Order: HOT before WARM before COOL before COLD
         # Within tier: highest score first
         # Note: Cannot order by related table columns (properties.*) in Supabase
-        result = query.order("lead_tier", desc=False) \
-                      .order("lead_score", desc=True) \
-                      .range(offset, offset + limit - 1) \
-                      .execute()
+        ordered = query.order("lead_tier", desc=False).order("lead_score", desc=True)
+
+        # PostgREST caps any single request at ~1000 rows. When the caller
+        # asks for more (e.g., MapPage requests 12K leads so every pin
+        # plots), we page through internally and concatenate. Without this
+        # the Map would silently truncate at ~1000 pins.
+        SUPABASE_PAGE = 1000
+        collected: list = []
+        rel_offset = 0
+        while rel_offset < limit:
+            page_size = min(SUPABASE_PAGE, limit - rel_offset)
+            abs_start = offset + rel_offset
+            abs_end = abs_start + page_size - 1
+            page = ordered.range(abs_start, abs_end).execute()
+            chunk = page.data or []
+            collected.extend(chunk)
+            if len(chunk) < page_size:
+                break  # end of dataset reached
+            rel_offset += page_size
 
         return {
             "success": True,
             "data": {
-                "leads": result.data,
-                "count": len(result.data),
+                "leads": collected,
+                "count": len(collected),
                 "total": total_count,
                 "limit": limit,
                 "offset": offset

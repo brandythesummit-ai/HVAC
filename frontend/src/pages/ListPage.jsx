@@ -33,7 +33,10 @@ function tierBadge(tier) {
 
 export default function ListPage() {
   const { filters } = useLeadFilters();
-  const { data, isLoading, error } = useLeads(filters);
+  // High limit so the virtual-scroll table can sort across the full set
+  // rather than paginating. TanStack Virtual only renders visible rows,
+  // so 12k in memory is fine.
+  const { data, isLoading, error } = useLeads({ ...filters, limit: 12000 });
 
   // API returns { leads, count, total } — normalize
   const rows = useMemo(() => {

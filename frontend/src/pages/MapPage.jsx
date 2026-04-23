@@ -77,15 +77,20 @@ function hasCoords(lead) {
 
 export default function MapPage() {
   const { filters } = useLeadFilters();
-  const { data, isLoading } = useLeads(filters);
+  // Request a high limit so every plottable lead gets a pin. Default
+  // API limit is 50, which would cap the map at 50 markers. Setting
+  // to 12k covers the full 11,836-lead dataset with headroom.
+  const { data, isLoading } = useLeads({ ...filters, limit: 12000 });
 
   const leads = useMemo(() => {
     if (!data) return [];
     const arr = Array.isArray(data) ? data : data.leads || [];
-    // Only plot leads with coords. The backend is responsible for
-    // geocoding during ingest; unplotted leads show up in List view.
-    // Default: hide COLD tier (not qualified leads — noise on the map).
-    return arr.filter((l) => hasCoords(l) && l.lead_tier !== 'COLD');
+    // Plot every lead with coords. COLD tier is NOT filtered here —
+    // use the FilterBar's tier chips to narrow down. During early
+    // rollout (HCFL historical scraper still backfilling), most leads
+    // are COLD because the Accela API only has post-2021 permits.
+    // The user wants to see everything that has coordinates.
+    return arr.filter((l) => hasCoords(l));
   }, [data]);
 
   const unplotted = useMemo(() => {
@@ -93,6 +98,12 @@ export default function MapPage() {
     const arr = Array.isArray(data) ? data : data.leads || [];
     return arr.length - leads.length;
   }, [data, leads.length]);
+
+  const totalLeads = useMemo(() => {
+    if (!data) return 0;
+    if (Array.isArray(data)) return data.length;
+    return data.total || (data.leads?.length ?? 0);
+  }, [data]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -149,11 +160,11 @@ export default function MapPage() {
             </CircleMarker>
           ))}
         </MapContainer>
-        {unplotted > 0 && (
-          <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow">
-            {unplotted} lead{unplotted === 1 ? '' : 's'} hidden (no coordinates or COLD tier)
-          </div>
-        )}
+        <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow">
+          {leads.length.toLocaleString()} pinned
+          {unplotted > 0 && ` · ${unplotted.toLocaleString()} awaiting geocoding`}
+          {totalLeads > 0 && ` · ${totalLeads.toLocaleString()} total`}
+        </div>
       </div>
     </div>
   );

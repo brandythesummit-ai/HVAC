@@ -74,3 +74,4 @@ logs/
 /playwright/.cache/
 /playwright/.auth/
 .claude/
+.vercel

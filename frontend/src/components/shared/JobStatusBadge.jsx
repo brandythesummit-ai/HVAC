@@ -92,7 +92,13 @@ export default function JobStatusBadge() {
   }[data.job_type] || data.job_type;
 
   return (
-    <div className="fixed bottom-4 right-4 z-30 bg-white shadow-lg rounded-lg border border-slate-200 text-sm overflow-hidden w-72">
+    // z-[9999] sits above Leaflet's internal z-index range (max ~1000 for
+    // its control container). isolation:isolate gives the badge its own
+    // stacking context so map repaints can't overpaint it.
+    <div
+      className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg border border-slate-200 text-sm overflow-hidden w-72"
+      style={{ zIndex: 9999, isolation: 'isolate' }}
+    >
       <div className={`${statusColor(data.status)} text-white px-3 py-1.5 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           {statusIcon(data.status)}
