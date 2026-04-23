@@ -59,6 +59,77 @@ class PropertyListResponse(BaseModel):
     page_size: int
 
 
+@router.get("/search-bounds")
+async def search_address_bounds(
+    q: str = Query(..., min_length=2, description="Address search text (subdivision name, street, etc.)"),
+    max_sample: int = Query(500, ge=50, le=2000),
+    db: Client = Depends(get_db),
+):
+    """Return a bounding box covering properties whose normalized_address
+    matches the search string. Used by the Map's search input to fly the
+    viewport to a subdivision without needing an external geocoder.
+
+    The search runs against our own residential parcels (is_residential=true)
+    so every hit is guaranteed to correspond to a pin we'd render. If the
+    search is too broad (e.g. "DRIVE" matching 50K streets), the sampled
+    bbox will naturally widen — the client can warn the user to refine.
+    """
+    # Strip and normalize — the column is uppercase in the DB. ILIKE is
+    # case-insensitive so the uppercase isn't strictly required, but being
+    # explicit avoids a Postgres collation surprise.
+    needle = q.strip()
+    if not needle:
+        raise HTTPException(status_code=400, detail="Empty search")
+
+    # Fetch only the coord columns we need for the bbox calculation.
+    # PostgREST caps at ~1000 per request, so request up to max_sample.
+    try:
+        res = (
+            db.table("properties")
+            .select("latitude, longitude")
+            .eq("is_residential", True)
+            .ilike("normalized_address", f"%{needle}%")
+            .not_.is_("latitude", "null")
+            .not_.is_("longitude", "null")
+            .limit(max_sample)
+            .execute()
+        )
+    except Exception as e:
+        return {"success": False, "data": None, "error": str(e)}
+
+    rows = res.data or []
+    if not rows:
+        return {
+            "success": True,
+            "data": {"found": False, "count": 0, "bbox": None},
+            "error": None,
+        }
+
+    lats = [r["latitude"] for r in rows if r.get("latitude") is not None]
+    lngs = [r["longitude"] for r in rows if r.get("longitude") is not None]
+    if not lats or not lngs:
+        return {
+            "success": True,
+            "data": {"found": False, "count": len(rows), "bbox": None},
+            "error": None,
+        }
+
+    return {
+        "success": True,
+        "data": {
+            "found": True,
+            "count": len(rows),
+            "bbox": {
+                "ne_lat": max(lats),
+                "ne_lng": max(lngs),
+                "sw_lat": min(lats),
+                "sw_lng": min(lngs),
+            },
+        },
+        "error": None,
+    }
+
+
 @router.get("/counties/{county_id}/properties", response_model=PropertyListResponse)
 async def list_properties(
     county_id: str,
