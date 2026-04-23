@@ -69,21 +69,28 @@ class TestWindowCap:
 
 class TestBackoff:
     async def test_handle_429_exponential(self, monkeypatch):
-        # Deterministic: monkeypatch asyncio.sleep so we assert on the
-        # requested delay rather than wall-clock (which is flaky under
-        # coverage overhead).
+        # Deterministic: monkeypatch asyncio.sleep + random.uniform so
+        # we assert on the math, not on wall-clock or jitter. The base
+        # `random.uniform(0,1)` jitter inside handle_429_backoff can
+        # make attempt 1 (base 2) exceed attempt 3 (base 8) on any
+        # given run.
+        from app.services import polite_rate_limiter as prl
+
         observed: list[float] = []
 
         async def fake_sleep(delay):
             observed.append(delay)
 
         monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+        monkeypatch.setattr(prl.random, "uniform", lambda a, b: 0.0)
+
         rl = PoliteRateLimiter(base_delay_s=0.01)
         await rl.handle_429_backoff(attempt=1)
         await rl.handle_429_backoff(attempt=3)
         assert len(observed) == 2
-        # Attempt 3 delay should be substantially greater than attempt 1
-        assert observed[1] > observed[0]
+        # attempt 1 = 2^1 * 0.01 + 0 = 0.02; attempt 3 = 2^3 * 0.01 + 0 = 0.08
+        assert observed[0] == pytest.approx(0.02, rel=1e-6)
+        assert observed[1] == pytest.approx(0.08, rel=1e-6)
         assert rl.stats()["total_429_backoffs"] == 2
 
     async def test_backoff_is_capped(self, monkeypatch):
