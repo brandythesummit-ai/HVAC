@@ -51,3 +51,17 @@ export const useDeleteLead = () => {
     },
   });
 };
+
+// M19: transition a lead through the state machine. Triggers cooldown
+// computation server-side + optional GHL push on INTERESTED.
+export const useUpdateLeadStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, newStatus, note }) =>
+      leadsApi.updateStatus(id, { newStatus, note }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+};

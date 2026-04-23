@@ -41,4 +41,14 @@ export const leadsApi = {
     const response = await apiClient.delete(`/api/leads/${id}`);
     return response.data;
   },
+
+  // M19: transition lead status via the state machine endpoint.
+  // The backend computes cooldown + GHL-push flag from the transition.
+  updateStatus: async (id, { newStatus, note }) => {
+    const response = await apiClient.patch(`/api/leads/${id}/status`, {
+      new_status: newStatus,
+      note,
+    });
+    return response.data;
+  },
 };
