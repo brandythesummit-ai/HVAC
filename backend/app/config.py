@@ -10,9 +10,27 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
 
-    # Summit.AI (Private Integration - Static Token)
+    # GoHighLevel (GHL) — Summit.AI is a white-labeled GHL under
+    # the user's agency. New GHL_* env vars are preferred; legacy
+    # SUMMIT_* names are accepted as fallbacks for deploy safety
+    # during the rename transition.
+    ghl_access_token: str = ""
+    ghl_location_id: str = ""
+    # Legacy Summit aliases — populated from SUMMIT_* env vars if set.
+    # Code reads from ghl_access_token / ghl_location_id after
+    # post-init fallback.
     summit_access_token: str = ""
     summit_location_id: str = ""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # If new GHL_* vars are unset but legacy SUMMIT_* are, fall
+        # back so a production env without GHL_* env vars still works.
+        # Remove this fallback once Railway/Vercel have GHL_* vars set.
+        if not self.ghl_access_token and self.summit_access_token:
+            self.ghl_access_token = self.summit_access_token
+        if not self.ghl_location_id and self.summit_location_id:
+            self.ghl_location_id = self.summit_location_id
 
     # Encryption
     encryption_key: str
