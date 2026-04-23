@@ -61,8 +61,12 @@ def fetch_ungeocoded_properties(client, limit: int | None = None, retry_failed: 
     out = []
     offset = 0
     while True:
+        # county_id is NOT NULL on properties and PostgREST's upsert (even
+        # when it will UPDATE on conflict) requires the full row to satisfy
+        # INSERT constraints. We select it here so we can round-trip it into
+        # the upsert payload.
         q = client.table("properties").select(
-            "id, normalized_address, street_number, street_name, street_suffix, city, state, zip_code",
+            "id, county_id, normalized_address, street_number, street_name, street_suffix, city, state, zip_code",
         )
         if retry_failed:
             q = q.is_("latitude", "null")
@@ -212,29 +216,47 @@ def main():
             log.error("Census batch failed: %s", exc)
             continue
 
-        # Apply results to DB
+        # Apply results to DB via upsert in batches of 500. One row-PATCH
+        # per property hits Supabase with 10K+ individual HTTP/2 streams
+        # and Cloudflare terminates the connection after ~20K. Upsert-
+        # batches drop that to a handful of requests.
+        # county_id pulled from the SELECT so PostgREST upsert satisfies
+        # the NOT NULL constraint on INSERT (even though we're really
+        # UPDATEing on conflict). Without it: 23502 "null value in
+        # column county_id of relation properties" every batch.
+        matched_rows = []
+        missed_rows = []
         for row_id, _street, _city, _state, _zip in chunk:
+            prop = index_to_prop.get(row_id, {})
+            county_id = prop.get("county_id")
             if row_id in results:
-                lat = results[row_id]["lat"]
-                lng = results[row_id]["lng"]
-                if not args.dry_run:
-                    client.table("properties").update({
-                        "latitude": lat,
-                        "longitude": lng,
-                        "geocoded_at": now_iso,
-                        "geocode_source": "us_census",
-                    }).eq("id", row_id).execute()
+                matched_rows.append({
+                    "id": row_id,
+                    "county_id": county_id,
+                    "latitude": results[row_id]["lat"],
+                    "longitude": results[row_id]["lng"],
+                    "geocoded_at": now_iso,
+                    "geocode_source": "us_census",
+                })
                 total_matched += 1
             else:
-                # Mark as attempted so we don't re-try on every run.
-                # Census declined — likely address normalization issue.
-                # Left nullable so a manual re-geocode can still update.
-                if not args.dry_run:
-                    client.table("properties").update({
-                        "geocoded_at": now_iso,
-                        "geocode_source": "us_census_no_match",
-                    }).eq("id", row_id).execute()
+                missed_rows.append({
+                    "id": row_id,
+                    "county_id": county_id,
+                    "geocoded_at": now_iso,
+                    "geocode_source": "us_census_no_match",
+                })
                 total_missed += 1
+
+        if not args.dry_run:
+            BATCH = 500
+            for batch_rows, label in ((matched_rows, "matched"), (missed_rows, "missed")):
+                for j in range(0, len(batch_rows), BATCH):
+                    client.table("properties").upsert(
+                        batch_rows[j : j + BATCH],
+                        on_conflict="id",
+                    ).execute()
+                log.info("Persisted %d %s rows", len(batch_rows), label)
 
     log.info("Done. Matched %d, missed %d (of %d attempted)",
              total_matched, total_missed, total_matched + total_missed)
