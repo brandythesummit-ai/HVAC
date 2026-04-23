@@ -851,15 +851,27 @@ class JobProcessor:
 
         logger.info("[HCFL-LEGACY] Picked up %d streets for this batch", len(streets))
 
-        # Track counters across the run
+        # Concurrency lever: how many streets to process in parallel.
+        # Each worker gets its own HcflLegacyScraper (→ own polite rate
+        # limiter, own httpx client). HCFL doesn't publish rate limits;
+        # 4 concurrent at 400-600ms/req means ~600 req/min total across
+        # workers, which is well below what a residential-scale site
+        # should tolerate. Can be dialed down via job.parameters.concurrency
+        # if 429s show up.
+        concurrency = int(params.get('concurrency', 4))
+
+        # Track counters across the run (atomic via GIL — no locks needed
+        # for simple int increments between await points).
         streets_done = 0
         streets_failed = 0
         permits_ingested = 0
         permits_skipped_hvac_filter = 0
 
-        async with HcflLegacyScraper(hvac_prefixes=prefix_allowlist_override) as scraper:
-            for idx, street_row in enumerate(streets):
-                street_name = street_row['street_name']
+        async def _worker_one_street(street_row):
+            """Own scraper instance per worker → independent rate limiter."""
+            nonlocal streets_done, streets_failed, permits_ingested, permits_skipped_hvac_filter
+            street_name = street_row['street_name']
+            async with HcflLegacyScraper(hvac_prefixes=prefix_allowlist_override) as scraper:
                 try:
                     result = await self._scrape_one_street(
                         scraper, street_row, county_id,
@@ -872,20 +884,28 @@ class JobProcessor:
                     logger.exception(
                         "[HCFL-LEGACY] Street %s failed: %s", street_name, exc,
                     )
-                    # Increment retry_count; capture last_error for debugging.
                     self.db.table('hcfl_streets').update({
                         'retry_count': (street_row.get('retry_count') or 0) + 1,
                         'last_error': str(exc)[:500],
                     }).eq('id', street_row['id']).execute()
 
-                # Update job progress every 5 streets or on last
-                if (idx + 1) % 5 == 0 or (idx + 1) == len(streets):
-                    pct = min(100, int(((idx + 1) / len(streets)) * 100))
-                    await self._update_job(job_id, {
-                        'progress_percent': pct,
-                        'permits_pulled': permits_ingested,
-                        'permits_saved': permits_ingested,
-                    })
+        # Process streets in parallel chunks of `concurrency`. Each chunk
+        # waits for all workers before starting the next chunk — simpler
+        # than a sliding semaphore and keeps per-chunk progress reporting.
+        for chunk_start in range(0, len(streets), concurrency):
+            chunk = streets[chunk_start : chunk_start + concurrency]
+            await asyncio.gather(
+                *(_worker_one_street(s) for s in chunk),
+                return_exceptions=False,  # inner try/except already handles
+            )
+
+            processed = chunk_start + len(chunk)
+            pct = min(100, int((processed / len(streets)) * 100))
+            await self._update_job(job_id, {
+                'progress_percent': pct,
+                'permits_pulled': permits_ingested,
+                'permits_saved': permits_ingested,
+            })
 
         logger.info(
             "[HCFL-LEGACY] Batch complete: %d/%d streets done, %d permits ingested, "
