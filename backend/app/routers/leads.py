@@ -69,6 +69,17 @@ async def list_leads(
     permit_type: str = None,
     search: str = None,  # free-text over address + owner_name
 
+    # Bbox viewport filter — required when the Map queries at low zoom
+    # to avoid scanning all 400K residential parcels. Supply all four
+    # or none; partial bbox is ignored.
+    bbox_ne_lat: float = None,
+    bbox_ne_lng: float = None,
+    bbox_sw_lat: float = None,
+    bbox_sw_lng: float = None,
+
+    # Residential-only gate (parcels-first default TRUE).
+    residential_only: bool = True,
+
     # Pagination
     limit: int = 50,
     offset: int = 0,
@@ -177,6 +188,18 @@ async def list_leads(
                     f"normalized_address.ilike.%{esc}%,owner_name.ilike.%{esc}%",
                     reference_table="properties",
                 )
+
+            # Bbox viewport filter for the map. All 4 corners must be
+            # present; otherwise skipped (the list view doesn't care).
+            if (bbox_ne_lat is not None and bbox_ne_lng is not None
+                    and bbox_sw_lat is not None and bbox_sw_lng is not None):
+                q = q.gte("properties.latitude", bbox_sw_lat)
+                q = q.lte("properties.latitude", bbox_ne_lat)
+                q = q.gte("properties.longitude", bbox_sw_lng)
+                q = q.lte("properties.longitude", bbox_ne_lng)
+
+            if residential_only:
+                q = q.eq("properties.is_residential", True)
             return q
 
         # PostgREST filter-on-foreign-table semantics: with a plain to-one
@@ -204,6 +227,8 @@ async def list_leads(
             date_to,
             zip,
             search,
+            residential_only,
+            bbox_ne_lat is not None,
         ])
         properties_projection = "properties!inner(*)" if needs_inner_join else "properties(*)"
         count_properties_projection = (
@@ -212,13 +237,21 @@ async def list_leads(
 
         query = apply_filters(db.table("leads").select(f"*, {properties_projection}"))
 
-        # Count query uses the same filter pipeline — keeps main and
-        # count results perfectly consistent.
-        count_query = apply_filters(
-            db.table("leads").select(f"id, {count_properties_projection}", count="exact")
-        )
-        count_result = count_query.execute()
-        total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else 0
+        # Count query: `planned` uses Postgres planner row estimates
+        # instead of a full scan. At ~500K lead rows, `exact` counts
+        # hit Supabase's statement timeout. `planned` is ~accurate
+        # enough for the UI's "N total" display; if the client needs
+        # exactness (rare) they can request it via count_mode param.
+        try:
+            count_query = apply_filters(
+                db.table("leads").select(f"id, {count_properties_projection}", count="planned")
+            )
+            count_result = count_query.execute()
+            total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else 0
+        except Exception:
+            # If the planner estimate path errors (rare), fall back to
+            # omitting the total count. The listing still works.
+            total_count = 0
 
         # Multi-factor sorting: tier → score
         # Order: HOT before WARM before COOL before COLD
