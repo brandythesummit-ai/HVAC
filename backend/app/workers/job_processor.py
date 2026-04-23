@@ -826,12 +826,18 @@ class JobProcessor:
             job_id, county_id, street_batch_size,
         )
 
-        # Query unscraped streets capped by street_batch_size
+        # Query unscraped streets capped by street_batch_size.
+        # Order by scrape_priority first so high-value residential streets
+        # (KENNEDY, DALE MABRY, BUSCH, ...) are hit before Tampa's long
+        # tail of ordinal avenues (110TH, 111TH, ...). Priority column
+        # added in a SQL migration; defaults to 10 so never-seen-before
+        # streets slot in with the named residential batch.
         streets_query = (
             self.db.table('hcfl_streets')
-            .select('id, street_name, retry_count')
+            .select('id, street_name, retry_count, scrape_priority')
             .is_('scraped_at', 'null')
             .lt('retry_count', max_street_retries)
+            .order('scrape_priority')
             .order('street_name')
             .limit(street_batch_size)
             .execute()

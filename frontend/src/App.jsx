@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 
 import AuthGuard from './components/auth/AuthGuard';
 import DetailSheet from './components/shared/DetailSheet';
+import JobStatusBadge from './components/shared/JobStatusBadge';
 import MapPage from './pages/MapPage';
 import ListPage from './pages/ListPage';
 import PlanForTodayPage from './pages/PlanForTodayPage';
@@ -58,6 +59,9 @@ function App() {
           authed view. It listens for 'open-lead-detail' events
           dispatched by pin/row clicks. */}
       <DetailSheet />
+      {/* Floating job progress indicator — shows when a background
+          job (scraper, initial pull, etc) is running for HCFL. */}
+      <JobStatusBadge />
     </>
   );
 }
