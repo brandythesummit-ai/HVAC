@@ -867,6 +867,12 @@ class JobProcessor:
         permits_ingested = 0
         permits_skipped_hvac_filter = 0
 
+        # Property aggregator: shared across all workers. Without this,
+        # scraper permits land in `permits` but never feed into `properties`,
+        # which means legacy HVAC dates never become the most_recent_hvac_date
+        # for any property and every lead scores as COOL/COLD.
+        aggregator = PropertyAggregator(self.db)
+
         async def _worker_one_street(street_row):
             """Own scraper instance per worker → independent rate limiter.
 
@@ -881,6 +887,7 @@ class JobProcessor:
                     result = await self._scrape_one_street(
                         scraper, street_row, county_id,
                         permit_concurrency=permit_concurrency,
+                        aggregator=aggregator,
                     )
                     permits_ingested += result['permits_ingested']
                     permits_skipped_hvac_filter += result['permits_skipped_hvac_filter']
@@ -937,6 +944,7 @@ class JobProcessor:
         street_row: Dict,
         county_id: str,
         permit_concurrency: int = 3,
+        aggregator: Optional[PropertyAggregator] = None,
     ) -> Dict[str, int]:
         """
         Scrape all HVAC permits for one street, insert them, stamp scraped_at.
@@ -984,7 +992,7 @@ class JobProcessor:
 
             row = detail.to_permit_row(county_id=county_id)
             try:
-                self.db.table('permits').upsert(
+                upsert_resp = self.db.table('permits').upsert(
                     row,
                     on_conflict='county_id,source,source_permit_id',
                     ignore_duplicates=False,
@@ -995,6 +1003,22 @@ class JobProcessor:
                     "[HCFL-LEGACY] Permit upsert failed for %s: %s",
                     stub.permit_number, exc,
                 )
+                return
+
+            # Aggregate into properties. Without this, the `permits` row is
+            # orphaned — process_permit is what populates
+            # properties.most_recent_hvac_date, which drives the HVAC age
+            # signal used for lead tiering. Aggregator errors are isolated
+            # from ingest so a bad address string never blocks the scraper.
+            if aggregator is not None and upsert_resp and upsert_resp.data:
+                saved_row = upsert_resp.data[0]
+                try:
+                    await aggregator.process_permit(saved_row, county_id)
+                except Exception as agg_exc:
+                    logger.warning(
+                        "[HCFL-LEGACY] Aggregator failed for %s: %s",
+                        stub.permit_number, agg_exc,
+                    )
 
         # Partition stubs across permit_concurrency sub-scrapers. Each
         # sub-scraper has its own rate limiter → truly parallel HCFL
