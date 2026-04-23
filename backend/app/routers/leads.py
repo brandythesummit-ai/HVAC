@@ -179,18 +179,43 @@ async def list_leads(
                 )
             return q
 
-        # Build the base query for filtering.
-        # Permits can have large raw_data JSONB (Accela API responses,
-        # 10KB+ each) — dropping them from the list projection so the
-        # map view fetching 12K leads doesn't freeze the browser with
-        # ~100MB of JSON. DetailSheet fetches per-lead via GET /leads/:id
-        # and can include permits there.
-        query = apply_filters(db.table("leads").select("*, properties(*)"))
+        # PostgREST filter-on-foreign-table semantics: with a plain to-one
+        # join `properties(*)`, filters like `gte('properties.hvac_age_years', 20)`
+        # are applied but don't *prune* rows — they just affect the embedded
+        # fields. Using the `!inner` qualifier promotes the join to an INNER
+        # join so the filter actually constrains the result set. Without
+        # this, age/zip/date filters are no-ops.
+        needs_inner_join = any([
+            min_hvac_age is not None,
+            max_hvac_age is not None,
+            contact_completeness,
+            affluence_tier,
+            recommended_pipeline,
+            min_pipeline_confidence is not None,
+            min_property_value is not None,
+            max_property_value is not None,
+            has_phone is not None,
+            has_email is not None,
+            year_built_min is not None,
+            year_built_max is not None,
+            city,
+            state,
+            date_from,
+            date_to,
+            zip,
+            search,
+        ])
+        properties_projection = "properties!inner(*)" if needs_inner_join else "properties(*)"
+        count_properties_projection = (
+            "properties!inner(id)" if needs_inner_join else "properties(id)"
+        )
+
+        query = apply_filters(db.table("leads").select(f"*, {properties_projection}"))
 
         # Count query uses the same filter pipeline — keeps main and
         # count results perfectly consistent.
         count_query = apply_filters(
-            db.table("leads").select("id, properties(id)", count="exact")
+            db.table("leads").select(f"id, {count_properties_projection}", count="exact")
         )
         count_result = count_query.execute()
         total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else 0
