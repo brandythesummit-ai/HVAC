@@ -404,9 +404,15 @@ class AccelaClient:
         await self.rate_limiter.wait_if_needed(request_type=request_type)
 
         url = f"{self.base_url}{endpoint}"
+        # Browser-like User-Agent: Accela's WAF (Azure Front Door) has been
+        # observed silently dropping authenticated POSTs from clients
+        # advertising python-httpx UA. curl works because it sends a
+        # generic UA; mimicking that unblocks us.
         headers = {
             "Authorization": self.access_token,  # NO "Bearer " prefix!
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "curl/8.4.0",
             "x-accela-agency": self.county_code,  # Agency context header
             **kwargs.pop("headers", {})
         }
