@@ -68,6 +68,49 @@ const tileProps = MAPBOX_TOKEN
         '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     };
 
+/** Map-level click → nearest pin detection.
+ *
+ * react-leaflet 5 + preferCanvas=true is unreliable for per-marker
+ * eventHandlers.click (the click event silently doesn't fire in
+ * production builds). We listen at the map level instead: when the
+ * user clicks anywhere, convert click→latlng, find the nearest pin
+ * by great-circle distance, and if it's within a reasonable pixel
+ * threshold of the click, dispatch the same open-lead-detail event
+ * the old CircleMarker handler used to.
+ */
+function PinClickHandler({ pins, tolerancePx = 14 }) {
+  const map = useMap();
+  useMapEvents({
+    click(e) {
+      if (!pins || pins.length === 0) return;
+      const { latlng } = e;
+      let closest = null;
+      let closestDistMeters = Infinity;
+      for (const p of pins) {
+        const d = latlng.distanceTo([p.latitude, p.longitude]);
+        if (d < closestDistMeters) {
+          closestDistMeters = d;
+          closest = p;
+        }
+      }
+      if (!closest) return;
+      // Translate pixel tolerance to meters at the current zoom + lat.
+      // Earth circumference cos(lat) / 2^(zoom+8) is meters per tile-pixel.
+      const metersPerPx =
+        (40075016.686 * Math.cos((latlng.lat * Math.PI) / 180)) /
+        Math.pow(2, map.getZoom() + 8);
+      const toleranceMeters = tolerancePx * metersPerPx;
+      if (closestDistMeters <= toleranceMeters) {
+        const evt = new CustomEvent('open-lead-detail', {
+          detail: { propertyId: closest.id },
+        });
+        window.dispatchEvent(evt);
+      }
+    },
+  });
+  return null;
+}
+
 /** Pushes the current map bounds up to the parent via onBboxChange.
  *
  * Uses `useMap()` + a mount-time effect rather than the `load` event,
@@ -188,6 +231,7 @@ export default function MapPage() {
         >
           <TileLayer {...tileProps} />
           <BboxWatcher onBboxChange={setBbox} onZoomChange={setZoom} />
+          <PinClickHandler pins={displayPins} />
           {displayPins.map((p) => (
             <CircleMarker
               key={p.id}
@@ -197,19 +241,6 @@ export default function MapPage() {
                 color: TIER_COLOR[p.lead_tier] || TIER_COLOR.COOL,
                 fillOpacity: 0.7,
                 weight: 1,
-              }}
-              eventHandlers={{
-                click: () => {
-                  // DetailSheet listens for this event and fetches the
-                  // full property record by id. We intentionally do NOT
-                  // render a <Popup> here — with 10K markers, react-
-                  // leaflet would eagerly render 10K popup subtrees
-                  // into the DOM, tanking reconciliation perf.
-                  const evt = new CustomEvent('open-lead-detail', {
-                    detail: { propertyId: p.id },
-                  });
-                  window.dispatchEvent(evt);
-                },
               }}
             />
           ))}
