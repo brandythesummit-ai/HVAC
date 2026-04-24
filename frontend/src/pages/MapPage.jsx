@@ -5,14 +5,21 @@
  * ~450K residential parcels, we fetch per-viewport via /api/map-pins,
  * debounced on pan/zoom. The user zooms to a subdivision, sees every
  * house as a pin with tier coloring, clicks → DetailSheet opens.
+ *
+ * Search → viewport: the MapContainer is keyed on the search result's
+ * bbox. When a new address-search resolves, we pass a fresh key (and a
+ * `bounds` prop) so react-leaflet fully re-initializes the map at the
+ * target subdivision. Imperative flyToBounds on an already-mounted map
+ * turned out to be a no-op under react-leaflet 5 + React 19 — key-based
+ * remount is the reliable path.
  */
 import 'leaflet/dist/leaflet.css';
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
@@ -59,31 +66,6 @@ const tileProps = MAPBOX_TOKEN
         '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     };
 
-/** When the search bounds from useAddressSearchBounds change, fly the
- * map to cover them. Child of MapContainer so it can access the map
- * instance via useMap(). Remembers the last bbox we flew to so we
- * don't re-fly on unrelated state updates (e.g. when filters change
- * but the search text didn't). */
-function SearchFlyTo({ bounds }) {
-  const map = useMap();
-  const lastKey = useRef(null);
-  useEffect(() => {
-    if (!bounds) return;
-    const key = `${bounds.sw_lat},${bounds.sw_lng},${bounds.ne_lat},${bounds.ne_lng}`;
-    if (key === lastKey.current) return;
-    lastKey.current = key;
-    const latLngBounds = L.latLngBounds(
-      [bounds.sw_lat, bounds.sw_lng],
-      [bounds.ne_lat, bounds.ne_lng],
-    );
-    // maxZoom caps how far we zoom in — a single-address match would
-    // otherwise zoom to z=18 and show one lonely pin; z=16 keeps a
-    // subdivision in view.
-    map.flyToBounds(latLngBounds, { maxZoom: 16, padding: [40, 40], duration: 0.8 });
-  }, [bounds, map]);
-  return null;
-}
-
 /** Pushes the current map bounds up to the parent via onBboxChange. */
 function BboxWatcher({ onBboxChange, onZoomChange }) {
   const pushBbox = useCallback((map) => {
@@ -111,9 +93,9 @@ export default function MapPage() {
   const [bbox, setBbox] = useState(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
-  // Search text → bbox of matching parcels. Lets a buddy type
-  // "newberry grove" and be flown to that subdivision instead of
-  // seeing a blank county-wide view.
+  // Search text → bbox of matching parcels. When this resolves, the
+  // bbox becomes part of the MapContainer key, forcing a full remount
+  // with the subdivision bounds as the initial view.
   const searchResult = useAddressSearchBounds(filters.search);
 
   const shouldFetch = bbox && zoom >= MIN_FETCH_ZOOM;
@@ -130,12 +112,33 @@ export default function MapPage() {
     );
   }, [pins]);
 
+  // Derive a stable key + the initial view props for MapContainer.
+  // A change in searchResult.bounds (including clearing it) flips the
+  // key, triggering a fresh Leaflet init. This is heavier than an
+  // imperative flyTo but works reliably under react-leaflet 5 +
+  // React 19 where effect-driven flyToBounds didn't animate.
+  const mapViewProps = useMemo(() => {
+    const b = searchResult.bounds;
+    if (b) {
+      return {
+        viewKey: `b:${b.sw_lat.toFixed(5)},${b.sw_lng.toFixed(5)},${b.ne_lat.toFixed(5)},${b.ne_lng.toFixed(5)}`,
+        bounds: [[b.sw_lat, b.sw_lng], [b.ne_lat, b.ne_lng]],
+        boundsOptions: { maxZoom: 16, padding: [40, 40] },
+      };
+    }
+    return {
+      viewKey: 'default',
+      center: HCFL_CENTER,
+      zoom: DEFAULT_ZOOM,
+    };
+  }, [searchResult.bounds]);
+
   // Precedence: active search feedback wins over generic map-state
   // hints, so the user understands what their search did before we
   // surface anything about zoom or pin count.
   const trimmedSearch = (filters.search || '').trim();
   const hasSearch = trimmedSearch.length >= 2;
-  let hintText = null;
+  let hintText;
   if (hasSearch && searchResult.loading) {
     hintText = 'Searching addresses…';
   } else if (hasSearch && searchResult.tooBroad) {
@@ -150,6 +153,8 @@ export default function MapPage() {
     }`;
   }
 
+  const { viewKey, ...containerProps } = mapViewProps;
+
   return (
     <div className="flex flex-col h-screen">
       <ViewToggle />
@@ -162,15 +167,14 @@ export default function MapPage() {
           </div>
         )}
         <MapContainer
-          center={HCFL_CENTER}
-          zoom={DEFAULT_ZOOM}
+          key={viewKey}
+          {...containerProps}
           preferCanvas
           className="w-full h-full"
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer {...tileProps} />
           <BboxWatcher onBboxChange={setBbox} onZoomChange={setZoom} />
-          <SearchFlyTo bounds={searchResult.bounds} />
           {displayPins.map((p) => (
             <CircleMarker
               key={p.id}
