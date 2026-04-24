@@ -653,6 +653,8 @@ class JobProcessor:
 
         logger.info(f"🎉 Initial pull complete: {total_permits_pulled} permits, {total_properties_created} properties, {total_leads_created} leads")
 
+        await self._relink_permits_to_properties(county_id)
+
     async def _process_incremental_pull(self, job: Dict):
         """
         Process incremental permit pull (e.g., daily new permits).
@@ -779,6 +781,8 @@ class JobProcessor:
         })
 
         logger.info(f"✅ Incremental pull complete: {total_saved} permits, {total_properties_created} properties, {total_leads_created} leads")
+
+        await self._relink_permits_to_properties(county_id)
 
     async def _process_property_aggregation(self, job: Dict):
         """
@@ -942,6 +946,9 @@ class JobProcessor:
             {"streets_failed": streets_failed},
         )
 
+        if permits_ingested > 0:
+            await self._relink_permits_to_properties(county_id)
+
     async def _scrape_one_street(
         self,
         scraper: HcflLegacyScraper,
@@ -1101,8 +1108,16 @@ class JobProcessor:
         owners = permit.get('owners', [])
         parcels = permit.get('parcels', [])
 
-        # Extract primary address
-        primary_address = next((addr for addr in addresses if addr.get('isPrimary')), None) if addresses else None
+        # Extract primary address. Most Accela responses flag one entry
+        # with isPrimary=true, but ~0.3% of records have addresses yet
+        # no primary flag — fall back to the first address so those
+        # permits don't end up with property_address=NULL.
+        primary_address = None
+        if addresses:
+            primary_address = (
+                next((addr for addr in addresses if addr.get('isPrimary')), None)
+                or addresses[0]
+            )
 
         # Extract primary owner
         primary_owner = next((owner for owner in owners if owner.get('isPrimary')), None) if owners else None
@@ -1282,6 +1297,32 @@ class JobProcessor:
     async def _update_job(self, job_id: str, updates: Dict):
         """Update job with arbitrary fields."""
         self.db.table('background_jobs').update(updates).eq('id', job_id).execute()
+
+    async def _relink_permits_to_properties(self, county_id: str) -> None:
+        """Call the SECURITY DEFINER relink function (migration 045).
+
+        Must run at the end of any job that writes to `permits`, because
+        the property_aggregator joins on properties.normalized_address
+        but permit addresses have a different format (full address with
+        city/state/zip vs. HCPAO's street-only). The RPC encapsulates
+        the join via the address_street_key generated column (migration
+        044), so the relink is idempotent and O(distinct-addresses).
+
+        Never raises — logs and moves on. A failed relink leaves the
+        property rows unchanged; the next pull will retry.
+        """
+        try:
+            res = self.db.rpc(
+                "relink_hvac_permits_to_properties",
+                {"p_county_id": county_id},
+            ).execute()
+            row = (res.data or [{}])[0]
+            logger.info(
+                f"🔗 Relink: {row.get('matched_properties')} properties updated "
+                f"from {row.get('permits_considered')} distinct permit addresses"
+            )
+        except Exception as e:
+            logger.error(f"Relink failed for county {county_id}: {e}")
 
     async def _update_county_code(
         self,
