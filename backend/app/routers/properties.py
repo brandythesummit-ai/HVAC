@@ -78,71 +78,21 @@ async def search_address_bounds(
     if not needle:
         raise HTTPException(status_code=400, detail="Empty search")
 
-    # Escape LIKE wildcards so a user typing "first_street" or "100%"
-    # doesn't accidentally match-anything. Backslash is PostgreSQL's
-    # default LIKE escape char.
-    escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-    # Fetch only the coord columns we need for the bbox calculation.
-    # Pull one extra row so we can detect when we'd have needed more
-    # than max_sample rows — that signals a too-broad query (e.g. a
-    # common street suffix like "DRIVE") where any bbox we compute
-    # would fly the user to a county-wide view and reproduce the
-    # original "no pins" bug.
+    # Calls a SECURITY DEFINER function (migration 037) rather than the
+    # query builder. The function bypasses the RLS correlated subquery
+    # on properties_select that otherwise prevents the trigram index
+    # from being used under the anon role, which caused every search
+    # to hit the 3s statement_timeout.
     try:
-        res = (
-            db.table("properties")
-            .select("latitude, longitude")
-            .eq("is_residential", True)
-            .ilike("normalized_address", f"%{escaped}%")
-            .not_.is_("latitude", "null")
-            .not_.is_("longitude", "null")
-            .limit(max_sample + 1)
-            .execute()
-        )
+        res = db.rpc(
+            "search_address_bounds",
+            {"q": needle, "max_sample": max_sample},
+        ).execute()
     except Exception as e:
         return {"success": False, "data": None, "error": str(e)}
 
-    rows = res.data or []
-    if not rows:
-        return {
-            "success": True,
-            "data": {"found": False, "too_broad": False, "count": 0, "bbox": None},
-            "error": None,
-        }
-
-    too_broad = len(rows) > max_sample
-    if too_broad:
-        return {
-            "success": True,
-            "data": {"found": False, "too_broad": True, "count": len(rows), "bbox": None},
-            "error": None,
-        }
-
-    lats = [r["latitude"] for r in rows if r.get("latitude") is not None]
-    lngs = [r["longitude"] for r in rows if r.get("longitude") is not None]
-    if not lats or not lngs:
-        return {
-            "success": True,
-            "data": {"found": False, "too_broad": False, "count": len(rows), "bbox": None},
-            "error": None,
-        }
-
-    return {
-        "success": True,
-        "data": {
-            "found": True,
-            "too_broad": False,
-            "count": len(rows),
-            "bbox": {
-                "ne_lat": max(lats),
-                "ne_lng": max(lngs),
-                "sw_lat": min(lats),
-                "sw_lng": min(lngs),
-            },
-        },
-        "error": None,
-    }
+    payload = res.data or {}
+    return {"success": True, "data": payload, "error": None}
 
 
 @router.get("/counties/{county_id}/properties", response_model=PropertyListResponse)
