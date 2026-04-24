@@ -251,11 +251,10 @@ class AccelaClient:
             error_status = e.response.status_code
             trace_id = e.response.headers.get('x-accela-traceid') or e.response.headers.get('x-accela-trace-id')
 
-            logger.error(f" [PASSWORD GRANT] Failed:")
-            logger.debug(f"   Status: {error_status}")
-            logger.debug(f"   Response body: {error_body}")
+            logger.error(f" [PASSWORD GRANT] Failed with status {error_status}")
+            logger.error(f"   Response body: {error_body}")
             if trace_id:
-                logger.debug(f"   Trace ID: {trace_id}")
+                logger.error(f"   Trace ID: {trace_id}")
 
             return {
                 "success": False,
@@ -263,10 +262,16 @@ class AccelaClient:
                 "trace_id": trace_id
             }
         except Exception as e:
-            logger.error(f" [PASSWORD GRANT] Unexpected error: {str(e)}")
+            # Capture the exception type + full traceback; prior logger
+            # was printing str(e) which is often empty for non-HTTP
+            # exceptions (SSL, JSONDecodeError, AttributeError, etc).
+            logger.error(
+                f" [PASSWORD GRANT] Unexpected error: type={type(e).__name__} msg={str(e)!r}",
+                exc_info=True,
+            )
             return {
                 "success": False,
-                "error": str(e)
+                "error": f"{type(e).__name__}: {str(e)}"
             }
 
     async def refresh_access_token(self) -> Dict[str, Any]:
