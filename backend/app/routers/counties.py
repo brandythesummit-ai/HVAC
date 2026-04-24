@@ -111,13 +111,20 @@ async def list_counties(db=Depends(get_db)):
     try:
         result = db.table("counties").select("*").order("created_at", desc=True).execute()
 
-        # Get lead counts for all counties in one query
+        # Get lead counts per county. Use count=planned (Postgres' stat
+        # estimates via pg_class) so this stays O(1) per county instead
+        # of a full table scan — with 11K+ leads, count=exact was hitting
+        # the statement_timeout and failing the whole endpoint.
         lead_counts = {}
-        leads_result = db.table("leads").select("county_id", count="exact").execute()
-        # Count leads per county using a subquery approach
         for county in result.data:
             county_id = county["id"]
-            count_result = db.table("leads").select("id", count="exact").eq("county_id", county_id).execute()
+            count_result = (
+                db.table("leads")
+                .select("id", count="planned")
+                .eq("county_id", county_id)
+                .limit(1)
+                .execute()
+            )
             lead_counts[county_id] = count_result.count or 0
 
         # Get job statuses for all counties with initial_pull_job_id (batch query)
