@@ -62,17 +62,17 @@ HCFL_COUNTY_ID = "07e876b9-938e-4f53-b0dc-7bb9ce7e9cdd"
 HCPAO_BASE = "https://downloads.hcpafl.org"
 
 # Residential FL DOR use codes — loaded into properties with is_residential=true.
+# Intentionally narrow: owner-occupied single-dwelling parcels only. Excludes
+# condos (0400/0403/0408), cooperatives (0500/0508), mobile homes (0200),
+# SFR-around-mobile-home (0102). Commercial/industrial codes (1xxx+, 4xxx+)
+# aren't in this set either, so those parcels are never even loaded.
+# Rationale: the door-knocker only wants dwellings where the person answering
+# the door can authorize HVAC replacement — no tenants, no HOAs, no
+# board approvals, no site managers.
 RESIDENTIAL_DOR_CODES = {
     "0100",  # Single Family Residential (~355K)
-    "0102",  # SFR built around Mobile Home
-    "0106",  # Townhouse / Villa
-    "0111",  # New Residential permit
-    "0200",  # Mobile Home (~13K)
-    "0400",  # Condominium (~40K)
-    "0403",  # Condo Apt
-    "0408",  # Mobile Home Condo
-    "0500",  # Co-op
-    "0508",  # MH Co-op
+    "0106",  # Townhouse / Villa (~40K)
+    "0111",  # New Residential permit (rare)
 }
 
 # HCFL geographic bounding box (coarse). Parcels whose HCPAO-supplied
