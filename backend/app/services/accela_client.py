@@ -112,7 +112,7 @@ class AccelaClient:
         logger.debug(f"   Client ID: {self.app_id}")
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, transport=httpx.AsyncHTTPTransport(local_address="::")) as client:
                 response = await client.post(
                     url,
                     data=data,
@@ -217,7 +217,7 @@ class AccelaClient:
         logger.debug(f"   Scope: {scope}")
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, transport=httpx.AsyncHTTPTransport(local_address="::")) as client:
                 response = await client.post(
                     url,
                     data=data,
@@ -295,7 +295,7 @@ class AccelaClient:
             "client_secret": self.app_secret
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, transport=httpx.AsyncHTTPTransport(local_address="::")) as client:
             response = await client.post(
                 url,
                 data=data,
@@ -436,7 +436,7 @@ class AccelaClient:
 
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
+                async with httpx.AsyncClient(timeout=timeout, transport=httpx.AsyncHTTPTransport(local_address="::")) as client:
                     response = await client.request(method, url, headers=headers, **kwargs)
 
                     # Update rate limiter state from response headers
