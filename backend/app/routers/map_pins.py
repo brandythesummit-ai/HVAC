@@ -5,10 +5,11 @@ worked when there were ~12K leads total. With 450K residential parcels,
 the lead×properties inner join plus bbox filter exceeds Supabase's
 statement timeout even for small viewports.
 
-This endpoint queries `properties` directly (no lead join) and returns
-only the fields a map pin needs: id, lat, lng, tier, score, owner,
-address, year_built. The Map's DetailSheet fetches the full lead row
-separately via GET /api/leads/:id when the user clicks a pin.
+This endpoint calls a SECURITY DEFINER Postgres function
+(map_pins_in_bbox) that returns all matching residential parcels as a
+single jsonb blob. Migration 039 introduced this RPC because the prior
+PostgREST-paginated path required 10 round-trips for a 10K-limit fetch
+(1000 rows per page) and took ~4s end-to-end; the RPC lands in ~1.4s.
 
 Always bbox-scoped: the client must provide ne_lat, ne_lng, sw_lat,
 sw_lng. Unbounded queries would try to return 450K rows.
@@ -38,71 +39,44 @@ async def map_pins(
     year_built_max: Optional[int] = Query(None),
     limit: int = Query(10000, ge=1, le=20000),
 ):
-    """Return residential-parcel pins inside the bbox.
-
-    The returned rows are `properties`, not `leads`. One property maps
-    to at most one lead in our schema, so the frontend can still match
-    up state (INTERESTED/KNOCKED/...) by `property_id` → lead lookup.
-    """
+    """Return residential-parcel pins inside the bbox via RPC."""
     db = get_db()
 
     # Sanity: reject inverted boxes early — caller bug, not a DB problem.
     if bbox_ne_lat <= bbox_sw_lat or bbox_ne_lng <= bbox_sw_lng:
         raise HTTPException(status_code=400, detail="Inverted bbox")
 
-    q = (
-        db.table("properties")
-        .select(
-            "id, normalized_address, latitude, longitude, "
-            "lead_tier, lead_score, year_built, owner_name, "
-            "owner_occupied, total_hvac_permits, most_recent_hvac_date, "
-            "total_property_value, heated_sqft, bedrooms_count, bathrooms_count, city, zip_code"
-        )
-        .eq("is_residential", True)
-        .gte("latitude", bbox_sw_lat).lte("latitude", bbox_ne_lat)
-        .gte("longitude", bbox_sw_lng).lte("longitude", bbox_ne_lng)
-    )
-
+    tiers = None
     if lead_tier:
         tiers = [t.strip().upper() for t in lead_tier.split(",") if t.strip()]
-        if len(tiers) == 1:
-            q = q.eq("lead_tier", tiers[0])
-        elif tiers:
-            q = q.in_("lead_tier", tiers)
+        if not tiers:
+            tiers = None
 
-    if owner_occupied is True:
-        q = q.eq("owner_occupied", True)
-    elif owner_occupied is False:
-        q = q.eq("owner_occupied", False)
-
-    if year_built_min is not None:
-        q = q.gte("year_built", year_built_min)
-    if year_built_max is not None:
-        q = q.lte("year_built", year_built_max)
-
-    # PostgREST caps at ~1000 per request — paginate up to the caller's
-    # limit so the Map can grab a full viewport in one logical fetch.
-    PAGE = 1000
-    collected: list = []
-    offset = 0
     try:
-        while offset < limit:
-            page_size = min(PAGE, limit - offset)
-            page = q.range(offset, offset + page_size - 1).execute()
-            rows = page.data or []
-            collected.extend(rows)
-            if len(rows) < page_size:
-                break
-            offset += page_size
+        res = db.rpc(
+            "map_pins_in_bbox",
+            {
+                "p_ne_lat": bbox_ne_lat,
+                "p_ne_lng": bbox_ne_lng,
+                "p_sw_lat": bbox_sw_lat,
+                "p_sw_lng": bbox_sw_lng,
+                "p_lead_tiers": tiers,
+                "p_owner_occupied": owner_occupied,
+                "p_year_built_min": year_built_min,
+                "p_year_built_max": year_built_max,
+                "p_limit": limit,
+            },
+        ).execute()
     except Exception as e:
         return {"success": False, "data": None, "error": str(e)}
 
+    pins = res.data or []
     return {
         "success": True,
         "data": {
-            "pins": collected,
-            "count": len(collected),
-            "truncated": len(collected) >= limit,
+            "pins": pins,
+            "count": len(pins),
+            "truncated": len(pins) >= limit,
             "bbox": {
                 "ne_lat": bbox_ne_lat, "ne_lng": bbox_ne_lng,
                 "sw_lat": bbox_sw_lat, "sw_lng": bbox_sw_lng,
