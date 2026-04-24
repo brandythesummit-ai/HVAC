@@ -96,18 +96,17 @@ class AccelaClient:
         """
         url = f"{self.auth_url}/oauth2/token"
 
-        # agency_name + environment must be echoed here: Accela's .NET
-        # backend throws "Object reference not set to an instance of an
-        # object." on /oauth2/token when the authorize request was
-        # agency-scoped but the token exchange drops those values.
+        # Accela expects agency + environment as HEADERS (x-accela-agency,
+        # x-accela-environment), not body params. Body-only attempts
+        # produced HTTP 500 "Object reference not set to an instance of
+        # an object." because their .NET backend's agency lookup reads
+        # from request headers, finds nothing, and null-derefs.
         data = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
             "client_id": self.app_id,
             "client_secret": self.app_secret,
-            "agency_name": self.county_code,
-            "environment": "PROD",
         }
 
         # DETAILED LOGGING - Before request
@@ -124,7 +123,9 @@ class AccelaClient:
                     data=data,
                     headers={
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "x-accela-appid": self.app_id
+                        "x-accela-appid": self.app_id,
+                        "x-accela-agency": self.county_code,
+                        "x-accela-environment": "PROD",
                     }
                 )
 
@@ -292,8 +293,6 @@ class AccelaClient:
             "refresh_token": self.refresh_token_decrypted,
             "client_id": self.app_id,
             "client_secret": self.app_secret,
-            "agency_name": self.county_code,
-            "environment": "PROD",
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -302,7 +301,9 @@ class AccelaClient:
                 data=data,
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "x-accela-appid": self.app_id
+                    "x-accela-appid": self.app_id,
+                    "x-accela-agency": self.county_code,
+                    "x-accela-environment": "PROD",
                 }
             )
             response.raise_for_status()
