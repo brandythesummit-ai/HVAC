@@ -43,6 +43,8 @@ export function useAddressSearchBounds(query) {
         const resp = await apiClient.get('/api/properties/search-bounds', { params: { q } });
         if (requestId !== activeRequestRef.current) return;
         const data = resp.data?.data;
+        // TEMP DEBUG: remove after verifying flyTo pipeline in prod
+        console.log('[search-bounds] response', { q, data });
         setResult({
           bounds: data?.found ? data.bbox : null,
           found: !!data?.found,

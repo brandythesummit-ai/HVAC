@@ -67,19 +67,28 @@ const tileProps = MAPBOX_TOKEN
 function SearchFlyTo({ bounds }) {
   const map = useMap();
   const lastKey = useRef(null);
+  // TEMP DEBUG
+  console.log('[SearchFlyTo] render', { hasBounds: !!bounds, hasMap: !!map });
   useEffect(() => {
+    console.log('[SearchFlyTo] effect', { hasBounds: !!bounds, hasMap: !!map, bounds });
     if (!bounds) return;
+    if (!map) return;
     const key = `${bounds.sw_lat},${bounds.sw_lng},${bounds.ne_lat},${bounds.ne_lng}`;
-    if (key === lastKey.current) return;
+    if (key === lastKey.current) {
+      console.log('[SearchFlyTo] skip: same key', key);
+      return;
+    }
     lastKey.current = key;
     const latLngBounds = L.latLngBounds(
       [bounds.sw_lat, bounds.sw_lng],
       [bounds.ne_lat, bounds.ne_lng],
     );
-    // maxZoom caps how far we zoom in — a single-address match would
-    // otherwise zoom to z=18 and show one lonely pin; z=16 keeps a
-    // subdivision in view.
-    map.flyToBounds(latLngBounds, { maxZoom: 16, padding: [40, 40], duration: 0.8 });
+    console.log('[SearchFlyTo] flyToBounds', latLngBounds.toBBoxString());
+    try {
+      map.flyToBounds(latLngBounds, { maxZoom: 16, padding: [40, 40], duration: 0.8 });
+    } catch (e) {
+      console.error('[SearchFlyTo] flyToBounds error', e);
+    }
   }, [bounds, map]);
   return null;
 }
