@@ -31,7 +31,6 @@
     "NME"
   ],
   "review_needed": [
-    "FCG",
     "RGB"
   ],
   "all_classifications": [
@@ -153,7 +152,7 @@
       "sample_count": 3,
       "hvac_matches": 1,
       "match_ratio": 0.333,
-      "is_hvac": false,
+      "is_hvac": true,
       "sample_descriptions": [
         "one(1) like for like Split  AC unit # 4   Changeout Address: 3000 BUSCH LAKE BLVD City: Parcel: 0242",
         "COM/FIRE PUMP HOUSE/NR #42993,43262,43263 Address: 9250 COLUMBUS DR City: TPA 33619 Parcel: 043262.0",
