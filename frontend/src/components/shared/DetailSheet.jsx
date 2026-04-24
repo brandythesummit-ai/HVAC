@@ -39,7 +39,10 @@ const POST_INTERESTED_ACTIONS = [
 ];
 
 export default function DetailSheet() {
-  const [openLeadId, setOpenLeadId] = useState(null);
+  // openKey: either { by: 'lead', id } (ListPage) or { by: 'property', id } (MapPage).
+  // Pins on the map carry property_id (they're rendered from the lean map-pins RPC,
+  // not from leads), so we resolve via /api/leads/by-property/:id for that path.
+  const [openKey, setOpenKey] = useState(null);
   const [lead, setLead] = useState(null);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,23 +51,33 @@ export default function DetailSheet() {
   // Listen for open-lead-detail events from MapPage / ListPage
   useEffect(() => {
     const handler = (e) => {
-      setOpenLeadId(e.detail?.id ?? null);
+      const d = e.detail || {};
+      if (d.propertyId) {
+        setOpenKey({ by: 'property', id: d.propertyId });
+      } else if (d.id) {
+        setOpenKey({ by: 'lead', id: d.id });
+      } else {
+        setOpenKey(null);
+      }
       setNote('');
     };
     window.addEventListener('open-lead-detail', handler);
     return () => window.removeEventListener('open-lead-detail', handler);
   }, []);
 
-  // When a lead is selected, fetch its full detail (permits API has raw_data)
+  // When a lead is selected, fetch its full detail
   useEffect(() => {
-    if (!openLeadId) {
+    if (!openKey) {
       setLead(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    const url = openKey.by === 'property'
+      ? `/api/leads/by-property/${openKey.id}`
+      : `/api/leads/${openKey.id}`;
     apiClient
-      .get(`/api/leads/${openLeadId}`)
+      .get(url)
       .then((res) => {
         if (!cancelled) setLead(res.data?.data || res.data);
       })
@@ -77,9 +90,9 @@ export default function DetailSheet() {
     return () => {
       cancelled = true;
     };
-  }, [openLeadId]);
+  }, [openKey]);
 
-  const close = () => setOpenLeadId(null);
+  const close = () => setOpenKey(null);
 
   // Which transition buttons to show depends on current status
   const availableActions = useMemo(() => {
@@ -104,7 +117,7 @@ export default function DetailSheet() {
     }
   };
 
-  if (!openLeadId) return null;
+  if (!openKey) return null;
 
   return (
     <div
