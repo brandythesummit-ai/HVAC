@@ -14,12 +14,12 @@
  * remount is the reliable path.
  */
 import 'leaflet/dist/leaflet.css';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
@@ -66,11 +66,19 @@ const tileProps = MAPBOX_TOKEN
         '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     };
 
-/** Pushes the current map bounds up to the parent via onBboxChange. */
+/** Pushes the current map bounds up to the parent via onBboxChange.
+ *
+ * Uses `useMap()` + a mount-time effect rather than the `load` event,
+ * because `load` fires very early (before useMapEvents can subscribe
+ * after a keyed remount), leaving the parent without the initial
+ * bbox/zoom and keeping shouldFetch=false.
+ */
 function BboxWatcher({ onBboxChange, onZoomChange }) {
-  const pushBbox = useCallback((map) => {
-    const b = map.getBounds();
-    const z = map.getZoom();
+  const map = useMap();
+
+  const pushBbox = useCallback((m) => {
+    const b = m.getBounds();
+    const z = m.getZoom();
     onBboxChange({
       ne_lat: b.getNorth(),
       ne_lng: b.getEast(),
@@ -80,8 +88,11 @@ function BboxWatcher({ onBboxChange, onZoomChange }) {
     onZoomChange(z);
   }, [onBboxChange, onZoomChange]);
 
+  useEffect(() => {
+    if (map) pushBbox(map);
+  }, [map, pushBbox]);
+
   useMapEvents({
-    load: (e) => pushBbox(e.target),
     moveend: (e) => pushBbox(e.target),
     zoomend: (e) => pushBbox(e.target),
   });
