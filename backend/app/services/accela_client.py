@@ -96,12 +96,18 @@ class AccelaClient:
         """
         url = f"{self.auth_url}/oauth2/token"
 
+        # agency_name + environment must be echoed here: Accela's .NET
+        # backend throws "Object reference not set to an instance of an
+        # object." on /oauth2/token when the authorize request was
+        # agency-scoped but the token exchange drops those values.
         data = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
             "client_id": self.app_id,
-            "client_secret": self.app_secret
+            "client_secret": self.app_secret,
+            "agency_name": self.county_code,
+            "environment": "PROD",
         }
 
         # DETAILED LOGGING - Before request
@@ -283,7 +289,9 @@ class AccelaClient:
             "grant_type": "refresh_token",
             "refresh_token": self.refresh_token_decrypted,
             "client_id": self.app_id,
-            "client_secret": self.app_secret
+            "client_secret": self.app_secret,
+            "agency_name": self.county_code,
+            "environment": "PROD",
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:

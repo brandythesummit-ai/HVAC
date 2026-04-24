@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-22T16:38:30-0700",
+  "generated_at": "2026-04-23T20:55:24-0700",
   "seed_streets": [
     "KENNEDY",
     "DALE MABRY",
@@ -10,10 +10,22 @@
     "BAYSHORE",
     "COLUMBUS",
     "HILLSBOROUGH",
-    "LINEBAUGH"
+    "LINEBAUGH",
+    "NEWBERRY GROVE",
+    "SUMMER SPRINGS",
+    "CATTAIL SHORE",
+    "BRIGHTON KNOLL",
+    "CARLOWAY HILLS",
+    "CARRIAGE POINTE",
+    "SAGE CANYON",
+    "STANDING STONE",
+    "MANGROVE SHADE",
+    "EARLY RUN",
+    "OSPREY LAKE"
   ],
-  "max_samples_per_prefix": 3,
+  "max_samples_per_prefix": 5,
   "hvac_prefixes": [
+    "FCG",
     "FCM",
     "NMC",
     "NME"
