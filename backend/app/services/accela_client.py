@@ -162,12 +162,12 @@ class AccelaClient:
             req_body_scrubbed = _re.sub(r"client_secret=[^&]+", "client_secret=[REDACTED]", req_body)
 
             logger.error(f" [AUTH CODE EXCHANGE] Failed with status {error_status}")
-            logger.info(f"   URL: {url}")
-            logger.info(f"   Redirect URI sent: {redirect_uri}")
-            logger.info(f"   Request body (scrubbed): {req_body_scrubbed}")
-            logger.info(f"   Response body: {error_body}")
+            logger.error(f"   URL: {url}")
+            logger.error(f"   Redirect URI sent: {redirect_uri}")
+            logger.error(f"   Request body (scrubbed): {req_body_scrubbed}")
+            logger.error(f"   Response body: {error_body}")
             if trace_id:
-                logger.info(f"   Trace ID: {trace_id}")
+                logger.error(f"   Trace ID: {trace_id}")
 
             return {
                 "success": False,
