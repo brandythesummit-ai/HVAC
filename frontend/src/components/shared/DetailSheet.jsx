@@ -121,7 +121,7 @@ export default function DetailSheet() {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-[1001] flex items-end sm:items-center justify-center"
       role="dialog"
       aria-modal="true"
     >
