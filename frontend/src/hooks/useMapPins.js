@@ -14,7 +14,7 @@ import apiClient from '../api/client';
 
 const DEBOUNCE_MS = 250;
 
-export function useMapPins({ bbox, filters = {}, enabled = true, limit = 10000 }) {
+export function useMapPins({ bbox, filters = {}, enabled = true, limit = 15000 }) {
   const [pins, setPins] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);

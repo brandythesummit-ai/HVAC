@@ -118,12 +118,18 @@ export default function MapPage() {
     enabled: shouldFetch,
   });
 
+  // When the bbox matches more rows than the RPC's limit, Postgres
+  // truncates to a spatially-biased slice (rows by latitude via the
+  // spatial index, or by physical storage via seq scan). Either way
+  // you'd see a "band of pins with gaps N/S". Rather than showing a
+  // misleading slice, we render nothing and tell the user to zoom in.
   const displayPins = useMemo(() => {
+    if (truncated) return [];
     return pins.filter((p) =>
       typeof p.latitude === 'number' && typeof p.longitude === 'number'
       && !Number.isNaN(p.latitude) && !Number.isNaN(p.longitude),
     );
-  }, [pins]);
+  }, [pins, truncated]);
 
   // Derive a stable key + the initial view props for MapContainer.
   // A change in searchResult.bounds (including clearing it) flips the
@@ -160,10 +166,10 @@ export default function MapPage() {
     hintText = `No matches for “${trimmedSearch}”`;
   } else if (!shouldFetch) {
     hintText = `Zoom in to load pins (zoom ≥ ${MIN_FETCH_ZOOM})`;
+  } else if (truncated) {
+    hintText = 'Too many pins in view — zoom in further to load them';
   } else {
-    hintText = `${displayPins.length.toLocaleString()} pinned${
-      truncated ? ' · showing first 10K (zoom in for more)' : ''
-    }`;
+    hintText = `${displayPins.length.toLocaleString()} pinned`;
   }
 
   const { viewKey, ...containerProps } = mapViewProps;
