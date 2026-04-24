@@ -363,10 +363,14 @@ class AccelaClient:
                 "expires_at": self._token_expires_at
             }
         except Exception as e:
-            logger.error(f"[TOKEN] Unexpected error during token refresh: {str(e)}")
+            logger.error(
+                f"[TOKEN] Unexpected error during token refresh: "
+                f"type={type(e).__name__} msg={str(e)!r}",
+                exc_info=True,
+            )
             return {
                 "success": False,
-                "error": str(e),
+                "error": f"{type(e).__name__}: {str(e)}",
                 "needs_reauth": True,  # Assume re-auth needed on unknown errors
                 "expires_at": self._token_expires_at
             }
