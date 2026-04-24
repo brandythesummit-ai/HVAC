@@ -21,9 +21,15 @@ export function useMapPins({ bbox, filters = {}, enabled = true, limit = 10000 }
   const [truncated, setTruncated] = useState(false);
   const debounceRef = useRef(null);
   const activeRequestRef = useRef(0);
+  const abortRef = useRef(null);
 
   const fetchPins = useCallback(async (b) => {
     if (!b) return;
+    // Abort any in-flight request so a rapid pan doesn't leave 5-10
+    // zombie HTTP requests chewing bandwidth + backend connections.
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     const requestId = ++activeRequestRef.current;
     setIsLoading(true);
     setError(null);
@@ -48,8 +54,10 @@ export function useMapPins({ bbox, filters = {}, enabled = true, limit = 10000 }
     }
 
     try {
-      const resp = await apiClient.get('/api/map-pins', { params });
-      // Ignore responses from superseded requests (stale bbox during pan)
+      const resp = await apiClient.get('/api/map-pins', {
+        params,
+        signal: controller.signal,
+      });
       if (requestId !== activeRequestRef.current) return;
       const data = resp.data?.data;
       if (data) {
@@ -60,6 +68,8 @@ export function useMapPins({ bbox, filters = {}, enabled = true, limit = 10000 }
         setTruncated(false);
       }
     } catch (e) {
+      // Cancelled requests aren't errors — just ignore.
+      if (e?.name === 'CanceledError' || e?.name === 'AbortError' || e?.code === 'ERR_CANCELED') return;
       if (requestId !== activeRequestRef.current) return;
       setError(e);
       setPins([]);
