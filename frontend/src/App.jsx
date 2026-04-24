@@ -7,6 +7,7 @@ import JobStatusBadge from './components/shared/JobStatusBadge';
 import MapPage from './pages/MapPage';
 import ListPage from './pages/ListPage';
 import PlanForTodayPage from './pages/PlanForTodayPage';
+import CountiesPage from './pages/CountiesPage';
 
 function App() {
   return (
@@ -51,8 +52,14 @@ function App() {
             </AuthGuard>
           }
         />
-        {/* Legacy routes removed in M15 (CountiesPage, LeadReviewPage, etc).
-            Any old bookmark redirects to /map. */}
+        <Route
+          path="/counties"
+          element={
+            <AuthGuard>
+              <CountiesPage />
+            </AuthGuard>
+          }
+        />
         <Route path="*" element={<Navigate to="/map" replace />} />
       </Routes>
       {/* DetailSheet lives at the app root so it's available from any
