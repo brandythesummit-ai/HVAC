@@ -151,21 +151,23 @@ class AccelaClient:
             }
 
         except httpx.HTTPStatusError as e:
-            # DETAILED LOGGING - Error case
+            # DETAILED LOGGING - Error case (INFO-level so Railway captures it)
             error_body = e.response.text
             error_status = e.response.status_code
             trace_id = e.response.headers.get('x-accela-traceid') or e.response.headers.get('x-accela-trace-id')
+            # Scrub client_secret from the logged body to avoid leaking it
+            # into Railway logs (traces are operator-readable).
+            req_body = e.response.request.content.decode()
+            import re as _re
+            req_body_scrubbed = _re.sub(r"client_secret=[^&]+", "client_secret=[REDACTED]", req_body)
 
-            logger.error(f" [AUTH CODE EXCHANGE] Failed:")
-            logger.debug(f"   Status: {error_status}")
-            logger.debug(f"   URL: {url}")
-            logger.debug(f"   Redirect URI sent: {redirect_uri}")
-            logger.debug(f"   Request headers: {dict(e.response.request.headers)}")
-            logger.debug(f"   Request body: {e.response.request.content.decode()}")
-            logger.debug(f"   Response headers: {dict(e.response.headers)}")
-            logger.debug(f"   Response body: {error_body}")
+            logger.error(f" [AUTH CODE EXCHANGE] Failed with status {error_status}")
+            logger.info(f"   URL: {url}")
+            logger.info(f"   Redirect URI sent: {redirect_uri}")
+            logger.info(f"   Request body (scrubbed): {req_body_scrubbed}")
+            logger.info(f"   Response body: {error_body}")
             if trace_id:
-                logger.debug(f"   Trace ID: {trace_id}")
+                logger.info(f"   Trace ID: {trace_id}")
 
             return {
                 "success": False,
