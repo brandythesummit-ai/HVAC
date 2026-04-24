@@ -322,7 +322,7 @@ class JobProcessor:
             app_secret=app_secret,
             county_code=county['county_code'],
             refresh_token=county['refresh_token'],
-            access_token=county.get('access_token', ''),
+            access_token=county.get('accela_access_token', ''),
             token_expires_at=county.get('token_expires_at', '')
         )
 
@@ -697,7 +697,7 @@ class JobProcessor:
             app_secret=app_secret,
             county_code=county['county_code'],
             refresh_token=county['refresh_token'],
-            access_token=county.get('access_token', ''),
+            access_token=county.get('accela_access_token', ''),
             token_expires_at=county.get('token_expires_at', '')
         )
 
