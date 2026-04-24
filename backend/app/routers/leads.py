@@ -355,6 +355,35 @@ async def create_leads_from_permits(request: CreateLeadsRequest, db=Depends(get_
         }
 
 
+@router.get("/by-property/{property_id}", response_model=dict)
+async def get_lead_by_property(property_id: str, db=Depends(get_db)):
+    """Fetch the lead for a given property_id, with full property context.
+
+    MapPage pins carry a property_id (not a lead_id), so clicks need a
+    property→lead resolver. In parcels-first each residential property
+    has exactly one lead row; we return that row with properties joined.
+    """
+    try:
+        result = (
+            db.table("leads")
+            .select("*, property:properties(*)")
+            .eq("property_id", property_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Lead not found for property")
+        lead = result.data[0]
+        prop = lead.pop("property", None) or {}
+        merged = {**prop, **lead}
+        return {"success": True, "data": merged, "error": None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_lead_by_property failed")
+        return {"success": False, "data": None, "error": str(e)}
+
+
 @router.get("/{lead_id}", response_model=dict)
 async def get_lead(lead_id: str, db=Depends(get_db)):
     """Fetch a single lead with its full property + permit context.
