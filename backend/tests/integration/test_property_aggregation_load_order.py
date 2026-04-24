@@ -241,7 +241,7 @@ class TestLoadOrderIndependence:
         assert state['most_recent_hvac_permit_id'] == "permit-B"
         assert state['total_hvac_permits'] == 3
         # Scoring: a 2024 HVAC is <2 years old → COLD, not qualified
-        # (the <5 year rule — user's explicit filter)
+        # (FL-tuned: <4 years is COLD — see property_aggregator.TIER_THRESHOLDS)
         assert state['lead_tier'] == "COLD"
         assert state['is_qualified'] is False
 
@@ -319,7 +319,7 @@ class TestUserGrilledScenario:
             "User's explicit correctness requirement violated: "
             "aggregation must reflect the newer HVAC permit, not the older one"
         )
-        # <1 yr old → COLD, NOT qualified (user's 5+ year rule)
+        # <1 yr old → COLD, NOT qualified (FL-tuned: 4+ yr qualification)
         assert state['hvac_age_years'] in (0, 1)
         assert state['lead_tier'] == "COLD"
         assert state['is_qualified'] is False

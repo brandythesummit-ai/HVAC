@@ -34,15 +34,22 @@ class PropertyAggregator:
     - Qualification threshold: 5+ years
     """
 
-    # Lead tier thresholds (in years)
+    # Lead tier thresholds (in years).
+    #
+    # Tuned for Florida climate: residential central AC runs near-continuously
+    # under high humidity and (coastward) salt exposure. Field data puts the
+    # typical FL replacement sweet spot at 10-14 years — ~2/3 of the national
+    # 15-20 year average. Thresholds are shifted down accordingly so the HOT
+    # tier captures actual replacement candidates instead of
+    # past-end-of-life outliers.
     TIER_THRESHOLDS = {
-        'HOT': 15,      # 15+ years = HOT
-        'WARM': 10,     # 10-15 years = WARM
-        'COOL': 5,      # 5-10 years = COOL
-        'COLD': 0,      # <5 years = COLD
+        'HOT': 12,      # 12+ years = HOT (replacement likely soon in FL)
+        'WARM': 8,      # 8-11 years = WARM (pre-replacement window)
+        'COOL': 4,      # 4-7 years = COOL (maintenance / future watch)
+        'COLD': 0,      # <4 years = COLD
     }
 
-    QUALIFICATION_THRESHOLD = 5  # 5+ years = qualified lead
+    QUALIFICATION_THRESHOLD = 4  # 4+ years = qualified lead (COOL floor)
 
     def __init__(self, db: Client):
         """
@@ -77,14 +84,21 @@ class PropertyAggregator:
 
     def calculate_lead_score(self, hvac_age_years: int) -> int:
         """
-        Calculate lead score (0-100) based on HVAC age.
+        Calculate lead score (0-100) from HVAC age with a smooth curve.
 
-        Scoring:
-        - 20+ years:  100 (HOT - replacement urgent)
-        - 15-20 years: 80-95 (HOT - replacement soon)
-        - 10-15 years: 60-75 (WARM - maintenance + potential replacement)
-        - 5-10 years:  40-55 (COOL - maintenance only)
-        - <5 years:    0-35 (COLD - not qualified)
+        The previous implementation had an 8-point gap at every tier
+        boundary and only a 3-point step within tiers — so boundary ages
+        jumped 8 points while non-boundary years barely moved. This
+        implementation spaces each non-HOT tier evenly across a
+        25-point band (step=8/yr) and lets HOT stretch toward 100 as
+        age climbs past 20, so sort order reflects real urgency.
+
+        Scoring (FL-tuned boundaries — see TIER_THRESHOLDS):
+        - 20+ years:  100        (HOT — past end-of-life)
+        - 12-19:      75-96      (HOT — replacement likely soon)
+        - 8-11:       50-74      (WARM — pre-replacement)
+        - 4-7:        25-49      (COOL — maintenance / future watch)
+        - 0-3:        0-24       (COLD — not qualified)
 
         Args:
             hvac_age_years: Age of HVAC system in years
@@ -94,18 +108,18 @@ class PropertyAggregator:
         """
         if hvac_age_years >= 20:
             return 100
-        elif hvac_age_years >= 15:
-            # Linear scale from 80 to 95 over 5 years
-            return 80 + int((hvac_age_years - 15) * 3)
-        elif hvac_age_years >= 10:
-            # Linear scale from 60 to 75 over 5 years
-            return 60 + int((hvac_age_years - 10) * 3)
-        elif hvac_age_years >= 5:
-            # Linear scale from 40 to 55 over 5 years
-            return 40 + int((hvac_age_years - 5) * 3)
-        else:
-            # Linear scale from 0 to 35 over 5 years
-            return int(hvac_age_years * 7)
+        if hvac_age_years >= 12:
+            # HOT: 75 at age 12, +3/yr, capped by the age-20 branch above.
+            return 75 + (hvac_age_years - 12) * 3
+        if hvac_age_years >= 8:
+            # WARM: 50-74, step=8/yr over 4-year tier.
+            return 50 + (hvac_age_years - 8) * 8
+        if hvac_age_years >= 4:
+            # COOL: 25-49, step=8/yr.
+            return 25 + (hvac_age_years - 4) * 8
+        # COLD: 0-24, step=8/yr. Monotonic across the whole 0-100 range
+        # so there is no longer a discontinuity at any tier boundary.
+        return hvac_age_years * 8
 
     def determine_lead_tier(self, hvac_age_years: int) -> str:
         """
@@ -134,7 +148,7 @@ class PropertyAggregator:
             hvac_age_years: Age of HVAC system in years
 
         Returns:
-            True if HVAC is 5+ years old
+            True if HVAC is 4+ years old (FL-tuned — see TIER_THRESHOLDS)
         """
         return hvac_age_years >= self.QUALIFICATION_THRESHOLD
 
@@ -210,7 +224,7 @@ class PropertyAggregator:
         Returns:
             Tuple of (pipeline_name, confidence_score)
         """
-        # HOT leads (15+ years)
+        # HOT leads (12+ years — FL-tuned)
         if lead_tier == 'HOT':
             if contact_completeness == 'complete':
                 # Best leads: old HVAC + full contact info = immediate call opportunity
@@ -222,7 +236,7 @@ class PropertyAggregator:
                 # HOT but no contact info = still worth premium effort
                 return 'premium_mailer', 75
 
-        # WARM leads (10-15 years)
+        # WARM leads (8-11 years — FL-tuned)
         elif lead_tier == 'WARM':
             if affluence_tier in ('ultra_high', 'high'):
                 # High-value properties worth premium mailer even if not urgent yet
@@ -234,7 +248,7 @@ class PropertyAggregator:
                 # Standard WARM lead = nurture campaign
                 return 'nurture_drip', 70
 
-        # COOL leads (5-10 years)
+        # COOL leads (4-7 years — FL-tuned)
         elif lead_tier == 'COOL':
             if affluence_tier in ('ultra_high', 'high'):
                 # High-value properties worth nurturing long-term
@@ -243,7 +257,7 @@ class PropertyAggregator:
                 # Standard COOL = retargeting ads for brand awareness
                 return 'retargeting_ads', 60
 
-        # COLD leads (<5 years) - not qualified but keep in system
+        # COLD leads (<4 years — FL-tuned) — not qualified but kept in system
         else:
             return 'cold_storage', 50
 
