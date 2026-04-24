@@ -150,7 +150,14 @@ export default function DetailSheet() {
             <>
               <div>
                 <div className="text-xs text-slate-500 uppercase tracking-wide">Property</div>
-                <div className="font-medium">{lead.property_address || '(no address)'}</div>
+                <div className="font-medium">
+                  {lead.normalized_address || lead.property_address || '(no address)'}
+                </div>
+                {(lead.city || lead.zip_code) && (
+                  <div className="text-xs text-slate-500">
+                    {[lead.city, lead.state, lead.zip_code].filter(Boolean).join(', ')}
+                  </div>
+                )}
               </div>
               {lead.owner_name && (
                 <div>
