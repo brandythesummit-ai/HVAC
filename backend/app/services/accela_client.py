@@ -96,17 +96,12 @@ class AccelaClient:
         """
         url = f"{self.auth_url}/oauth2/token"
 
-        # Accela expects agency + environment as HEADERS (x-accela-agency,
-        # x-accela-environment), not body params. Body-only attempts
-        # produced HTTP 500 "Object reference not set to an instance of
-        # an object." because their .NET backend's agency lookup reads
-        # from request headers, finds nothing, and null-derefs.
         data = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
             "client_id": self.app_id,
-            "client_secret": self.app_secret,
+            "client_secret": self.app_secret
         }
 
         # DETAILED LOGGING - Before request
@@ -123,9 +118,7 @@ class AccelaClient:
                     data=data,
                     headers={
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "x-accela-appid": self.app_id,
-                        "x-accela-agency": self.county_code,
-                        "x-accela-environment": "PROD",
+                        "x-accela-appid": self.app_id
                     }
                 )
 
@@ -292,7 +285,7 @@ class AccelaClient:
             "grant_type": "refresh_token",
             "refresh_token": self.refresh_token_decrypted,
             "client_id": self.app_id,
-            "client_secret": self.app_secret,
+            "client_secret": self.app_secret
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -301,9 +294,7 @@ class AccelaClient:
                 data=data,
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "x-accela-appid": self.app_id,
-                    "x-accela-agency": self.county_code,
-                    "x-accela-environment": "PROD",
+                    "x-accela-appid": self.app_id
                 }
             )
             response.raise_for_status()
