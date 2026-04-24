@@ -3,8 +3,10 @@
  *
  * Pre-pivot, this fetched 12K leads and rendered all at once. With
  * ~450K residential parcels, we fetch per-viewport via /api/map-pins,
- * debounced on pan/zoom. The user zooms to a subdivision, sees every
- * house as a pin with tier coloring, clicks → DetailSheet opens.
+ * debounced on pan/zoom. The render path receives lean pins
+ * ({id, latitude, longitude, lead_tier, lead_score} — about 1MB for
+ * 10K markers). The full property record is fetched on click by
+ * DetailSheet, which listens for the 'open-lead-detail' event.
  *
  * Search → viewport: the MapContainer is keyed on the search result's
  * bbox. When a new address-search resolves, we pass a fresh key (and a
@@ -19,7 +21,7 @@ import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
@@ -198,36 +200,18 @@ export default function MapPage() {
               }}
               eventHandlers={{
                 click: () => {
-                  // DetailSheet listens for this. It'll fetch the full
-                  // lead by property_id from /api/leads?property_id=...
+                  // DetailSheet listens for this event and fetches the
+                  // full property record by id. We intentionally do NOT
+                  // render a <Popup> here — with 10K markers, react-
+                  // leaflet would eagerly render 10K popup subtrees
+                  // into the DOM, tanking reconciliation perf.
                   const evt = new CustomEvent('open-lead-detail', {
                     detail: { propertyId: p.id },
                   });
                   window.dispatchEvent(evt);
                 },
               }}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <div className="font-medium">
-                    {p.normalized_address || '(no address)'}
-                  </div>
-                  {p.owner_name && (
-                    <div className="text-slate-600">{p.owner_name}</div>
-                  )}
-                  <div className="text-xs text-slate-500 mt-1">
-                    Built {p.year_built ?? '?'}
-                    {p.heated_sqft && ` · ${p.heated_sqft} sqft`}
-                    {p.bedrooms_count && ` · ${p.bedrooms_count}BR`}
-                    {p.bathrooms_count && `/${p.bathrooms_count}BA`}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {p.lead_tier} · Score {p.lead_score ?? 0}
-                    {p.owner_occupied && ' · Homestead'}
-                  </div>
-                </div>
-              </Popup>
-            </CircleMarker>
+            />
           ))}
         </MapContainer>
 
