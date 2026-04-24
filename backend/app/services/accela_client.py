@@ -118,7 +118,8 @@ class AccelaClient:
                     data=data,
                     headers={
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "x-accela-appid": self.app_id
+                        "x-accela-appid": self.app_id,
+                        "User-Agent": "curl/8.4.0",
                     }
                 )
 
@@ -222,7 +223,8 @@ class AccelaClient:
                     data=data,
                     headers={
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "x-accela-appid": self.app_id
+                        "x-accela-appid": self.app_id,
+                        "User-Agent": "curl/8.4.0",
                     }
                 )
 
@@ -299,7 +301,8 @@ class AccelaClient:
                 data=data,
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "x-accela-appid": self.app_id
+                    "x-accela-appid": self.app_id,
+                    "User-Agent": "curl/8.4.0",
                 }
             )
             response.raise_for_status()
