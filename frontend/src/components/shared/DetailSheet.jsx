@@ -190,12 +190,17 @@ export default function DetailSheet() {
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">HVAC age</div>
                   <div className="font-medium">{lead.hvac_age_years ?? '—'} yrs</div>
-                  {lead.properties?.score_source === 'permit' && (
-                    <div className="text-[11px] text-emerald-700 mt-0.5">✓ Confirmed via permit</div>
-                  )}
-                  {lead.properties?.score_source === 'year_built' && (
-                    <div className="text-[11px] text-amber-700 mt-0.5">ⓘ Estimated from build year</div>
-                  )}
+                  {/* Read both shapes: /api/leads (list) returns nested
+                      `properties.score_source`; /api/leads/{id} and
+                      /api/leads/by-property/{id} flatten property fields
+                      onto the lead. Without the fallback the badge silently
+                      never renders on detail-fetch paths. */}
+                  {(() => {
+                    const src = lead.score_source ?? lead.properties?.score_source;
+                    if (src === 'permit') return <div className="text-[11px] text-emerald-700 mt-0.5">✓ Confirmed via permit</div>;
+                    if (src === 'year_built') return <div className="text-[11px] text-amber-700 mt-0.5">ⓘ Estimated from build year</div>;
+                    return null;
+                  })()}
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Score</div>
