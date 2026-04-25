@@ -102,6 +102,7 @@ class PermitDetail:
             "status": self.status,
             "opened_date": self.opened_date.isoformat() if self.opened_date else None,
             "property_address": self.address,
+            "parcel_number": _normalize_parcel(self.parcel),
             "raw_data": {
                 "source": "hcfl_legacy_scraper",
                 "permit_number": self.permit_number,
@@ -173,6 +174,14 @@ def _parse_date(s: str | None) -> date | None:
             except ValueError:
                 continue
     return None
+
+
+def _normalize_parcel(p: str | None) -> str | None:
+    # Reduce to alphanumeric uppercase so HCFL's "056362.0556" matches HCPAO's "0563620556".
+    if not p:
+        return None
+    norm = ''.join(c for c in p.upper() if c.isalnum())
+    return norm or None
 
 
 class HcflLegacyScraper:

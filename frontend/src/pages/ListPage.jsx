@@ -1,35 +1,28 @@
 /**
  * ListPage — virtual-scrolling table of leads, sorted by score.
  *
- * Peer surface to MapPage. Shares FilterBar so filter state flows
- * between them via URL. Tap a row → opens DetailSheet (M19).
+ * Peer surface to MapPage. Shares FilterBar (desktop strip) +
+ * FilterSheet (mobile) so filter state flows between map/list/plan
+ * via URL. Tap a row → opens DetailSheet via 'open-lead-detail'
+ * event with { id }.
+ *
+ * Mobile chrome: PageFiltersHeader + Filters button → FilterSheet.
+ * BottomNav (rendered globally in App.jsx) sits below the list, so
+ * we add `pb-14 lg:pb-0` to the page root for clearance.
  *
  * Virtual scroll keeps the list responsive at 10K+ leads on
  * low-end mobile.
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
+import PageFiltersHeader from '../components/shared/PageFiltersHeader';
+import FilterSheet from '../components/shared/FilterSheet';
+import TierBadge from '../components/ui/TierBadge';
 import { useLeads } from '../hooks/useLeads';
 import { useLeadFilters } from '../hooks/useLeadFilters';
-
-const TIER_COLOR = {
-  HOT: 'bg-red-100 text-red-800',
-  WARM: 'bg-orange-100 text-orange-800',
-  COOL: 'bg-blue-100 text-blue-800',
-  COLD: 'bg-slate-100 text-slate-600',
-};
-
-function tierBadge(tier) {
-  const cls = TIER_COLOR[tier] || 'bg-slate-100 text-slate-600';
-  return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
-      {tier || '—'}
-    </span>
-  );
-}
 
 export default function ListPage() {
   const { filters } = useLeadFilters();
@@ -37,6 +30,7 @@ export default function ListPage() {
   // rather than paginating. TanStack Virtual only renders visible rows,
   // so 12k in memory is fine.
   const { data, isLoading, error } = useLeads({ ...filters, limit: 12000 });
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   // API returns { leads, count, total } — normalize
   const rows = useMemo(() => {
@@ -60,8 +54,9 @@ export default function ListPage() {
   });
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen pb-14 lg:pb-0">
       <ViewToggle />
+      <PageFiltersHeader onFiltersClick={() => setFilterSheetOpen(true)} />
       <FilterBar />
 
       {isLoading && (
@@ -105,8 +100,6 @@ export default function ListPage() {
                   }}
                   className="border-b border-slate-100 px-4 py-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer"
                   onClick={() => {
-                    // M19 will mount DetailSheet here. For now, a
-                    // placeholder — no-op until the sheet lands.
                     const evt = new CustomEvent('open-lead-detail', { detail: { id: lead.id } });
                     window.dispatchEvent(evt);
                   }}
@@ -126,7 +119,7 @@ export default function ListPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 pl-3">
-                    {tierBadge(lead.lead_tier)}
+                    <TierBadge tier={lead.lead_tier} />
                     <span className="text-slate-400 text-sm tabular-nums">
                       {lead.lead_score ?? 0}
                     </span>
@@ -137,6 +130,8 @@ export default function ListPage() {
           </div>
         </div>
       )}
+
+      <FilterSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)} />
     </div>
   );
 }

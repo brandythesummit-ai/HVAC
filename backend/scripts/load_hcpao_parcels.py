@@ -51,6 +51,8 @@ import httpx
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from app.services.address_normalizer import AddressNormalizer
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -294,7 +296,12 @@ def build_property_row(
         return None
 
     normalized = site_addr  # already uppercase; leave structural normalization
-                            # to the aggregator on the permit side
+                            # to the aggregator on the permit side. The parser
+                            # below extracts components into separate columns,
+                            # but normalized_address stays raw to preserve the
+                            # existing permit-to-property address-string match.
+    parsed_addr = AddressNormalizer.parse_address(site_addr)
+
     coords = latlon.get(folio)
     lat, lng = (coords if coords else (None, None))
 
@@ -305,6 +312,10 @@ def build_property_row(
     just_val = parcel_row.get("JUST")
     land_val = parcel_row.get("LAND")
     bldg_val = parcel_row.get("BLDG")
+    # HCPAO stores lot size as ACREAGE (numeric, in acres). Convert to sqft
+    # to match the existing column semantics. 1 acre = 43,560 sqft.
+    acreage = parcel_row.get("ACREAGE")
+    lot_size_sqft = int(round(acreage * 43560)) if acreage else None
 
     return {
         "county_id": county_id,
@@ -312,9 +323,11 @@ def build_property_row(
         "parcel_number": folio,
         "dor_code": dor,
         "normalized_address": normalized,
-        "street_number": None,  # will be populated by address parser later if needed
-        "street_name": None,
-        "street_suffix": None,
+        "street_number": parsed_addr.street_number,
+        "street_name": parsed_addr.street_name,
+        "street_suffix": parsed_addr.street_suffix,
+        "unit_number": parsed_addr.unit_number,
+        "lot_size_sqft": lot_size_sqft,
         "city": (parcel_row.get("SITE_CITY") or "").strip() or None,
         "state": "FL",
         "zip_code": (parcel_row.get("SITE_ZIP") or "").strip() or None,

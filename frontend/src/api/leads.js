@@ -4,6 +4,10 @@ import apiClient from './client';
 // at /api/leads uses snake_case names from before the post-pivot rebuild.
 // Translate here so neither side has to change its naming convention.
 // Arrays get comma-joined — the backend splits on commas for list filters.
+//
+// Scope: this map only governs the /api/leads path (used by ListPage and
+// PlanForTodayPage via useLeads). The Map page uses useMapPins, which
+// builds its own snake_case params directly and doesn't consult this map.
 const FILTER_KEY_MAP = {
   tier: 'lead_tier',
   status: 'status',
@@ -15,6 +19,9 @@ const FILTER_KEY_MAP = {
   dateTo: 'date_to',
   zip: 'zip',
   ownerOccupied: 'owner_occupied',
+  yearBuiltMin: 'year_built_min',
+  yearBuiltMax: 'year_built_max',
+  hasPermitHistory: 'has_permit_history',
   permitType: 'permit_type',
   search: 'search',
 };

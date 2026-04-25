@@ -16,12 +16,18 @@ const DEBOUNCE_MS = 350;
 const MIN_LENGTH = 2;
 
 export function useAddressSearchBounds(query) {
+  // `searched` flips true only after a network response (success or
+  // failure). It's distinct from `!loading` because the 350ms debounce
+  // window sits between "user typed" and "we started loading" — during
+  // that gap, `loading=false` and `found=false`, which would otherwise
+  // misread as "no match" and flash the empty-result state to the user.
   const [result, setResult] = useState({
     bounds: null,
     found: false,
     tooBroad: false,
     count: 0,
     loading: false,
+    searched: false,
   });
   const debounceRef = useRef(null);
   const activeRequestRef = useRef(0);
@@ -31,7 +37,10 @@ export function useAddressSearchBounds(query) {
     if (q.length < MIN_LENGTH) {
       // Clear any stale result so MapPage doesn't keep flying to the
       // previous subdivision after the user clears the search.
-      setResult({ bounds: null, found: false, tooBroad: false, count: 0, loading: false });
+      setResult({
+        bounds: null, found: false, tooBroad: false,
+        count: 0, loading: false, searched: false,
+      });
       return;
     }
 
@@ -49,10 +58,14 @@ export function useAddressSearchBounds(query) {
           tooBroad: !!data?.too_broad,
           count: data?.count || 0,
           loading: false,
+          searched: true,
         });
       } catch {
         if (requestId !== activeRequestRef.current) return;
-        setResult({ bounds: null, found: false, tooBroad: false, count: 0, loading: false });
+        setResult({
+          bounds: null, found: false, tooBroad: false,
+          count: 0, loading: false, searched: true,
+        });
       }
     }, DEBOUNCE_MS);
 
