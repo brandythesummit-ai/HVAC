@@ -14,7 +14,7 @@ PostgREST-paginated path required 10 round-trips for a 10K-limit fetch
 Always bbox-scoped: the client must provide ne_lat, ne_lng, sw_lat,
 sw_lng. Unbounded queries would try to return 450K rows.
 """
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Response
 from typing import Optional
 import logging
 
@@ -23,9 +23,19 @@ from app.database import get_db
 router = APIRouter(prefix="/api", tags=["map"])
 logger = logging.getLogger(__name__)
 
+# Browser HTTP cache for repeat-pan to recently-visited bboxes.
+# - max-age=60: any pan within the last 60s of the same bbox returns
+#   from the browser cache instantly (no network).
+# - stale-while-revalidate=300: between 60s and 5min, browser shows
+#   the cached response immediately and revalidates in the background,
+#   so panning back to a recent area still feels instant even when
+#   data has aged. Property scoring changes propagate within 60s.
+_MAP_PINS_CACHE_CONTROL = "private, max-age=60, stale-while-revalidate=300"
+
 
 @router.get("/map-pins", response_model=dict)
 async def map_pins(
+    response: Response,
     bbox_ne_lat: float = Query(...),
     bbox_ne_lng: float = Query(...),
     bbox_sw_lat: float = Query(...),
@@ -73,6 +83,7 @@ async def map_pins(
         return {"success": False, "data": None, "error": str(e)}
 
     pins = res.data or []
+    response.headers["Cache-Control"] = _MAP_PINS_CACHE_CONTROL
     return {
         "success": True,
         "data": {
