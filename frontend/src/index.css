@@ -205,6 +205,14 @@ code {
   color: rgb(30 64 175);
 }
 
+/* Cluster marker custom divIcon — defeats Leaflet's default
+   .leaflet-div-icon background/border so our inline-styled bubble
+   sits clean over the tiles. */
+.cluster-marker-icon {
+  background: transparent;
+  border: none;
+}
+
 @layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in;

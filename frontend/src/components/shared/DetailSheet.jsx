@@ -22,6 +22,8 @@ import toast from 'react-hot-toast';
 
 import { useUpdateLeadStatus } from '../../hooks/useLeads';
 import apiClient from '../../api/client';
+import TierBadge from '../ui/TierBadge';
+import StatusBadge from '../ui/StatusBadge';
 
 const KNOCK_ACTIONS = [
   { label: 'No answer', status: 'KNOCKED_NO_ANSWER', color: 'bg-slate-600' },
@@ -178,11 +180,15 @@ export default function DetailSheet() {
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Tier</div>
-                  <div>{lead.lead_tier || '—'}</div>
+                  <div className="mt-0.5">
+                    {lead.lead_tier ? <TierBadge tier={lead.lead_tier} /> : <span className="text-slate-400">—</span>}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Status</div>
-                  <div>{(lead.lead_status || 'NEW').replace(/_/g, ' ')}</div>
+                  <div className="mt-0.5">
+                    <StatusBadge status={lead.lead_status || 'NEW'} />
+                  </div>
                 </div>
               </div>
               {lead.most_recent_hvac_date && (

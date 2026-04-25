@@ -21,10 +21,12 @@ import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { MapContainer, TileLayer, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
+import SuperclusterLayer from '../components/map/SuperclusterLayer';
+import MapStatusBar from '../components/map/MapStatusBar';
 import { useMapPins } from '../hooks/useMapPins';
 import { useLeadFilters } from '../hooks/useLeadFilters';
 import { useAddressSearchBounds } from '../hooks/useAddressSearchBounds';
@@ -43,12 +45,9 @@ const DEFAULT_ZOOM = 10;
 // instead of fetching.
 const MIN_FETCH_ZOOM = 13;
 
-const TIER_COLOR = {
-  HOT: '#dc2626',
-  WARM: '#ea580c',
-  COOL: '#2563eb',
-  COLD: '#94a3b8',
-};
+// Tier color now lives in constants/visual.js (TIER_MARKER) and is
+// consumed by TierMarker / ClusterMarker. The local TIER_COLOR map
+// was removed in PR 2 of the redesign.
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const MAPBOX_STYLE = import.meta.env.VITE_MAPBOX_STYLE_ID || 'streets-v12';
@@ -189,25 +188,31 @@ export default function MapPage() {
     };
   }, [searchResult.bounds]);
 
-  // Precedence: active search feedback wins over generic map-state
-  // hints, so the user understands what their search did before we
-  // surface anything about zoom or pin count.
+  // MapStatusBar takes raw inputs and applies its own priority logic
+  // (searching > tooBroad > noMatch > belowMinZoom > truncated > pinned).
+  // The previous concatenated-prose hintText is gone — MapStatusBar
+  // now renders distinct visual treatments per state.
   const trimmedSearch = (filters.search || '').trim();
   const hasSearch = trimmedSearch.length >= 2;
-  let hintText;
-  if (hasSearch && searchResult.loading) {
-    hintText = 'Searching addresses…';
-  } else if (hasSearch && searchResult.tooBroad) {
-    hintText = `“${trimmedSearch}” matches ${searchResult.count.toLocaleString()}+ parcels — refine your search`;
-  } else if (hasSearch && !searchResult.found) {
-    hintText = `No matches for “${trimmedSearch}”`;
-  } else if (!shouldFetch) {
-    hintText = `Zoom in to load pins (zoom ≥ ${MIN_FETCH_ZOOM})`;
-  } else if (truncated) {
-    hintText = `${displayPins.length.toLocaleString()} pinned (uniform sample · zoom in for full detail)`;
-  } else {
-    hintText = `${displayPins.length.toLocaleString()} pinned`;
-  }
+  // `noMatch` is gated on `searched` — the 350ms debounce window in
+  // useAddressSearchBounds sits between "user typed" and "loading=true",
+  // and reading just `!loading && !found && !tooBroad` would flash
+  // "No matches for X" to the user during that gap.
+  const statusBarProps = {
+    searching: hasSearch && (searchResult.loading || !searchResult.searched),
+    tooBroad: hasSearch && searchResult.tooBroad,
+    noMatch:
+      hasSearch
+      && searchResult.searched
+      && !searchResult.loading
+      && !searchResult.found
+      && !searchResult.tooBroad,
+    belowMinZoom: !shouldFetch,
+    truncated: shouldFetch && truncated,
+    searchQuery: trimmedSearch,
+    searchCount: searchResult.count,
+    pinnedCount: displayPins.length,
+  };
 
   const { viewKey, ...containerProps } = mapViewProps;
 
@@ -232,23 +237,10 @@ export default function MapPage() {
           <TileLayer {...tileProps} />
           <BboxWatcher onBboxChange={setBbox} onZoomChange={setZoom} />
           <PinClickHandler pins={displayPins} />
-          {displayPins.map((p) => (
-            <CircleMarker
-              key={p.id}
-              center={[p.latitude, p.longitude]}
-              radius={8}
-              pathOptions={{
-                color: TIER_COLOR[p.lead_tier] || TIER_COLOR.COOL,
-                fillOpacity: 0.7,
-                weight: 1,
-              }}
-            />
-          ))}
+          <SuperclusterLayer pins={displayPins} bbox={bbox} zoom={zoom} />
         </MapContainer>
 
-        <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10">
-          {hintText}
-        </div>
+        <MapStatusBar {...statusBarProps} />
       </div>
     </div>
   );
