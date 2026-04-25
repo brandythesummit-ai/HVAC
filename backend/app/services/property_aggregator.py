@@ -418,6 +418,10 @@ class PropertyAggregator:
             'lead_score': lead_score,
             'lead_tier': lead_tier,
             'is_qualified': is_qualified,
+            # Permit-driven score: high-confidence signal from a real permit date.
+            # See _rescore_from_year_built() / migration 047 for the year_built
+            # fallback path used when no permit exists.
+            'score_source': 'permit',
             'owner_name': permit_data.get('owner_name'),
             'parcel_number': permit_data.get('parcel_number')
                 or permit_data.get('raw_data', {}).get('parcelNumber'),
@@ -465,6 +469,9 @@ class PropertyAggregator:
             'lead_score': lead_score,
             'lead_tier': lead_tier,
             'is_qualified': is_qualified,
+            # A more-recent permit replaces any prior year_built-derived score
+            # with high-confidence permit signal.
+            'score_source': 'permit',
             'owner_name': permit_data.get('owner_name'),
             'year_built': permit_data.get('year_built'),
             'lot_size_sqft': int(permit_data.get('lot_size')) if permit_data.get('lot_size') else None,
