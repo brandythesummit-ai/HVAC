@@ -37,9 +37,10 @@ const MapStatusBar = ({
   searchCount = 0,
   pinnedCount = 0,
   onZoomIn,
-  variant = 'desktop',
 }) => {
-  const positionClass = variant === 'mobile' ? 'absolute bottom-20 left-3 z-10' : 'absolute bottom-3 left-3 z-10';
+  // bottom-20 on mobile (clears BottomNav h-14 + safe-area).
+  // lg:bottom-3 on desktop (no BottomNav, sit closer to map edge).
+  const positionClass = 'absolute bottom-20 lg:bottom-3 left-3 z-10';
 
   if (searching) {
     return (
