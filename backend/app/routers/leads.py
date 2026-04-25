@@ -102,7 +102,14 @@ async def list_leads(
             limit = 20000
 
         # Parse comma-separated lists from FilterBar multi-selects.
-        tier_list = [t.strip().upper() for t in lead_tier.split(",") if t.strip()] if lead_tier else None
+        # Default to HOT+WARM only when no tier filter is supplied — V1 is a
+        # field-sales tool, and COLD/COOL leads (HVAC under 8 yrs old) are
+        # noise the door-knocker shouldn't see. Caller can override by passing
+        # an explicit tier list (e.g. lead_tier=COLD for spot-checks).
+        tier_list = (
+            [t.strip().upper() for t in lead_tier.split(",") if t.strip()]
+            if lead_tier else ["HOT", "WARM"]
+        )
         status_list = [s.strip().upper() for s in status.split(",") if s.strip()] if status else None
 
         def apply_filters(q):

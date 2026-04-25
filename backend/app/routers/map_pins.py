@@ -46,11 +46,13 @@ async def map_pins(
     if bbox_ne_lat <= bbox_sw_lat or bbox_ne_lng <= bbox_sw_lng:
         raise HTTPException(status_code=400, detail="Inverted bbox")
 
-    tiers = None
+    # Default to HOT+WARM only when no tier filter is supplied. COLD/COOL
+    # are noise for the V1 field-sales use case; caller can override by
+    # passing an explicit tier list.
     if lead_tier:
-        tiers = [t.strip().upper() for t in lead_tier.split(",") if t.strip()]
-        if not tiers:
-            tiers = None
+        tiers = [t.strip().upper() for t in lead_tier.split(",") if t.strip()] or None
+    else:
+        tiers = ["HOT", "WARM"]
 
     try:
         res = db.rpc(
