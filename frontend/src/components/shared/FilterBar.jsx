@@ -20,10 +20,15 @@ import { useState } from 'react';
 import { Filter, X } from 'lucide-react';
 import { useLeadFilters } from '../../hooks/useLeadFilters';
 
+// Full 10-status list — must match FilterSheet's LEAD_STATUSES, which
+// matches DetailSheet.KNOCK_ACTIONS, which matches the lead-status
+// machine. KNOCKED_WRONG_PERSON sits between NON_DM and NOT_INTERESTED
+// so users who marked a knock as wrong-person can later filter to find it.
 const LEAD_STATUSES = [
   'NEW',
   'KNOCKED_NO_ANSWER',
   'KNOCKED_SPOKE_TO_NON_DM',
+  'KNOCKED_WRONG_PERSON',
   'KNOCKED_NOT_INTERESTED',
   'INTERESTED',
   'APPOINTMENT_SET',
