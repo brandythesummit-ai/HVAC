@@ -111,7 +111,15 @@ export default function ListPage() {
                     <div className="text-xs text-slate-500 truncate">
                       {lead.owner_name}
                       {lead.hvac_age_years != null && (
-                        <>{' · '}HVAC {lead.hvac_age_years}y</>
+                        <>
+                          {' · '}HVAC {lead.hvac_age_years}y
+                          {lead.properties?.score_source === 'permit' && (
+                            <span className="text-emerald-700 ml-1" title="Confirmed via HVAC permit">✓</span>
+                          )}
+                          {lead.properties?.score_source === 'year_built' && (
+                            <span className="text-amber-600 ml-1" title="Estimated from year built">ⓘ</span>
+                          )}
+                        </>
                       )}
                       {lead.lead_status && (
                         <>{' · '}{lead.lead_status.replace(/_/g, ' ')}</>
