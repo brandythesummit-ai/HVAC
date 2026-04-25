@@ -1,6 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* Z-index ladder — must clear Leaflet's pane stack (panes ~200, markers
+ * ~600, popups ~700, controls 1000). Defined here as v4 @theme tokens
+ * because Tailwind v4 does not read the legacy tailwind.config.js, and
+ * the named utilities `z-sheet` / `z-filter` / `z-toast` were silently
+ * resolving to `z-index: auto` — sheets and dialogs were rendering
+ * behind the map canvas. */
+@theme {
+  --z-index-sheet: 1100;
+  --z-index-filter: 1100;
+  --z-index-toast: 1200;
+}
+
 :root {
   --color-bg-primary: 255 255 255;
   --color-bg-secondary: 249 250 251;
