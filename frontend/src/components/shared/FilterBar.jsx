@@ -1,13 +1,20 @@
 /**
- * FilterBar — 9 functional filters + 1 greyed placeholder.
+ * FilterBar — desktop-only filter strip + drawer.
  *
- * Design doc §3 spec. Shared between MapPage and ListPage. All state
- * lives in URL params via useLeadFilters so the filter is reload- and
- * share-safe.
+ * Renders nothing on mobile (hidden sm:block). Mobile filtering is
+ * handled by FilterSheet, which is opened via the Filters button in
+ * MapTopBar / PageFiltersHeader. Both the mobile sheet and desktop
+ * strip read/write through useLeadFilters → URL, so state always
+ * syncs across surfaces without prop plumbing.
  *
- * Layout is mobile-first: a collapsible drawer on small screens, a
- * horizontal strip on desktops. Each filter is a labeled input;
- * multi-select fields (status, tier) use chips.
+ * Filter set (post parcels-first pivot):
+ *   search, status[], tier[], permit dateFrom/dateTo,
+ *   HVAC age min/max, value min/max, ZIP, owner_occupied,
+ *   year_built min/max, has_permit_history.
+ *
+ * The legacy "Year Built (Signal B)" greyed placeholder is dropped —
+ * the parcels-first migration enabled real year_built columns, and
+ * the new yearBuiltMin/Max inputs replace it.
  */
 import { useState } from 'react';
 import { Filter, X } from 'lucide-react';
@@ -38,16 +45,17 @@ export default function FilterBar() {
   const hasActive = Object.keys(filters).length > 0;
 
   return (
-    <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
+    <div className="hidden lg:block bg-white border-b border-slate-200 sticky top-0 z-20">
       <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto">
         <button
+          type="button"
           onClick={() => setOpen(!open)}
           className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 flex-shrink-0"
         >
           <Filter size={16} />
           <span className="text-sm">Filters</span>
           {hasActive && (
-            <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">
+            <span className="bg-primary-600 text-white text-xs rounded-full px-1.5 py-0.5">
               {Object.keys(filters).length}
             </span>
           )}
@@ -58,11 +66,12 @@ export default function FilterBar() {
           placeholder="Address, owner, or permit #"
           value={filters.search || ''}
           onChange={(e) => setFilter('search', e.target.value)}
-          className="flex-1 min-w-[160px] px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:border-blue-500 outline-none"
+          className="flex-1 min-w-[160px] px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:border-primary-500 outline-none"
         />
 
         {hasActive && (
           <button
+            type="button"
             onClick={clearAll}
             className="flex items-center gap-1 text-slate-500 hover:text-slate-700 flex-shrink-0"
             title="Clear all filters"
@@ -84,14 +93,13 @@ export default function FilterBar() {
                 return (
                   <button
                     key={s}
-                    onClick={() =>
-                      setFilter('status', toggleInArray(filters.status, s))
-                    }
+                    type="button"
+                    onClick={() => setFilter('status', toggleInArray(filters.status, s))}
                     className={
                       'px-2 py-1 text-xs rounded-full border ' +
                       (active
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-slate-700 border-slate-300 hover:border-blue-500')
+                        ? 'bg-primary-600 text-white border-primary-600'
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-primary-500')
                     }
                   >
                     {s.replace(/_/g, ' ')}
@@ -110,6 +118,7 @@ export default function FilterBar() {
                 return (
                   <button
                     key={t}
+                    type="button"
                     onClick={() => setFilter('tier', toggleInArray(filters.tier, t))}
                     className={
                       'px-2 py-1 text-xs rounded-full border ' +
@@ -199,8 +208,35 @@ export default function FilterBar() {
             </div>
           </div>
 
-          {/* ZIP + owner occupied */}
+          {/* Year built — replaces the deferred Signal B placeholder.
+              Parcels-first migration (034) enables real year_built data. */}
           <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Year built min</label>
+              <input
+                type="number"
+                min="1900"
+                max={new Date().getFullYear()}
+                value={filters.yearBuiltMin ?? ''}
+                onChange={(e) => setFilter('yearBuiltMin', e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Year built max</label>
+              <input
+                type="number"
+                min="1900"
+                max={new Date().getFullYear()}
+                value={filters.yearBuiltMax ?? ''}
+                onChange={(e) => setFilter('yearBuiltMax', e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg"
+              />
+            </div>
+          </div>
+
+          {/* ZIP + owner occupied + permit history */}
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">ZIP</label>
               <input
@@ -228,19 +264,21 @@ export default function FilterBar() {
                 <option value="false">No (rental)</option>
               </select>
             </div>
-          </div>
-
-          {/* Year Built — greyed, deferred to Signal B per design doc */}
-          <div className="opacity-60">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Year Built <span className="text-slate-400">(Signal B coming soon)</span>
-            </label>
-            <input
-              type="number"
-              disabled
-              placeholder="Requires Signal B (GIS)"
-              className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg bg-slate-50 cursor-not-allowed"
-            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Permit history</label>
+              <select
+                value={filters.hasPermitHistory == null ? '' : String(filters.hasPermitHistory)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFilter('hasPermitHistory', v === '' ? undefined : v === 'true');
+                }}
+                className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg"
+              >
+                <option value="">Any</option>
+                <option value="true">With permits</option>
+                <option value="false">No permits</option>
+              </select>
+            </div>
           </div>
         </div>
       )}

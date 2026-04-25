@@ -67,6 +67,7 @@ async def list_leads(
     zip: str = None,
     owner_occupied: bool = None,
     permit_type: str = None,
+    has_permit_history: bool = None,  # true = at least one HVAC permit on record
     search: str = None,  # free-text over address + owner_name
 
     # Bbox viewport filter — required when the Map queries at low zoom
@@ -177,10 +178,27 @@ async def list_leads(
                 q = q.lte("properties.most_recent_hvac_date", date_to)
             if zip:
                 q = q.eq("properties.zip_code", zip)
-            # owner_occupied / permit_type: the FilterBar sends these, but
-            # the properties schema doesn't track either today. Accepted
-            # silently so the URL stays clean until Signal B / permit-level
-            # tagging lands. Ignoring in filter = no-op, no false matches.
+            # owner_occupied: parcels-first pivot (migration 034) added the
+            # owner_occupied column on properties (computed: homestead_year > 0).
+            # Wire the filter so FilterBar's three-way control (Any/Yes/No)
+            # actually prunes results.
+            if owner_occupied is True:
+                q = q.eq("properties.owner_occupied", True)
+            elif owner_occupied is False:
+                q = q.eq("properties.owner_occupied", False)
+            # has_permit_history: true → at least one HVAC permit linked
+            # to the property; false → none on record. Backed by
+            # properties.total_hvac_permits which the parcels-first relink
+            # script populates.
+            if has_permit_history is True:
+                q = q.gte("properties.total_hvac_permits", 1)
+            elif has_permit_history is False:
+                q = q.or_(
+                    "total_hvac_permits.is.null,total_hvac_permits.eq.0",
+                    reference_table="properties",
+                )
+            # permit_type: still no permit-level tagging on properties; accepted
+            # silently for URL cleanliness until that schema lands.
             if search:
                 # Free-text across normalized_address and owner_name via PostgREST `or`.
                 esc = search.replace(",", " ").replace("(", "").replace(")", "")
@@ -226,6 +244,8 @@ async def list_leads(
             date_from,
             date_to,
             zip,
+            owner_occupied is not None,
+            has_permit_history is not None,
             search,
             residential_only,
             bbox_ne_lat is not None,

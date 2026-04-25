@@ -5,12 +5,19 @@
  * Per design doc §3: "Header button → modal showing top-30 ranked
  * leads → user multi-selects → client-side nearest-neighbor routing
  * → ordered list + export to Google/Apple Maps."
+ *
+ * Mobile chrome: PageFiltersHeader + FilterSheet on mobile;
+ * desktop uses ViewToggle + FilterBar. BottomNav clears via
+ * pb-14 lg:pb-0 + a mb-14 lg:mb-0 on the route export footer so
+ * neither overlaps the global bottom nav.
  */
 import { useMemo, useState } from 'react';
 import { ArrowUpRight, Route } from 'lucide-react';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
+import PageFiltersHeader from '../components/shared/PageFiltersHeader';
+import FilterSheet from '../components/shared/FilterSheet';
 import { useLeads } from '../hooks/useLeads';
 import { useLeadFilters } from '../hooks/useLeadFilters';
 import {
@@ -25,6 +32,7 @@ export default function PlanForTodayPage() {
   const { filters } = useLeadFilters();
   const { data, isLoading } = useLeads(filters);
   const [selected, setSelected] = useState(new Set());
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   // Top-30 plottable, HVAC-qualified leads sorted by score
   const candidates = useMemo(() => {
@@ -71,8 +79,9 @@ export default function PlanForTodayPage() {
   const clearAll = () => setSelected(new Set());
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen pb-14 lg:pb-0">
       <ViewToggle />
+      <PageFiltersHeader onFiltersClick={() => setFilterSheetOpen(true)} />
       <FilterBar />
 
       <div className="flex-1 overflow-y-auto">
@@ -100,12 +109,14 @@ export default function PlanForTodayPage() {
               </div>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={selectAll}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm text-primary-600 hover:underline"
                 >
                   Select all
                 </button>
                 <button
+                  type="button"
                   onClick={clearAll}
                   className="text-sm text-slate-500 hover:underline"
                 >
@@ -115,7 +126,7 @@ export default function PlanForTodayPage() {
             </div>
 
             <div className="space-y-1">
-              {candidates.map((lead, idx) => {
+              {candidates.map((lead) => {
                 const isSelected = selected.has(lead.id);
                 const orderIdx = ordered.findIndex((l) => l.id === lead.id);
                 return (
@@ -124,7 +135,7 @@ export default function PlanForTodayPage() {
                     className={
                       'flex items-center gap-3 p-3 rounded-lg border cursor-pointer ' +
                       (isSelected
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-primary-500 bg-primary-50'
                         : 'border-slate-200 hover:border-slate-300')
                     }
                   >
@@ -145,7 +156,7 @@ export default function PlanForTodayPage() {
                       </div>
                     </div>
                     {isSelected && orderIdx >= 0 && (
-                      <div className="text-xs bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                      <div className="text-xs bg-primary-600 text-white rounded-full w-6 h-6 flex items-center justify-center">
                         {orderIdx + 1}
                       </div>
                     )}
@@ -167,7 +178,7 @@ export default function PlanForTodayPage() {
             href={buildGoogleMapsUrl(ordered)}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary-600 text-white text-sm font-medium"
           >
             <Route size={16} />
             Google Maps <ArrowUpRight size={14} />
@@ -183,6 +194,8 @@ export default function PlanForTodayPage() {
           </a>
         </div>
       )}
+
+      <FilterSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)} />
     </div>
   );
 }

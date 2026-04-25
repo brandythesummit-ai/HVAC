@@ -17,16 +17,22 @@ import { useSearchParams } from 'react-router-dom';
 
 const LIST_FIELDS = new Set(['status', 'tier', 'permitType']);
 
+const NUMERIC_FIELDS = new Set([
+  'minAge', 'maxAge', 'valueMin', 'valueMax',
+  'yearBuiltMin', 'yearBuiltMax',
+]);
+const BOOL_FIELDS = new Set(['ownerOccupied', 'hasPermitHistory']);
+
 function parseValue(key, raw) {
   if (raw == null) return undefined;
   if (LIST_FIELDS.has(key)) {
     return raw.split(',').filter(Boolean);
   }
-  if (key === 'minAge' || key === 'maxAge' || key === 'valueMin' || key === 'valueMax') {
+  if (NUMERIC_FIELDS.has(key)) {
     const n = Number(raw);
     return Number.isFinite(n) ? n : undefined;
   }
-  if (key === 'ownerOccupied') {
+  if (BOOL_FIELDS.has(key)) {
     if (raw === 'true') return true;
     if (raw === 'false') return false;
     return undefined;

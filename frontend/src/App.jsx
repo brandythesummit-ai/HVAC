@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import AuthGuard from './components/auth/AuthGuard';
 import DetailSheet from './components/shared/DetailSheet';
 import JobStatusBadge from './components/shared/JobStatusBadge';
+import BottomNav from './components/shared/BottomNav';
 import MapPage from './pages/MapPage';
 import ListPage from './pages/ListPage';
 import PlanForTodayPage from './pages/PlanForTodayPage';
@@ -69,6 +70,10 @@ function App() {
       {/* Floating job progress indicator — shows when a background
           job (scraper, initial pull, etc) is running for HCFL. */}
       <JobStatusBadge />
+      {/* Mobile bottom nav — self-gates with lg:hidden so it only
+          appears below 1024px. Pages must reserve space for it
+          (pb-14 lg:pb-0 on the page root) so content isn't occluded. */}
+      <BottomNav />
     </>
   );
 }

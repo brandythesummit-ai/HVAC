@@ -25,6 +25,10 @@ import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 
 import FilterBar from '../components/shared/FilterBar';
 import ViewToggle from '../components/shared/ViewToggle';
+import MapTopBar from '../components/shared/MapTopBar';
+import MapFAB from '../components/shared/MapFAB';
+import FilterSheet from '../components/shared/FilterSheet';
+import ActiveFilterChips from '../components/shared/ActiveFilterChips';
 import SuperclusterLayer from '../components/map/SuperclusterLayer';
 import MapStatusBar from '../components/map/MapStatusBar';
 import { useMapPins } from '../hooks/useMapPins';
@@ -144,9 +148,11 @@ function BboxWatcher({ onBboxChange, onZoomChange }) {
 }
 
 export default function MapPage() {
-  const { filters } = useLeadFilters();
+  const { filters, setFilter } = useLeadFilters();
   const [bbox, setBbox] = useState(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const activeFilterCount = Object.keys(filters).length;
 
   // Search text → bbox of matching parcels. When this resolves, the
   // bbox becomes part of the MapContainer key, forcing a full remount
@@ -217,13 +223,17 @@ export default function MapPage() {
   const { viewKey, ...containerProps } = mapViewProps;
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen pb-14 lg:pb-0">
+      {/* Desktop chrome — both ViewToggle and FilterBar self-gate via
+          their internal `hidden lg:flex` / `hidden sm:block` wrappers,
+          so on mobile they collapse to zero height and the floating
+          MapTopBar takes over. */}
       <ViewToggle />
       <FilterBar />
 
       <div className="relative flex-1">
         {isLoading && (
-          <div className="absolute top-2 right-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10">
+          <div className="absolute top-2 right-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10 pt-[env(safe-area-inset-top)] lg:pt-1">
             Loading pins…
           </div>
         )}
@@ -238,10 +248,25 @@ export default function MapPage() {
           <BboxWatcher onBboxChange={setBbox} onZoomChange={setZoom} />
           <PinClickHandler pins={displayPins} />
           <SuperclusterLayer pins={displayPins} bbox={bbox} zoom={zoom} />
+          <MapFAB />
         </MapContainer>
+
+        {/* Mobile floating chrome over the map. Wrapper is `lg:hidden`
+            so desktop sees ViewToggle + FilterBar (above) instead. */}
+        <div className="lg:hidden absolute top-0 inset-x-0 z-filter">
+          <MapTopBar
+            onFiltersClick={() => setFilterSheetOpen(true)}
+            activeFilterCount={activeFilterCount}
+            searchValue={filters.search || ''}
+            onSearchChange={(v) => setFilter('search', v)}
+          />
+          <ActiveFilterChips />
+        </div>
 
         <MapStatusBar {...statusBarProps} />
       </div>
+
+      <FilterSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)} />
     </div>
   );
 }
