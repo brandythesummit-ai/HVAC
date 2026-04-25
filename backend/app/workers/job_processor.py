@@ -21,7 +21,7 @@ import traceback
 from supabase import Client
 from app.database import get_db
 from app.services.accela_client import AccelaClient, TokenExpiredError
-from app.services.hcfl_legacy_scraper import HcflLegacyScraper, PermitDetail
+from app.services.hcfl_legacy_scraper import HcflLegacyScraper, PermitDetail, _normalize_parcel
 from app.services.property_aggregator import PropertyAggregator
 from app.services.encryption import encryption_service
 from app.services.agency_discovery import AgencyDiscoveryService
@@ -1194,6 +1194,7 @@ class JobProcessor:
             'status': permit.get('status', {}).get('text'),
             'job_value': permit.get('estimatedCostOfConstruction') or permit.get('jobValue'),
             'property_address': property_address,
+            'parcel_number': _normalize_parcel(primary_parcel.get('parcelNumber') if primary_parcel else None),
             'year_built': year_built,
             'square_footage': square_footage,
             'property_value': property_value,
@@ -1237,7 +1238,12 @@ class JobProcessor:
                 # but indicate this was NOT a new insert
                 return existing.data[0], False
 
-            # Insert new permit
+            # Insert new permit. Property metadata (year_built, square_footage,
+            # bedrooms, bathrooms, lot_size) lives on the properties table, not
+            # here — those columns were dropped from `permits` in migration 053
+            # because they duplicated the parcels-first source of truth. Owner
+            # contact (phone/email) was also dropped: permits don't carry phone
+            # or email, and skip-tracing isn't wired up.
             insert_data = {
                 'county_id': county_id,
                 'accela_record_id': permit_data['id'],
@@ -1247,13 +1253,9 @@ class JobProcessor:
                 'status': permit_data.get('status'),
                 'job_value': permit_data.get('job_value'),
                 'property_address': permit_data.get('property_address'),
-                'year_built': permit_data.get('year_built'),
-                'square_footage': permit_data.get('square_footage'),
+                'parcel_number': permit_data.get('parcel_number'),
                 'property_value': permit_data.get('property_value'),
-                'lot_size': permit_data.get('lot_size'),
                 'owner_name': permit_data.get('owner_name'),
-                'owner_phone': permit_data.get('owner_phone'),
-                'owner_email': permit_data.get('owner_email'),
                 'raw_data': permit_data.get('raw_data')
             }
 

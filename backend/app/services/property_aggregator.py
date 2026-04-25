@@ -400,16 +400,7 @@ class PropertyAggregator:
         lead_tier = self.determine_lead_tier(hvac_age)
         is_qualified = self.is_qualified_lead(hvac_age)
 
-        # Calculate pipeline intelligence
-        owner_phone = permit_data.get('owner_phone')
-        owner_email = permit_data.get('owner_email')
         property_value = permit_data.get('property_value')
-
-        contact_completeness = self.calculate_contact_completeness(owner_phone, owner_email)
-        affluence_tier = self.calculate_affluence_tier(property_value)
-        recommended_pipeline, pipeline_confidence = self.calculate_pipeline_assignment(
-            lead_tier, hvac_age, contact_completeness, affluence_tier, property_value
-        )
 
         property_data = {
             'county_id': county_id,
@@ -428,28 +419,21 @@ class PropertyAggregator:
             'lead_tier': lead_tier,
             'is_qualified': is_qualified,
             'owner_name': permit_data.get('owner_name'),
-            'owner_phone': owner_phone,
-            'owner_email': owner_email,
-            'parcel_number': permit_data.get('raw_data', {}).get('parcelNumber'),
+            'parcel_number': permit_data.get('parcel_number')
+                or permit_data.get('raw_data', {}).get('parcelNumber'),
             'year_built': permit_data.get('year_built'),
             'lot_size_sqft': int(permit_data.get('lot_size')) if permit_data.get('lot_size') else None,
             'total_property_value': property_value,
             'total_hvac_permits': 1,
-            'contact_completeness': contact_completeness,
-            'affluence_tier': affluence_tier,
-            'recommended_pipeline': recommended_pipeline,
-            'pipeline_confidence': pipeline_confidence,
         }
 
-        # Use upsert to handle re-pulls gracefully (avoids duplicate key errors)
-        # If a property with this county_id + normalized_address already exists, update it
         result = self.db.table('properties').upsert(
             property_data,
             on_conflict='county_id,normalized_address'
         ).execute()
 
         if result.data:
-            logger.info(f"Upserted property {result.data[0]['id']} at {parsed_address.normalized_address} (Pipeline: {recommended_pipeline})")
+            logger.info(f"Upserted property {result.data[0]['id']} at {parsed_address.normalized_address}")
             return result.data[0]['id']
         else:
             raise Exception("Failed to upsert property record")
@@ -468,16 +452,7 @@ class PropertyAggregator:
         lead_tier = self.determine_lead_tier(hvac_age)
         is_qualified = self.is_qualified_lead(hvac_age)
 
-        # Calculate pipeline intelligence
-        owner_phone = permit_data.get('owner_phone')
-        owner_email = permit_data.get('owner_email')
         property_value = permit_data.get('property_value')
-
-        contact_completeness = self.calculate_contact_completeness(owner_phone, owner_email)
-        affluence_tier = self.calculate_affluence_tier(property_value)
-        recommended_pipeline, pipeline_confidence = self.calculate_pipeline_assignment(
-            lead_tier, hvac_age, contact_completeness, affluence_tier, property_value
-        )
 
         # Get current total_hvac_permits count
         current = self.db.table('properties').select('total_hvac_permits').eq('id', property_id).execute()
@@ -491,23 +466,17 @@ class PropertyAggregator:
             'lead_tier': lead_tier,
             'is_qualified': is_qualified,
             'owner_name': permit_data.get('owner_name'),
-            'owner_phone': owner_phone,
-            'owner_email': owner_email,
             'year_built': permit_data.get('year_built'),
             'lot_size_sqft': int(permit_data.get('lot_size')) if permit_data.get('lot_size') else None,
             'total_property_value': property_value,
             'total_hvac_permits': current_count + 1,
-            'contact_completeness': contact_completeness,
-            'affluence_tier': affluence_tier,
-            'recommended_pipeline': recommended_pipeline,
-            'pipeline_confidence': pipeline_confidence,
             'updated_at': datetime.utcnow().isoformat(),
         }
 
         result = self.db.table('properties').update(update_data).eq('id', property_id).execute()
 
         if result.data:
-            logger.info(f"Updated property {property_id} with more recent HVAC from {hvac_date} (Pipeline: {recommended_pipeline})")
+            logger.info(f"Updated property {property_id} with more recent HVAC from {hvac_date}")
             return property_id
         else:
             raise Exception(f"Failed to update property {property_id}")

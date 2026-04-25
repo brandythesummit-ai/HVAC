@@ -39,19 +39,9 @@ async def list_leads(
     min_hvac_age: int = None,
     max_hvac_age: int = None,
 
-    # Pipeline intelligence filters
-    contact_completeness: str = None,  # complete, partial, minimal
-    affluence_tier: str = None,  # ultra_high, high, medium, standard
-    recommended_pipeline: str = None,  # hot_call, premium_mailer, nurture_drip, retargeting_ads, cold_storage
-    min_pipeline_confidence: int = None,
-
     # Property value filters
     min_property_value: float = None,
     max_property_value: float = None,
-
-    # Contact info filters
-    has_phone: bool = None,
-    has_email: bool = None,
 
     # Property details filters
     year_built_min: int = None,
@@ -96,12 +86,7 @@ async def list_leads(
     - lead_tier: HOT, WARM, COOL, COLD
     - min_score/max_score: Lead score range (0-100)
     - min_hvac_age/max_hvac_age: HVAC system age range in years
-    - contact_completeness: complete (phone+email), partial (phone OR email), minimal (neither)
-    - affluence_tier: ultra_high ($500K+), high ($350K+), medium ($200K+), standard
-    - recommended_pipeline: hot_call, premium_mailer, nurture_drip, retargeting_ads, cold_storage
-    - min_pipeline_confidence: Minimum confidence score (50-95)
     - min_property_value/max_property_value: Property value range
-    - has_phone/has_email: Filter by contact info availability
     - year_built_min/year_built_max: Year built range
     - city/state: Geographic filters
     - limit: Results per page (default 50, max 20000 for map view)
@@ -143,26 +128,10 @@ async def list_leads(
                 q = q.gte("properties.hvac_age_years", min_hvac_age)
             if max_hvac_age is not None:
                 q = q.lte("properties.hvac_age_years", max_hvac_age)
-            if contact_completeness:
-                q = q.eq("properties.contact_completeness", contact_completeness.lower())
-            if affluence_tier:
-                q = q.eq("properties.affluence_tier", affluence_tier.lower())
-            if recommended_pipeline:
-                q = q.eq("properties.recommended_pipeline", recommended_pipeline.lower())
-            if min_pipeline_confidence is not None:
-                q = q.gte("properties.pipeline_confidence", min_pipeline_confidence)
             if min_property_value is not None:
                 q = q.gte("properties.total_property_value", min_property_value)
             if max_property_value is not None:
                 q = q.lte("properties.total_property_value", max_property_value)
-            if has_phone is True:
-                q = q.not_.is_("properties.owner_phone", "null")
-            elif has_phone is False:
-                q = q.is_("properties.owner_phone", "null")
-            if has_email is True:
-                q = q.not_.is_("properties.owner_email", "null")
-            elif has_email is False:
-                q = q.is_("properties.owner_email", "null")
             if year_built_min is not None:
                 q = q.gte("properties.year_built", year_built_min)
             if year_built_max is not None:
