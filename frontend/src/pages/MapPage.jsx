@@ -31,7 +31,9 @@ import FilterSheet from '../components/shared/FilterSheet';
 import ActiveFilterChips from '../components/shared/ActiveFilterChips';
 import SuperclusterLayer from '../components/map/SuperclusterLayer';
 import MapStatusBar from '../components/map/MapStatusBar';
+import PinScatterLoader from '../components/map/PinScatterLoader';
 import { useMapPins } from '../hooks/useMapPins';
+import { useMapSnapshot } from '../hooks/useMapSnapshot';
 import { useLeadFilters } from '../hooks/useLeadFilters';
 import { useAddressSearchBounds } from '../hooks/useAddressSearchBounds';
 
@@ -172,18 +174,66 @@ export default function MapPage() {
   const searchResult = useAddressSearchBounds(filters.search);
 
   const shouldFetch = bbox && zoom >= MIN_FETCH_ZOOM;
-  const { pins, isLoading, truncated } = useMapPins({
+
+  // Once-per-session full-county snapshot. After first load (and every
+  // session thereafter, via IndexedDB persistence) pin data is in
+  // memory; pan/zoom doesn't hit the network at all.
+  const snapshot = useMapSnapshot();
+
+  // Filters that aren't covered by the snapshot's lean shape force us
+  // back to /api/map-pins (the bbox-scoped path that DOES support
+  // server-side owner_occupied / year_built filtering). Same for the
+  // case where snapshot fetch errored entirely.
+  const needsBboxFallback =
+    !!snapshot.error
+    || filters.ownerOccupied != null
+    || filters.yearBuiltMin != null
+    || filters.yearBuiltMax != null;
+
+  const fallback = useMapPins({
     bbox,
     filters,
-    enabled: shouldFetch,
+    enabled: shouldFetch && needsBboxFallback,
   });
 
+  // Snapshot pins use {lat, lng} (compact wire format); the rest of
+  // the map (PinClickHandler, SuperclusterLayer) reads {latitude,
+  // longitude} from useMapPins. Normalize at the boundary so neither
+  // consumer has to know which path produced the data.
   const displayPins = useMemo(() => {
-    return pins.filter((p) =>
-      typeof p.latitude === 'number' && typeof p.longitude === 'number'
-      && !Number.isNaN(p.latitude) && !Number.isNaN(p.longitude),
-    );
-  }, [pins]);
+    const sourcePins = needsBboxFallback ? (fallback.pins || []) : (snapshot.pins || []);
+    const tierFilter = filters.tier;
+    const out = [];
+    for (const p of sourcePins) {
+      const lat = p.latitude ?? p.lat;
+      const lng = p.longitude ?? p.lng;
+      if (typeof lat !== 'number' || typeof lng !== 'number') continue;
+      if (Number.isNaN(lat) || Number.isNaN(lng)) continue;
+      // Client-side tier filter (snapshot includes both HOT+WARM; the
+      // user's UI can narrow further). useMapPins already filters
+      // server-side, but applying again here is a cheap no-op.
+      if (tierFilter && tierFilter.length > 0 && !tierFilter.includes(p.lead_tier)) continue;
+      out.push({
+        id: p.id,
+        latitude: lat,
+        longitude: lng,
+        lead_tier: p.lead_tier,
+        lead_score: p.lead_score,
+      });
+    }
+    return out;
+  }, [needsBboxFallback, snapshot.pins, fallback.pins, filters.tier]);
+
+  const isLoading = needsBboxFallback ? fallback.isLoading : snapshot.isLoading;
+  const truncated = needsBboxFallback ? fallback.truncated : false;
+  // First-time loader appears only when there's no cache + we're
+  // fetching fresh. Subsequent sessions hit the cache and skip the
+  // overlay entirely. Suppressed during fallback path (which already
+  // has its own bbox-loading indicator).
+  const showFirstTimeLoader =
+    !needsBboxFallback
+    && !snapshot.isHydrated
+    && snapshot.isLoading;
 
   // Derive a stable key + the initial view props for MapContainer.
   // A change in searchResult.bounds (including clearing it) flips the
@@ -244,11 +294,18 @@ export default function MapPage() {
       <FilterBar />
 
       <div className="relative flex-1">
-        {isLoading && (
+        {/* Bbox-fallback loading indicator (lightweight). Suppressed
+            when the first-time snapshot loader is up. */}
+        {isLoading && !showFirstTimeLoader && (
           <div className="absolute top-2 right-2 bg-white/90 rounded-lg px-3 py-1 text-xs text-slate-600 shadow z-10 pt-[env(safe-area-inset-top)] lg:pt-1">
             Loading pins…
           </div>
         )}
+        {/* Full-screen first-time snapshot loader (only fires when no
+            IndexedDB cache exists). After first install, this never
+            renders again on the same device. */}
+        <PinScatterLoader visible={showFirstTimeLoader} />
+
         <MapContainer
           key={viewKey}
           {...containerProps}
