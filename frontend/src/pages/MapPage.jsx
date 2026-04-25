@@ -16,7 +16,7 @@
  * remount is the reliable path.
  */
 import 'leaflet/dist/leaflet.css';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png';
@@ -86,15 +86,22 @@ const tileProps = MAPBOX_TOKEN
  * threshold of the click, dispatch the same open-lead-detail event
  * the old CircleMarker handler used to.
  */
-function PinClickHandler({ pins, tolerancePx = 14 }) {
+function PinClickHandler({ pins, tolerancePx = 24 }) {
   const map = useMap();
+  // useMapEvents subscribes once and the handler closes over the
+  // initial `pins` value (an empty array, before fetch). Pin clicks
+  // would forever silently return early. Keep a ref of the latest
+  // pins so the click handler always reads current state.
+  const pinsRef = useRef(pins);
+  useEffect(() => { pinsRef.current = pins; }, [pins]);
   useMapEvents({
     click(e) {
-      if (!pins || pins.length === 0) return;
+      const currentPins = pinsRef.current;
+      if (!currentPins || currentPins.length === 0) return;
       const { latlng } = e;
       let closest = null;
       let closestDistMeters = Infinity;
-      for (const p of pins) {
+      for (const p of currentPins) {
         const d = latlng.distanceTo([p.latitude, p.longitude]);
         if (d < closestDistMeters) {
           closestDistMeters = d;
