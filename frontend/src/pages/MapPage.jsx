@@ -42,7 +42,12 @@ L.Icon.Default.mergeOptions({
 });
 
 const HCFL_CENTER = [27.9506, -82.4572];
-const DEFAULT_ZOOM = 10;
+// Default to neighborhood zoom so pins load on first paint. At zoom 10
+// (county-wide) the map shows zero pins because /api/map-pins is gated
+// at MIN_FETCH_ZOOM=13 to avoid 272K-pin payloads. Door-knockers
+// reported "I clicked a pin and nothing happened" — they were clicking
+// on an empty map. Starting at 13 puts them mid-Tampa with pins visible.
+const DEFAULT_ZOOM = 13;
 
 // Below this zoom, the viewport covers too much area for useful pin
 // rendering (a county-wide view of 450K pins). Show a "zoom in" hint
