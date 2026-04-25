@@ -190,6 +190,12 @@ export default function DetailSheet() {
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">HVAC age</div>
                   <div className="font-medium">{lead.hvac_age_years ?? '—'} yrs</div>
+                  {lead.properties?.score_source === 'permit' && (
+                    <div className="text-[11px] text-emerald-700 mt-0.5">✓ Confirmed via permit</div>
+                  )}
+                  {lead.properties?.score_source === 'year_built' && (
+                    <div className="text-[11px] text-amber-700 mt-0.5">ⓘ Estimated from build year</div>
+                  )}
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Score</div>

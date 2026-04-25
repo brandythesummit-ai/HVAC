@@ -32,6 +32,7 @@ const LeadRow = ({ lead, isSelected, onToggle, visibleColumns, onDelete }) => {
     pipeline_confidence: property.pipeline_confidence,
     contact_completeness: property.contact_completeness,
     affluence_tier: property.affluence_tier,
+    score_source: property.score_source,
   };
 
   // Clean up address - remove dict string representation from state
@@ -186,6 +187,12 @@ const LeadRow = ({ lead, isSelected, onToggle, visibleColumns, onDelete }) => {
               <div>
                 <div className="text-sm font-semibold text-gray-900">{displayData.hvac_age_years} years</div>
                 <div className="text-xs text-gray-500">{formatDate(displayData.most_recent_hvac_date)}</div>
+                {displayData.score_source === 'permit' && (
+                  <div className="text-[11px] text-emerald-700 mt-0.5" title="Most-recent HVAC permit on record">✓ Permit</div>
+                )}
+                {displayData.score_source === 'year_built' && (
+                  <div className="text-[11px] text-amber-700 mt-0.5" title="No HVAC permit found — estimated from year_built">ⓘ Year built</div>
+                )}
               </div>
             ) : (
               <span className="text-sm text-gray-400">—</span>
