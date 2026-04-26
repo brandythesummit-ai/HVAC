@@ -187,21 +187,38 @@ export default function DetailSheet() {
                     <StatusBadge status={lead.lead_status || 'NEW'} />
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-slate-500 uppercase tracking-wide">HVAC age</div>
-                  <div className="font-medium">{lead.hvac_age_years ?? '—'} yrs</div>
-                  {/* Read both shapes: /api/leads (list) returns nested
-                      `properties.score_source`; /api/leads/{id} and
-                      /api/leads/by-property/{id} flatten property fields
-                      onto the lead. Without the fallback the badge silently
-                      never renders on detail-fetch paths. */}
-                  {(() => {
-                    const src = lead.score_source ?? lead.properties?.score_source;
-                    if (src === 'permit') return <div className="text-[11px] text-emerald-700 mt-0.5">✓ Confirmed via permit</div>;
-                    if (src === 'year_built') return <div className="text-[11px] text-amber-700 mt-0.5">ⓘ Estimated from build year</div>;
-                    return null;
-                  })()}
-                </div>
+                {/* Honest age display: when score_source='year_built',
+                    we don't actually know the HVAC age — we know the
+                    HOUSE age. Calling it "HVAC age 43y" is misinformation
+                    on a row whose HVAC could be 5 years old. */}
+                {(() => {
+                  const src = lead.score_source ?? lead.properties?.score_source;
+                  const yearBuilt = lead.year_built ?? lead.properties?.year_built;
+                  if (src === 'permit') {
+                    return (
+                      <div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wide">HVAC age</div>
+                        <div className="font-medium">{lead.hvac_age_years ?? '—'} yrs</div>
+                        <div className="text-[11px] text-emerald-700 mt-0.5">✓ Confirmed via permit</div>
+                      </div>
+                    );
+                  }
+                  if (src === 'year_built') {
+                    return (
+                      <div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wide">House built</div>
+                        <div className="font-medium">{yearBuilt || '—'}</div>
+                        <div className="text-[11px] text-amber-700 mt-0.5">⚠ HVAC age unverified · no permit on file</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wide">HVAC age</div>
+                      <div className="font-medium">{lead.hvac_age_years ?? '—'} yrs</div>
+                    </div>
+                  );
+                })()}
                 <div>
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Score</div>
                   <div className="font-medium">{lead.lead_score ?? 0}</div>
