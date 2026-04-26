@@ -175,10 +175,17 @@ export default function MapPage() {
 
   const shouldFetch = bbox && zoom >= MIN_FETCH_ZOOM;
 
+  // Kill switch: set VITE_DISABLE_SNAPSHOT_CACHE=true on Vercel to bypass
+  // the snapshot path entirely (forces every map session into the
+  // bbox-scoped /api/map-pins flow). Useful insurance if the snapshot
+  // path ever causes a real-device issue post-launch — flip the env
+  // var, redeploy, no code revert needed.
+  const SNAPSHOT_DISABLED = import.meta.env.VITE_DISABLE_SNAPSHOT_CACHE === 'true';
+
   // Once-per-session full-county snapshot. After first load (and every
   // session thereafter, via IndexedDB persistence) pin data is in
   // memory; pan/zoom doesn't hit the network at all.
-  const snapshot = useMapSnapshot();
+  const snapshot = useMapSnapshot({ enabled: !SNAPSHOT_DISABLED });
 
   // Filters that aren't covered by the snapshot's lean shape force us
   // back to /api/map-pins (the bbox-scoped path that DOES support

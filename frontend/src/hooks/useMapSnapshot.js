@@ -25,12 +25,16 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import apiClient from '../api/client';
 import { getSnapshot, setSnapshot, clearSnapshot } from '../lib/snapshotStore';
 
-export function useMapSnapshot() {
+export function useMapSnapshot({ enabled = true } = {}) {
   const [pins, setPins] = useState(null);     // null = not yet hydrated
   const [version, setVersion] = useState(null);
   const [source, setSource] = useState(null); // 'cache' | 'fresh' | null
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  // When disabled (kill-switch from VITE_DISABLE_SNAPSHOT_CACHE), surface a
+  // synthetic error so MapPage's `needsBboxFallback = !!snapshot.error || ...`
+  // flips to true and routes through useMapPins(bbox) instead. No network
+  // is consumed; no IndexedDB read happens.
+  const [error, setError] = useState(enabled ? null : new Error('snapshot_disabled'));
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -66,6 +70,7 @@ export function useMapSnapshot() {
 
   // Cache-first hydration on mount.
   useEffect(() => {
+    if (!enabled) return; // Kill-switch: skip the entire snapshot path
     let cancelled = false;
     (async () => {
       const cached = await getSnapshot();
@@ -81,7 +86,7 @@ export function useMapSnapshot() {
       await fetchFresh();
     })();
     return () => { cancelled = true; };
-  }, [fetchFresh]);
+  }, [enabled, fetchFresh]);
 
   /**
    * Manual refresh — clears IDB, refetches, rewrites. Used by a
