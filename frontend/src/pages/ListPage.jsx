@@ -26,10 +26,13 @@ import { useLeadFilters } from '../hooks/useLeadFilters';
 
 export default function ListPage() {
   const { filters } = useLeadFilters();
-  // High limit so the virtual-scroll table can sort across the full set
-  // rather than paginating. TanStack Virtual only renders visible rows,
-  // so 12k in memory is fine.
-  const { data, isLoading, error } = useLeads({ ...filters, limit: 12000 });
+  // Top-200 by score. The lead pool grew from ~12K to 391K post-pivot;
+  // pulling all of them was a 24MB payload that took 20s on mobile.
+  // The buddy never knocks past row ~50/day, so 200 = a week of buffer
+  // plus we get sub-second loads. Compound scoring (migration 063)
+  // means the top 200 are now genuinely the highest-priority leads,
+  // not an arbitrary alphabetical slice.
+  const { data, isLoading, error } = useLeads({ ...filters, limit: 200 });
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   // API returns { leads, count, total } — normalize
