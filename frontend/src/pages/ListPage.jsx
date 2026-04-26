@@ -113,16 +113,27 @@ export default function ListPage() {
                     </div>
                     <div className="text-xs text-slate-500 truncate">
                       {lead.owner_name}
-                      {lead.hvac_age_years != null && (
+                      {/* Honest HVAC age display: only call it "HVAC" age
+                          when there's a permit on file. Year-built derived
+                          rows are showing the HOUSE age, not the HVAC age —
+                          historically they were labeled HVAC anyway. */}
+                      {lead.hvac_age_years != null && lead.properties?.score_source === 'permit' && (
                         <>
                           {' · '}HVAC {lead.hvac_age_years}y
-                          {lead.properties?.score_source === 'permit' && (
-                            <span className="text-emerald-700 ml-1" title="Confirmed via HVAC permit">✓</span>
-                          )}
-                          {lead.properties?.score_source === 'year_built' && (
-                            <span className="text-amber-600 ml-1" title="Estimated from year built">ⓘ</span>
-                          )}
+                          <span className="text-emerald-700 ml-1" title="Confirmed via HVAC permit">✓</span>
                         </>
+                      )}
+                      {lead.hvac_age_years != null && lead.properties?.score_source === 'year_built' && (
+                        <>
+                          {' · '}
+                          {lead.properties?.year_built
+                            ? <>Built {lead.properties.year_built}</>
+                            : <>House {lead.hvac_age_years}y</>}
+                          <span className="text-amber-600 ml-1" title="HVAC age unverified — no permit on file, using house age as proxy">⚠</span>
+                        </>
+                      )}
+                      {lead.hvac_age_years != null && !lead.properties?.score_source && (
+                        <>{' · '}HVAC {lead.hvac_age_years}y</>
                       )}
                       {lead.lead_status && (
                         <>{' · '}{lead.lead_status.replace(/_/g, ' ')}</>
