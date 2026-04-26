@@ -5,8 +5,9 @@ import sys
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.config import settings
-from app.routers import counties, permits, leads, summit, background_jobs, properties, health, map_pins
+from app.routers import counties, permits, leads, summit, background_jobs, properties, health, map_pins, map_snapshot
 from app.routers import settings as settings_router
 from app.workers.job_processor import start_job_processor, stop_job_processor
 from app.services.health_checker import background_health_checker
@@ -24,6 +25,11 @@ app = FastAPI(
     description="Backend API for HVAC lead generation platform with Accela and Summit.AI integration",
     version="1.0.0"
 )
+
+# GZip large responses (notably /api/map-snapshot, ~40MB JSON → ~5-7MB gzipped).
+# uvicorn doesn't auto-gzip; add this so the client's first-load isn't multi-MB
+# over the wire. minimum_size=1024 avoids overhead on small JSON responses.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # Configure CORS
 app.add_middleware(
@@ -44,6 +50,7 @@ app.include_router(settings_router.router)
 app.include_router(background_jobs.router)
 app.include_router(properties.router)
 app.include_router(map_pins.router)
+app.include_router(map_snapshot.router)
 
 
 def _handle_shutdown_signal(signum, frame):
